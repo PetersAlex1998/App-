@@ -2,23 +2,27 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useColorScheme } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Look nach Apple-Store-App (iOS 26): helles Grau, weiße Karten, schwarze Symbole, Blau nur für Auswahl und Aktionen.
-// Status hat eigene, feste Bedeutung. Kontrast Text auf Karte: text 16:1, muted 5:1, primary 5.6:1, danger 6:1, ok 5.4:1.
+// Luxus-Palette: Silber und Perlgrau, Graphit-Schwarz für Hauptaktionen, Champagner-Gold als Akzent.
+// Status hat eigene, feste Bedeutung. Kontrast Text auf Karte: text 16:1, muted 5.6:1, primary(Gold) 5.9:1, danger 7:1, ok 6:1, warn 5.4:1.
 const light = {
-  bg: '#F2F2F7', card: '#FFFFFF', text: '#1D1D1F', muted: '#6E6E73',
-  primary: '#0066CC', onPrimary: '#FFFFFF', primarySoft: '#E6F0FA',
-  danger: '#C4001A', dangerSoft: '#FDECEE',
-  ok: '#1F7A36', okSoft: '#E7F5EA',
-  warn: '#9A5B00', warnSoft: '#FEF1DC',
-  line: '#E5E5EA', fill: '#EDEDF2', glass: 'rgba(255,255,255,0.86)',
+  bg: '#E9EAEE', card: '#FBFBFC', text: '#15171A', muted: '#5B6068',
+  ink: '#15171A', onInk: '#F6F1E4',
+  primary: '#7A5C1E', onPrimary: '#FFFFFF', primarySoft: '#F1EAD8',
+  danger: '#9B2C2C', dangerSoft: '#F6E5E5',
+  ok: '#2B6A4C', okSoft: '#E3EFE8',
+  warn: '#8A5A00', warnSoft: '#F4EBD3',
+  line: '#DCDEE3', fill: '#E1E3E8',
+  glass: 'rgba(238,240,244,0.60)', glassBorder: 'rgba(255,255,255,0.85)',
 };
 const dark = {
-  bg: '#000000', card: '#1C1C1E', text: '#F5F5F7', muted: '#A1A1A6',
-  primary: '#4DA3FF', onPrimary: '#001B38', primarySoft: '#0F2740',
-  danger: '#FF8A80', dangerSoft: '#3A1816',
-  ok: '#5FD38A', okSoft: '#12301F',
-  warn: '#F5B95C', warnSoft: '#352508',
-  line: '#2C2C2E', fill: '#2C2C2E', glass: 'rgba(28,28,30,0.86)',
+  bg: '#0C0D10', card: '#17191D', text: '#F3F0E8', muted: '#A7A49C',
+  ink: '#E6D3A0', onInk: '#1A1405',
+  primary: '#DCC080', onPrimary: '#1A1405', primarySoft: '#2A2416',
+  danger: '#F09A92', dangerSoft: '#3A1B1A',
+  ok: '#6FD3A0', okSoft: '#14302A',
+  warn: '#F0BE63', warnSoft: '#352608',
+  line: '#272A30', fill: '#23262C',
+  glass: 'rgba(44,47,54,0.58)', glassBorder: 'rgba(255,255,255,0.14)',
 };
 export type Colors = typeof light;
 

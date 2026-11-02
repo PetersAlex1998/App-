@@ -12,8 +12,9 @@ const ICONS: Record<string, React.ComponentProps<typeof Ionicons>['name']> = {
 export function FloatingTabBar({ state, navigation }: any) {
   const c = useColors();
   const insets = useSafeAreaInsets();
-  const glass: any = { backgroundColor: c.glass, shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 20, shadowOffset: { width: 0, height: 6 }, elevation: 10 };
-  if (Platform.OS === 'web') glass.backdropFilter = 'blur(24px) saturate(1.6)';
+  const glass: any = { backgroundColor: c.glass, borderWidth: 1, borderColor: c.glassBorder, shadowColor: '#1B1D22', shadowOpacity: 0.18, shadowRadius: 26, shadowOffset: { width: 0, height: 10 }, elevation: 12 };
+  if (Platform.OS === 'web') glass.backdropFilter = 'blur(28px) saturate(1.8)';
+  else glass.backgroundColor = c.glass.replace(/0\.\d+\)/, '0.86)'); // ohne Unschärfe weniger transparent
   return (
     <View pointerEvents="box-none" style={{ position: 'absolute', left: 0, right: 0, bottom: Math.max(insets.bottom, 14), paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
       <View style={[{ flex: 1, maxWidth: 520, flexDirection: 'row', borderRadius: 40, padding: 6 }, glass]}>
@@ -23,7 +24,7 @@ export function FloatingTabBar({ state, navigation }: any) {
           return (
             <Pressable key={route.key} accessibilityRole="tab" accessibilityLabel={route.name} accessibilityState={{ selected: focused }}
               onPress={() => { const e = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true }); if (!focused && !e.defaultPrevented) navigation.navigate(route.name); }}
-              style={{ flex: 1, minHeight: 56, borderRadius: 34, alignItems: 'center', justifyContent: 'center', gap: 2, backgroundColor: focused ? c.fill : 'transparent' }}>
+              style={{ flex: 1, minHeight: 56, borderRadius: 34, alignItems: 'center', justifyContent: 'center', gap: 2, backgroundColor: focused ? c.primarySoft : 'transparent' }}>
               <Ionicons name={ICONS[route.name] ?? 'ellipse'} size={24} color={color} />
               <Text numberOfLines={1} style={{ fontSize: 11, fontWeight: '600', color }}>{route.name}</Text>
             </Pressable>
