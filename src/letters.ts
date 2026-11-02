@@ -35,26 +35,41 @@ export function addressLines(t: Tenant, prop: Property, unit: Unit): { lines: st
   if (post.length) return { lines: [nameLine, ...post] };
   return { lines: [nameLine, prop.street, `${prop.zip} ${prop.city}`.trim()].filter((x) => x && x.trim()), unitNote: unit.name };
 }
-function addressBlock(s: Settings, t: Tenant, prop: Property, unit: Unit) {
+/** Rücksendeangabe (kleine Zeile über der Anschrift im Fensterumschlag). */
+function returnText(s: Settings) {
+  return [s.name, s.street, `${s.zip} ${s.city}`.trim()].filter((x) => x && x.trim()).join(' · ');
+}
+
+/**
+ * Briefbogen nach DIN 5008 (Form B) für Fensterumschläge und Hybridpost-Dienste:
+ * Anschriftfeld 20 mm von links / 45 mm von oben (85 × 45 mm), Rücksendezeile darüber,
+ * Infoblock rechts, Falz- und Lochmarke, Textbeginn bei 98,5 mm.
+ */
+function letterShell(s: Settings, t: Tenant, prop: Property, unit: Unit, dateIso: string, infoLines: string[], bodyHtml: string): string {
   const a = addressLines(t, prop, unit);
-  return `<div style="margin-top:24px">${returnLine(s)}<br>${a.lines.map(esc).join('<br>')}${a.unitNote ? `<br><span class="small">${esc(a.unitNote)}</span>` : ''}</div>`;
+  const ret = returnText(s);
+  return `<div class="page">
+<i class="mark" style="top:105mm"></i><i class="mark loch" style="top:148.5mm"></i><i class="mark" style="top:210mm"></i>
+<div class="head">${senderBlock(s)}</div>
+${ret ? `<div class="ret">${esc(ret)}</div>` : ''}
+<div class="addr">${a.lines.map(esc).join('<br>')}${a.unitNote ? `<br><span class="small">${esc(a.unitNote)}</span>` : ''}</div>
+<div class="info"><div><b>Datum:</b> ${dateDE(dateIso)}</div>${infoLines.map((l) => `<div>${l}</div>`).join('')}</div>
+<div class="main"><div class="spacer"></div>${bodyHtml}</div>
+${footerBlock(s)}
+</div>`;
 }
 
 const levelTitle = ['', 'Zahlungserinnerung', '1. Mahnung', '2. Mahnung – letzte Zahlungsaufforderung'];
 
 function senderBlock(s: Settings) {
   const lines = [s.name || 'Hausverwaltung', s.street, `${s.zip} ${s.city}`.trim(), s.phone, s.email].filter((x) => x && x.trim());
-  const text = `<div style="text-align:right;font-size:12px;color:#444;line-height:1.5">${lines.map(esc).join('<br>')}</div>`;
+  const text = `<div style="text-align:right;font-size:9pt;color:#444;line-height:1.45">${lines.map(esc).join('<br>')}</div>`;
   if (!s.logo) return text;
-  return `<table style="width:100%;border-collapse:collapse;margin:0"><tr><td style="border:none;padding:0;vertical-align:top"><img src="${s.logo}" alt="" style="max-height:64px;max-width:240px"></td><td style="border:none;padding:0;vertical-align:top">${text}</td></tr></table>`;
+  return `<table style="width:100%;border-collapse:collapse;margin:0"><tr><td style="border:none;padding:0;vertical-align:top"><img src="${s.logo}" alt="" style="max-height:24mm;max-width:70mm"></td><td style="border:none;padding:0;vertical-align:top">${text}</td></tr></table>`;
 }
 function footerBlock(s: Settings) {
   const lines = [s.footer, s.iban ? `IBAN ${s.iban}${s.bic ? ' · BIC ' + s.bic : ''}${s.bank ? ' · ' + s.bank : ''}` : ''].filter((x) => x && x.trim());
   return lines.length ? `<div class="foot">${lines.map((l) => esc(l).replace(/\n/g, '<br>')).join('<br>')}</div>` : '';
-}
-function returnLine(s: Settings) {
-  const t = [s.name, s.street, `${s.zip} ${s.city}`.trim()].filter((x) => x && x.trim()).join(' · ');
-  return t ? `<div class="small" style="border-bottom:1px solid #999;display:inline-block;margin-bottom:4px">${esc(t)}</div>` : '';
 }
 function bankBlock(s: Settings, unit: Unit, t: Tenant, purpose = 'Miete') {
   if (!s.iban) return '<p class="small">Bitte überweisen Sie auf das Ihnen bekannte Mietkonto.</p>';
@@ -73,12 +88,7 @@ export function reminderHtml(db: DB, r: Reminder, t: Tenant, unit: Unit, prop: P
     'trotz unserer Zahlungserinnerung konnten wir den Eingang der folgenden Mietzahlungen nicht feststellen. Wir bitten Sie, den offenen Betrag zuzüglich der Mahngebühr fristgerecht zu überweisen.',
     'trotz unserer bisherigen Schreiben sind die folgenden Mietzahlungen weiterhin offen. Wir fordern Sie letztmalig auf, den Gesamtbetrag bis zur genannten Frist zu zahlen. Andernfalls behalten wir uns weitere rechtliche Schritte vor.',
   ][r.level];
-  return `<div class="page">
-${senderBlock(s)}
-${addressBlock(s, t, prop, unit)}
-<p style="text-align:right;margin-top:24px">${dateDE(r.date)}</p>
-<h1>${levelTitle[r.level]}</h1>
-<p class="small">Mietverhältnis: ${esc(prop.name)}, ${esc(unit.name)}</p>
+  const body = `<h1>${levelTitle[r.level]}</h1>
 <p>${salutationLine(t)}</p>
 <p>${intro}</p>
 <table><tr><th>Monat</th><th class="r">Soll</th><th class="r">Gezahlt</th><th class="r">Offen</th></tr>${rows}
@@ -86,9 +96,8 @@ ${r.fee ? `<tr><td colspan="3">Mahngebühr</td><td class="r">${eur(r.fee)}</td><
 <tr class="sum"><td colspan="3">Zu zahlender Gesamtbetrag</td><td class="r">${eur(r.amount + r.fee)}</td></tr></table>
 <p>Bitte überweisen Sie den Betrag bis spätestens <b>${dateDE(r.deadline)}</b>.</p>
 ${bankBlock(s, unit, t)}
-<p style="margin-top:28px">Mit freundlichen Grüßen<br>${esc(s.name || 'Ihre Hausverwaltung')}</p>
-${footerBlock(s)}
-</div>`;
+<p style="margin-top:8mm">Mit freundlichen Grüßen<br>${esc(s.name || 'Ihre Hausverwaltung')}</p>`;
+  return letterShell(s, t, prop, unit, r.date, [`<b>Objekt:</b> ${esc(prop.name)}`, `<b>Einheit:</b> ${esc(unit.name)}`], body);
 }
 
 export function nkHtml(res: NkResult, t: Tenant, unit: Unit, prop: Property, year: number, s: Settings): string {
@@ -97,13 +106,9 @@ export function nkHtml(res: NkResult, t: Tenant, unit: Unit, prop: Property, yea
   const outro = res.balance > 0
     ? `Bitte überweisen Sie die Nachzahlung von <b>${eur(res.balance)}</b> innerhalb von 30 Tagen nach Zugang dieser Abrechnung.`
     : res.balance < 0 ? `Das Guthaben von <b>${eur(-res.balance)}</b> erstatten wir Ihnen bzw. verrechnen es mit der nächsten Miete.` : 'Die Abrechnung ist ausgeglichen.';
-  return `<div class="page">${senderBlock(s)}
-${addressBlock(s, t, prop, unit)}
-<p style="text-align:right;margin-top:24px">${dateDE(new Date().toISOString().slice(0, 10))}</p>
-<h1>Nebenkostenabrechnung ${year}</h1>
-<p class="small">Mietverhältnis: ${esc(prop.name)}, ${esc(unit.name)} (${unit.area} m²) · Abrechnungszeitraum: ${res.months} Monat(e)</p>
+  const body = `<h1>Nebenkostenabrechnung ${year}</h1>
 <p>${salutationLine(t)}</p>
-<p>nachfolgend erhalten Sie die Abrechnung der Betriebskosten für das Jahr ${year}.</p>
+<p>nachfolgend erhalten Sie die Abrechnung der Betriebskosten für das Jahr ${year}. Abrechnungszeitraum: ${res.months} Monat(e).</p>
 <table><tr><th>Kostenart</th><th>Verteilung</th><th class="r">Gesamt</th><th class="r">Ihr Anteil</th></tr>${rows}
 <tr class="sum"><td colspan="3">Summe Ihrer Kosten</td><td class="r">${eur(res.costs)}</td></tr>
 <tr><td colspan="3">abzgl. Vorauszahlungen</td><td class="r">${eur(res.advances)}</td></tr>
@@ -111,8 +116,8 @@ ${addressBlock(s, t, prop, unit)}
 <p>${outro}</p>
 ${res.balance > 0 ? bankBlock(s, unit, t, `Nebenkosten ${year}`) : ''}
 <p class="small">Die Abrechnung wurde anteilig nach Mietmonaten erstellt.</p>
-<p style="margin-top:20px">Mit freundlichen Grüßen<br>${esc(s.name || 'Ihre Hausverwaltung')}</p>
-${footerBlock(s)}</div>`;
+<p style="margin-top:8mm">Mit freundlichen Grüßen<br>${esc(s.name || 'Ihre Hausverwaltung')}</p>`;
+  return letterShell(s, t, prop, unit, new Date().toISOString().slice(0, 10), [`<b>Objekt:</b> ${esc(prop.name)}`, `<b>Einheit:</b> ${esc(unit.name)} (${unit.area} m²)`], body);
 }
 
 /** Beispielbrief für die Vorschau des Briefkopfs. */

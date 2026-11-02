@@ -15,6 +15,9 @@ export function BriefeSettings() {
     <Screen>
       <Text accessibilityRole="header" style={{ fontSize: 30, fontWeight: '800', color: c.text, letterSpacing: -0.6, marginTop: 6, marginBottom: 6 }}>Briefe und Mahnregeln</Text>
       <Text style={{ color: c.muted, fontSize: type.body, marginBottom: 18 }}>Diese Angaben erscheinen in Mahnungen und Nebenkostenabrechnungen. Änderungen werden sofort gespeichert.</Text>
+      <Section title="Versand per Post" footer="Die Anforderungen deines Versanddienstes (z. B. der E-POST Mailer der Deutschen Post) solltest du dort nachlesen. Teile mir Abweichungen mit, dann passe ich den Briefbogen an.">
+        <Note>Die Briefe sind nach DIN 5008 (Form B) aufgebaut: Anschrift im Fenster, Rücksendezeile, Falz- und Lochmarken, A4. Am PC wählst du beim Drucken den Drucker deines Versanddienstes oder „Als PDF speichern“. Auf dem Handy speicherst du das PDF und lädst es beim Dienst hoch.</Note>
+      </Section>
       <Section title="Briefkopf" footer={Platform.OS === 'web' ? 'Das Logo wird verkleinert und in der Sicherung mitgespeichert.' : 'Das Logo wählst du in der Web-App aus. Es wird mit der Sicherung übertragen.'}>
         {s.logo ? (
           <View style={{ padding: 16, alignItems: 'flex-start' }}>
