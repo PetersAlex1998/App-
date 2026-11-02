@@ -48,6 +48,7 @@ export interface Tenant {
   salutation?: string; mobile?: string; postalAddress?: string; emergencyContact?: string;
   contractEnd?: string; noticeMonths?: string; rentAdjust?: string; nextAdjust?: string;
   depositType?: string; depositAccount?: string; notes?: string;
+  nkDone?: Record<string, string>; // Jahr -> Datum, an dem die Nebenkostenabrechnung erstellt wurde
   trackFrom?: string; // YYYY-MM: erst ab diesem Monat zählen Mieten als offen (ältere Monate sind außerhalb der App erledigt)
 }
 

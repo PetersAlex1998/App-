@@ -7,6 +7,7 @@ import { type } from '../theme';
 import { useSettings } from '../settings';
 import { dunningPlans } from '../dunning';
 import { daysUntil, expiryState } from '../docs';
+import { dueStatements } from '../nk';
 
 const LIMIT = 5;
 const isActive = (t: { moveOut: string }) => !t.moveOut || t.moveOut >= today();
@@ -48,6 +49,10 @@ export function Dashboard({ navigation }: any) {
   activeTenants.forEach((t) => {
     if (t.contractEnd && daysUntil(t.contractEnd) <= 180) dues.push({ key: 'ce' + t.id, icon: 'calendar', tone: daysUntil(t.contractEnd) < 0 ? 'danger' : 'warn', title: `Befristung endet: ${t.name}`, subtitle: daysUntil(t.contractEnd) < 0 ? `Seit ${dateDE(t.contractEnd)} abgelaufen` : `Am ${dateDE(t.contractEnd)}`, go: () => navigation.navigate('TenantDetail', { id: t.id }) });
     if (t.nextAdjust && daysUntil(t.nextAdjust) <= 60) dues.push({ key: 'na' + t.id, icon: 'trending-up', tone: 'warn', title: `Mietanpassung: ${t.name}`, subtitle: `${t.rentAdjust ?? 'Anpassung'} am ${dateDE(t.nextAdjust)}`, go: () => navigation.navigate('TenantDetail', { id: t.id }) });
+  });
+  dueStatements(db).forEach((d) => {
+    const left = daysUntil(d.deadline);
+    dues.push({ key: 'nk' + d.prop.id, icon: 'calculator', tone: left <= 90 ? 'danger' : 'warn', title: `Nebenkosten ${d.year}: ${d.prop.name}`, subtitle: `${d.open} von ${d.total} Abrechnungen offen · Frist ${dateDE(d.deadline)}`, go: () => navigation.navigate('NkLauf', { propertyId: d.prop.id }) });
   });
   const todoCount = dues.length + arrears.length + vacant.length + depositMissing.length;
 

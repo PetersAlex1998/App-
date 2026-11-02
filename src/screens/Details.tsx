@@ -99,6 +99,8 @@ export function PropertyDetail({ route, navigation }: any) {
       </Section>
       {meters.length > 0 && <><Button kind="secondary" icon="create-outline" title="Zählerstände erfassen" onPress={() => navigation.navigate('Ablesung', { propertyId: p.id })} /><Gap h={22} /></>}
 
+      {years.length > 0 && <><Button kind="secondary" icon="calculator-outline" title="Nebenkostenabrechnung für alle Mieter" onPress={() => navigation.navigate('NkLauf', { propertyId: p.id })} /><Gap h={22} /></>}
+
       <Section title="Betriebskosten" action={{ label: '+ Hinzufügen', onPress: () => navigation.navigate('CostForm', { propertyId: p.id }) }}
         footer="Aus diesen Positionen entsteht die Nebenkostenabrechnung der Mieter.">
         {years.length === 0 && <Note>Noch keine Kosten erfasst.</Note>}
@@ -153,6 +155,7 @@ export function TenantDetail({ route, navigation }: any) {
   const createNk = async () => {
     if (!unit || !prop || !nk) return;
     if (nk.lines.length === 0) return notify(`Für ${year} sind noch keine Betriebskosten erfasst. Trage sie im Objekt ein.`);
+    save('tenants', { ...t, nkDone: { ...(t.nkDone ?? {}), [String(year)]: today() } });
     await exportPdf(nkHtml(nk, t, unit, prop, year, cfg));
   };
 
