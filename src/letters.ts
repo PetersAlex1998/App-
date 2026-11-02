@@ -7,7 +7,13 @@ const levelTitle = ['', 'Zahlungserinnerung', '1. Mahnung', '2. Mahnung – letz
 
 function senderBlock(s: Settings) {
   const lines = [s.name || 'Hausverwaltung', s.street, `${s.zip} ${s.city}`.trim(), s.phone, s.email].filter((x) => x && x.trim());
-  return `<div style="text-align:right;font-size:12px;color:#444;line-height:1.5">${lines.map(esc).join('<br>')}</div>`;
+  const text = `<div style="text-align:right;font-size:12px;color:#444;line-height:1.5">${lines.map(esc).join('<br>')}</div>`;
+  if (!s.logo) return text;
+  return `<table style="width:100%;border-collapse:collapse;margin:0"><tr><td style="border:none;padding:0;vertical-align:top"><img src="${s.logo}" alt="" style="max-height:64px;max-width:240px"></td><td style="border:none;padding:0;vertical-align:top">${text}</td></tr></table>`;
+}
+function footerBlock(s: Settings) {
+  const lines = [s.footer, s.iban ? `IBAN ${s.iban}${s.bic ? ' · BIC ' + s.bic : ''}${s.bank ? ' · ' + s.bank : ''}` : ''].filter((x) => x && x.trim());
+  return lines.length ? `<div class="foot">${lines.map((l) => esc(l).replace(/\n/g, '<br>')).join('<br>')}</div>` : '';
 }
 function returnLine(s: Settings) {
   const t = [s.name, s.street, `${s.zip} ${s.city}`.trim()].filter((x) => x && x.trim()).join(' · ');
@@ -44,6 +50,7 @@ ${r.fee ? `<tr><td colspan="3">Mahngebühr</td><td class="r">${eur(r.fee)}</td><
 <p>Bitte überweisen Sie den Betrag bis spätestens <b>${dateDE(r.deadline)}</b>.</p>
 ${bankBlock(s, unit, t)}
 <p style="margin-top:28px">Mit freundlichen Grüßen<br>${esc(s.name || 'Ihre Hausverwaltung')}</p>
+${footerBlock(s)}
 </div>`;
 }
 
@@ -57,5 +64,16 @@ export function nkHtml(res: NkResult, t: Tenant, unit: Unit, prop: Property, yea
 <tr class="sum"><td colspan="3">Summe Ihrer Kosten</td><td class="r">${eur(res.costs)}</td></tr>
 <tr><td colspan="3">abzgl. Vorauszahlungen</td><td class="r">${eur(res.advances)}</td></tr>
 <tr class="sum"><td colspan="3">${verdict}</td><td class="r">${eur(res.balance)}</td></tr></table>
-<p class="small">Die Abrechnung wurde anteilig nach Mietmonaten erstellt.</p></div>`;
+<p class="small">Die Abrechnung wurde anteilig nach Mietmonaten erstellt.</p>
+${footerBlock(s)}</div>`;
+}
+
+/** Beispielbrief für die Vorschau des Briefkopfs. */
+export function sampleLetterHtml(s: Settings): string {
+  const prop: Property = { id: 'p', name: 'Haus Lindenstraße', street: 'Lindenstr. 12', zip: '50667', city: 'Köln', yearBuilt: '', notes: '' };
+  const unit: Unit = { id: 'u', propertyId: 'p', name: 'WE 2, 1. OG', area: 70, rooms: 3, coldRent: 700, advance: 160 };
+  const t: Tenant = { id: 't', unitId: 'u', name: 'Erika Mustermann', email: '', phone: '', moveIn: '2024-01-01', moveOut: '', deposit: 0 };
+  const items = [{ month: '2026-09', due: 860, paid: 0, open: 860 }, { month: '2026-10', due: 860, paid: 0, open: 860 }];
+  const r: Reminder = { id: 'x', tenantId: 't', date: new Date().toISOString().slice(0, 10), level: 2, amount: 1720, fee: s.fee2, deadline: new Date(Date.now() + s.deadlineDays * 86400000).toISOString().slice(0, 10), items };
+  return reminderHtml({ properties: [prop], units: [unit], tenants: [t], payments: [], reminders: [], costs: [], meters: [], readings: [] }, r, t, unit, prop, s);
 }

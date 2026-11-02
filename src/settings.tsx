@@ -5,10 +5,12 @@ export interface Settings {
   name: string; street: string; zip: string; city: string; phone: string; email: string;
   bank: string; iban: string; bic: string;
   fee2: number; fee3: number; deadlineDays: number; rentDueDay: number; graceDays: number;
+  logo: string; // Data-URL (PNG/JPEG), '' = kein Logo
+  footer: string; // Fußzeile, z. B. Steuernummer, Registergericht
 }
 export const defaultSettings: Settings = {
   name: '', street: '', zip: '', city: '', phone: '', email: '', bank: '', iban: '', bic: '',
-  fee2: 5, fee3: 10, deadlineDays: 7, rentDueDay: 3, graceDays: 5,
+  fee2: 5, fee3: 10, deadlineDays: 7, rentDueDay: 3, graceDays: 5, logo: '', footer: '',
 };
 const KEY = 'immo-settings-v1';
 const Ctx = createContext<{ s: Settings; update: (p: Partial<Settings>) => void }>({ s: defaultSettings, update: () => {} });

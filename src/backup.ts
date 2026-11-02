@@ -1,14 +1,15 @@
 import { Platform, Share } from 'react-native';
 import { DB, emptyDB } from './types';
+import type { Settings } from './settings';
 
 const KEYS = Object.keys(emptyDB) as (keyof DB)[];
 
-export function serialize(db: DB): string {
-  return JSON.stringify({ app: 'immo-verwaltung', version: 1, exportedAt: new Date().toISOString(), data: db }, null, 2);
+export function serialize(db: DB, settings?: Settings): string {
+  return JSON.stringify({ app: 'immo-verwaltung', version: 2, exportedAt: new Date().toISOString(), data: db, settings }, null, 2);
 }
 
 /** Prüft den Inhalt einer Sicherung und liefert die Daten, oder wirft einen verständlichen Fehler. */
-export function parseBackup(text: string): DB {
+export function parseBackup(text: string): { db: DB; settings?: Partial<Settings> } {
   let raw: any;
   try {
     raw = JSON.parse(text);
@@ -24,11 +25,12 @@ export function parseBackup(text: string): DB {
     (out as any)[k] = v ?? [];
   }
   if (KEYS.every((k) => out[k].length === 0)) throw new Error('Die Sicherung ist leer.');
-  return out;
+  const settings = raw?.app === 'immo-verwaltung' && raw.settings && typeof raw.settings === 'object' ? (raw.settings as Partial<Settings>) : undefined;
+  return { db: out, settings };
 }
 
-export async function exportBackup(db: DB): Promise<void> {
-  const json = serialize(db);
+export async function exportBackup(db: DB, settings?: Settings): Promise<void> {
+  const json = serialize(db, settings);
   const name = `immo-sicherung-${new Date().toISOString().slice(0, 10)}.json`;
   if (Platform.OS === 'web') {
     const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
