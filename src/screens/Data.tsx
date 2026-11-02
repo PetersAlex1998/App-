@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { Platform } from 'react-native';
+import { Platform, Text } from 'react-native';
 import { useStore } from '../store';
 import { useThemePref } from '../theme';
-import { Button, Field, Segmented, Gap, LargeHeader, ListRow, Note, Screen, Section, confirm, notify } from '../ui';
+import { Button, Field, Segmented, Gap, ListRow, Note, Screen, Section, confirm, notify, useColors } from '../ui';
 import { demoData } from '../demo';
 import { exportBackup, parseBackup, pickBackupFile } from '../backup';
 
@@ -10,6 +10,7 @@ export function DataScreen() {
   const { db, replaceAll } = useStore();
   const [text, setText] = useState('');
   const { pref, setPref } = useThemePref();
+  const c = useColors();
   const empty = db.properties.length === 0;
 
   const doImport = (content: string) => {
@@ -28,8 +29,8 @@ export function DataScreen() {
   const fail = (e: any) => notify(String(e?.message ?? e));
 
   return (
-    <Screen tab>
-      <LargeHeader title="Daten" subtitle="Sicherung und Einstellungen" />
+    <Screen>
+      <Text accessibilityRole="header" style={{ fontSize: 30, fontWeight: '800', color: c.text, letterSpacing: -0.6, marginBottom: 20, marginTop: 6 }}>Sicherung und Darstellung</Text>
       <Section title="Darstellung">
         <Segmented value={pref} onChange={setPref} options={[{ label: 'Hell', value: 'hell' }, { label: 'Dunkel', value: 'dunkel' }, { label: 'Automatisch', value: 'auto' }]} />
       </Section>

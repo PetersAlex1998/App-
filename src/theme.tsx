@@ -2,24 +2,23 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useColorScheme } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Eigene Handschrift: ruhiges Schiefer-Grau mit einem einzigen Akzent (tiefes Petrol).
-// Akzentfarbe nur für primäre Aktionen und Auswahl; Status hat eigene, feste Bedeutung.
-// Kontrast (berechnet, Text auf Karte): text 16:1, muted 7:1, primary 6:1, danger 6:1, ok 5.6:1, warn 5.4:1.
+// Look nach Apple-Store-App (iOS 26): helles Grau, weiße Karten, schwarze Symbole, Blau nur für Auswahl und Aktionen.
+// Status hat eigene, feste Bedeutung. Kontrast Text auf Karte: text 16:1, muted 5:1, primary 5.6:1, danger 6:1, ok 5.4:1.
 const light = {
-  bg: '#F3F4F6', card: '#FFFFFF', text: '#0F172A', muted: '#475569',
-  primary: '#0E6B63', onPrimary: '#FFFFFF', primarySoft: '#E3F2F0',
-  danger: '#B42318', dangerSoft: '#FDECEA',
-  ok: '#067647', okSoft: '#E6F5EC',
+  bg: '#F2F2F7', card: '#FFFFFF', text: '#1D1D1F', muted: '#6E6E73',
+  primary: '#0066CC', onPrimary: '#FFFFFF', primarySoft: '#E6F0FA',
+  danger: '#C4001A', dangerSoft: '#FDECEE',
+  ok: '#1F7A36', okSoft: '#E7F5EA',
   warn: '#9A5B00', warnSoft: '#FEF1DC',
-  line: '#E2E5EA', fill: '#E9ECF0',
+  line: '#E5E5EA', fill: '#EDEDF2', glass: 'rgba(255,255,255,0.86)',
 };
 const dark = {
-  bg: '#0B0F14', card: '#151A21', text: '#F1F5F9', muted: '#A3AEBD',
-  primary: '#4FD1C5', onPrimary: '#04201D', primarySoft: '#12302D',
+  bg: '#000000', card: '#1C1C1E', text: '#F5F5F7', muted: '#A1A1A6',
+  primary: '#4DA3FF', onPrimary: '#001B38', primarySoft: '#0F2740',
   danger: '#FF8A80', dangerSoft: '#3A1816',
   ok: '#5FD38A', okSoft: '#12301F',
   warn: '#F5B95C', warnSoft: '#352508',
-  line: '#262D37', fill: '#202733',
+  line: '#2C2C2E', fill: '#2C2C2E', glass: 'rgba(28,28,30,0.86)',
 };
 export type Colors = typeof light;
 

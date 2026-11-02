@@ -31,7 +31,7 @@ export function Dashboard({ navigation }: any) {
   if (db.properties.length === 0) {
     return (
       <Screen tab>
-        <LargeHeader title="Willkommen" subtitle="Deine Immobilien an einem Ort" />
+        <LargeHeader navTitle="Übersicht" title="Willkommen" subtitle="Deine Immobilien an einem Ort" />
         <EmptyState icon="business" title="Legen wir los" text="Lege dein erstes Objekt an – danach Wohnungen und Mieter. Das dauert wenige Minuten." actionLabel="Erstes Objekt anlegen" onAction={() => navigation.navigate('PropertyForm', {})} />
         <Button kind="plain" title="Mit Beispieldaten ausprobieren" onPress={() => navigation.navigate('Daten')} />
       </Screen>
@@ -47,7 +47,7 @@ export function Dashboard({ navigation }: any) {
 
   return (
     <Screen tab>
-      <LargeHeader title="Übersicht" subtitle={`${db.properties.length} Objekt${db.properties.length === 1 ? '' : 'e'} · ${db.units.length} Wohneinheit${db.units.length === 1 ? '' : 'en'}`} />
+      <LargeHeader navTitle="Übersicht" title="Dein Bestand im Blick" action={{ label: 'Daten und Einstellungen', icon: 'settings-outline', onPress: () => navigation.navigate('Daten') }} subtitle={`${db.properties.length} Objekt${db.properties.length === 1 ? '' : 'e'} · ${db.units.length} Wohneinheit${db.units.length === 1 ? '' : 'en'}`} />
 
       <StatGrid>
         <Stat label="Offene Posten" value={eur(open)} tone={open > 0 ? 'danger' : 'ok'} icon="alert-circle-outline" />
@@ -104,7 +104,7 @@ export function Properties({ navigation }: any) {
   const list = db.properties.filter((p) => `${p.name} ${p.street} ${p.city}`.toLowerCase().includes(q.toLowerCase()));
   return (
     <Screen tab>
-      <LargeHeader title="Objekte" action={{ label: 'Objekt hinzufügen', onPress: () => navigation.navigate('PropertyForm', {}) }} />
+      <LargeHeader navTitle="Objekte" title="Deine Immobilien" action={{ label: 'Objekt hinzufügen', onPress: () => navigation.navigate('PropertyForm', {}) }} />
       {db.properties.length === 0 ? (
         <EmptyState icon="business" title="Noch keine Objekte" text="Lege Häuser oder Anlagen an und verwalte darin Wohnungen und Betriebskosten." actionLabel="Objekt anlegen" onAction={() => navigation.navigate('PropertyForm', {})} />
       ) : (
@@ -145,7 +145,7 @@ export function Tenants({ navigation }: any) {
   );
   return (
     <Screen tab>
-      <LargeHeader title="Mieter" action={{ label: 'Mieter hinzufügen', onPress: () => navigation.navigate('TenantForm', {}) }} />
+      <LargeHeader navTitle="Mieter" title="Deine Mieter" action={{ label: 'Mieter hinzufügen', onPress: () => navigation.navigate('TenantForm', {}) }} />
       {db.tenants.length === 0 ? (
         <EmptyState icon="people" title="Noch keine Mieter" text={db.units.length === 0 ? 'Lege zuerst ein Objekt mit einer Wohnung an. Dann kannst du Mieter zuordnen.' : 'Erfasse Mieter und ordne sie einer Wohnung zu.'} actionLabel={db.units.length === 0 ? 'Zu den Objekten' : 'Mieter anlegen'} onAction={() => (db.units.length === 0 ? navigation.navigate('Objekte') : navigation.navigate('TenantForm', {}))} />
       ) : (
@@ -186,7 +186,7 @@ export function Payments({ navigation }: any) {
   const kindLabel = { miete: 'Miete', kaution: 'Kaution', nachzahlung: 'NK-Nachzahlung' } as const;
   return (
     <Screen tab>
-      <LargeHeader title="Zahlungen" action={{ label: 'Zahlung erfassen', onPress: () => navigation.navigate('PaymentForm', {}) }} />
+      <LargeHeader navTitle="Zahlungen" title="Geldeingänge" action={{ label: 'Zahlung erfassen', onPress: () => navigation.navigate('PaymentForm', {}) }} />
       {groups.length === 0 ? (
         <EmptyState icon="card" title="Noch keine Zahlungen" text="Erfasse eingehende Mieten, Kautionen und Nachzahlungen. Offene Posten berechnet die App automatisch." actionLabel={db.tenants.length ? 'Zahlung erfassen' : undefined} onAction={() => navigation.navigate('PaymentForm', {})} />
       ) : (

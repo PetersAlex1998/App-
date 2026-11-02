@@ -1,6 +1,5 @@
 import React from 'react';
 import { ActivityIndicator } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { ThemeProvider, useColors, useIsDark } from './src/theme';
 import { StatusBar } from 'expo-status-bar';
 import { DefaultTheme, NavigationContainer } from '@react-navigation/native';
@@ -11,22 +10,21 @@ import { StoreProvider, useStore } from './src/store';
 import { Dashboard, Payments, Properties, Tenants } from './src/screens/Lists';
 import { CostForm, PaymentForm, PropertyForm, TenantForm, UnitForm } from './src/screens/Forms';
 import { DataScreen } from './src/screens/Data';
+import { SearchScreen } from './src/screens/Search';
+import { FloatingTabBar } from './src/FloatingTabBar';
 import { PropertyDetail, TenantDetail } from './src/screens/Details';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
-const icon = (name: React.ComponentProps<typeof Ionicons>['name']) => ({ color, size }: { color: string; size: number }) => <Ionicons name={name} size={size} color={color} />;
 
 function Tabs() {
-  const c = useColors();
   return (
-    <Tab.Navigator screenOptions={{ headerShown: false, tabBarActiveTintColor: c.primary, tabBarInactiveTintColor: c.muted, tabBarStyle: { backgroundColor: c.card, borderTopColor: c.line, height: 76, paddingTop: 8, paddingBottom: 14 }, tabBarLabelStyle: { fontSize: 11, fontWeight: '600' } }}>
-      <Tab.Screen name="Übersicht" component={Dashboard} options={{ tabBarIcon: icon('stats-chart') }} />
-      <Tab.Screen name="Objekte" component={Properties} options={{ tabBarIcon: icon('business') }} />
-      <Tab.Screen name="Mieter" component={Tenants} options={{ tabBarIcon: icon('people') }} />
-      <Tab.Screen name="Zahlungen" component={Payments} options={{ tabBarIcon: icon('card') }} />
-      <Tab.Screen name="Daten" component={DataScreen} options={{ tabBarIcon: icon('file-tray-full') }} />
+    <Tab.Navigator tabBar={(props) => <FloatingTabBar {...props} />} screenOptions={{ headerShown: false }}>
+      <Tab.Screen name="Übersicht" component={Dashboard} />
+      <Tab.Screen name="Objekte" component={Properties} />
+      <Tab.Screen name="Mieter" component={Tenants} />
+      <Tab.Screen name="Zahlungen" component={Payments} />
     </Tab.Navigator>
   );
 }
@@ -39,8 +37,10 @@ function Root() {
   return (
     <NavigationContainer theme={{ dark, colors: { primary: c.primary, background: c.bg, card: c.card, text: c.text, border: c.line, notification: c.danger }, fonts: DefaultTheme.fonts }}>
       <StatusBar style={dark ? 'light' : 'dark'} />
-      <Stack.Navigator screenOptions={{ headerStyle: { backgroundColor: c.bg }, headerShadowVisible: false, headerTintColor: c.primary, headerTitleStyle: { color: c.text, fontWeight: '700' }, headerBackTitle: 'Zurück', contentStyle: { backgroundColor: c.bg } }}>
+      <Stack.Navigator screenOptions={{ headerStyle: { backgroundColor: c.bg }, headerShadowVisible: false, headerTintColor: c.primary, headerTitleStyle: { color: c.text, fontWeight: '700' }, headerBackTitle: 'Zurück', headerTitleAlign: 'center', contentStyle: { backgroundColor: c.bg } }}>
         <Stack.Screen name="Tabs" component={Tabs} options={{ headerShown: false }} />
+        <Stack.Screen name="Search" component={SearchScreen} options={{ title: 'Suche' }} />
+        <Stack.Screen name="Daten" component={DataScreen} options={{ title: 'Daten' }} />
         <Stack.Screen name="PropertyForm" component={PropertyForm} options={({ route }: any) => ({ title: route.params?.id ? 'Objekt bearbeiten' : 'Neues Objekt' })} />
         <Stack.Screen name="PropertyDetail" component={PropertyDetail} options={({ route }: any) => ({ title: 'Objekt' })} />
         <Stack.Screen name="UnitForm" component={UnitForm} options={({ route }: any) => ({ title: route.params?.id ? 'Wohnung bearbeiten' : 'Neue Wohnung' })} />

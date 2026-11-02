@@ -6,7 +6,7 @@ import { MAX_WIDTH, MIN_TARGET, type, useColors, useIsDark } from './theme';
 
 export { useColors };
 export type IconName = React.ComponentProps<typeof Ionicons>['name'];
-type Tone = 'ok' | 'danger' | 'warn' | 'neutral' | 'primary';
+type Tone = 'ok' | 'danger' | 'warn' | 'neutral' | 'primary' | 'plain';
 
 /* ───────── Layout ───────── */
 
@@ -16,7 +16,7 @@ export function Screen({ children, tab }: { children: React.ReactNode; tab?: boo
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: c.bg }}
-      contentContainerStyle={{ paddingTop: tab ? insets.top + 8 : 8, paddingBottom: 40, alignItems: 'center' }}
+      contentContainerStyle={{ paddingTop: tab ? insets.top + 4 : 8, paddingBottom: tab ? 130 : 40, alignItems: 'center' }}
       keyboardShouldPersistTaps="handled"
     >
       <View style={{ width: '100%', maxWidth: MAX_WIDTH, paddingHorizontal: 16 }}>{children}</View>
@@ -24,20 +24,28 @@ export function Screen({ children, tab }: { children: React.ReactNode; tab?: boo
   );
 }
 
-export function LargeHeader({ title, subtitle, action }: { title: string; subtitle?: string; action?: { label: string; onPress: () => void; icon?: IconName } }) {
+export function CircleButton({ label, icon, onPress }: { label: string; icon: IconName; onPress: () => void }) {
   const c = useColors();
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8, marginBottom: 16, gap: 12 }}>
-      <View style={{ flex: 1 }}>
-        <Text accessibilityRole="header" style={{ fontSize: type.display, fontWeight: '800', color: c.text, letterSpacing: -0.5 }}>{title}</Text>
-        {subtitle ? <Text style={{ fontSize: type.subhead, color: c.muted, marginTop: 2 }}>{subtitle}</Text> : null}
+    <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress}
+      style={({ pressed }) => [{ width: MIN_TARGET, height: MIN_TARGET, borderRadius: MIN_TARGET / 2, backgroundColor: c.card, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.6 : 1 }, softShadow as object]}>
+      <Ionicons name={icon} size={22} color={c.text} />
+    </Pressable>
+  );
+}
+const softShadow = { shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 10, shadowOffset: { width: 0, height: 3 }, elevation: 3 };
+
+/** Kleine zentrierte Navigationszeile (wie iOS) über einer großen, fetten Überschrift. */
+export function LargeHeader({ navTitle, title, subtitle, action }: { navTitle: string; title: string; subtitle?: string; action?: { label: string; onPress: () => void; icon?: IconName } }) {
+  const c = useColors();
+  return (
+    <View style={{ marginBottom: 20 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', minHeight: MIN_TARGET + 4 }}>
+        <Text accessible={false} style={{ fontSize: type.headline, fontWeight: '600', color: c.text }}>{navTitle}</Text>
+        {action ? <View style={{ position: 'absolute', right: 0 }}><CircleButton label={action.label} icon={action.icon ?? 'add'} onPress={action.onPress} /></View> : null}
       </View>
-      {action ? (
-        <Pressable accessibilityRole="button" accessibilityLabel={action.label} onPress={action.onPress}
-          style={({ pressed }) => ({ width: MIN_TARGET, height: MIN_TARGET, borderRadius: MIN_TARGET / 2, backgroundColor: c.primary, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.75 : 1 })}>
-          <Ionicons name={action.icon ?? 'add'} size={26} color={c.onPrimary} />
-        </Pressable>
-      ) : null}
+      <Text accessibilityRole="header" style={{ fontSize: type.display, fontWeight: '800', color: c.text, letterSpacing: -0.6, marginTop: 14, lineHeight: 38 }}>{title}</Text>
+      {subtitle ? <Text style={{ fontSize: type.subhead, color: c.muted, marginTop: 4 }}>{subtitle}</Text> : null}
     </View>
   );
 }
@@ -58,9 +66,12 @@ export function Section({ title, footer, children, action }: { title?: string; f
         </View>
       ) : null}
       {items.length > 0 && (
-        <View style={{ backgroundColor: c.card, borderRadius: 14, overflow: 'hidden', borderWidth: 1, borderColor: c.line }}>
+        <View style={{ backgroundColor: c.card, borderRadius: 22, overflow: 'hidden' }}>
           {items.map((child, i) => (
-            <View key={i} style={i > 0 ? { borderTopWidth: 1, borderTopColor: c.line } : undefined}>{child}</View>
+            <View key={i}>
+              {i > 0 ? <View style={{ height: 1, backgroundColor: c.line, marginLeft: 14 }} /> : null}
+              {child}
+            </View>
           ))}
         </View>
       )}
@@ -74,13 +85,13 @@ export function Section({ title, footer, children, action }: { title?: string; f
 export function Avatar({ text, size = 40 }: { text: string; size?: number }) {
   const c = useColors();
   return (
-    <View accessible={false} style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: c.primarySoft, alignItems: 'center', justifyContent: 'center' }}>
-      <Text style={{ color: c.primary, fontWeight: '700', fontSize: size * 0.38 }}>{text}</Text>
+    <View accessible={false} style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: c.fill, alignItems: 'center', justifyContent: 'center' }}>
+      <Text style={{ color: c.text, fontWeight: '700', fontSize: size * 0.38 }}>{text}</Text>
     </View>
   );
 }
 
-export function IconBubble({ name, tone = 'primary', size = 40 }: { name: IconName; tone?: Tone; size?: number }) {
+export function IconBubble({ name, tone = 'plain', size = 40 }: { name: IconName; tone?: Tone; size?: number }) {
   const c = useColors();
   const { fg, bg } = toneColors(c, tone);
   return (
@@ -96,10 +107,11 @@ function toneColors(c: ReturnType<typeof useColors>, tone: Tone) {
     case 'danger': return { fg: c.danger, bg: c.dangerSoft };
     case 'warn': return { fg: c.warn, bg: c.warnSoft };
     case 'primary': return { fg: c.primary, bg: c.primarySoft };
+    case 'plain': return { fg: c.text, bg: c.fill };
     default: return { fg: c.muted, bg: c.fill };
   }
 }
-const toneIcon: Record<Tone, IconName | null> = { ok: 'checkmark-circle', danger: 'alert-circle', warn: 'time', neutral: null, primary: null };
+const toneIcon: Record<Tone, IconName | null> = { ok: 'checkmark-circle', danger: 'alert-circle', warn: 'time', neutral: null, primary: null, plain: null };
 
 /** Status immer mit Text UND Symbol – nie nur Farbe. */
 export function Badge({ text, tone = 'neutral' }: { text: string; tone?: Tone }) {
@@ -144,7 +156,7 @@ export function Stat({ label, value, tone, icon }: { label: string; value: strin
   const c = useColors();
   const color = tone === 'danger' ? c.danger : tone === 'ok' ? c.ok : c.text;
   return (
-    <View style={{ flex: 1, minWidth: 140, backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.line, padding: 14, gap: 6 }}>
+    <View style={{ flex: 1, minWidth: 140, backgroundColor: c.card, borderRadius: 22, padding: 16, gap: 6 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
         {icon ? <Ionicons name={icon} size={15} color={c.muted} /> : null}
         <Text style={{ fontSize: type.footnote, color: c.muted, fontWeight: '600' }}>{label}</Text>
@@ -175,7 +187,7 @@ export function Button({ title, onPress, kind = 'primary', icon, disabled }: { t
   const fg = kind === 'primary' ? c.onPrimary : kind === 'destructive' ? c.danger : c.primary;
   return (
     <Pressable accessibilityRole="button" accessibilityLabel={title} accessibilityState={{ disabled: !!disabled }} disabled={disabled} onPress={onPress}
-      style={({ pressed }) => ({ backgroundColor: bg, minHeight: 50, paddingHorizontal: 14, borderRadius: 14, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', opacity: disabled ? 0.4 : pressed ? 0.75 : 1 })}>
+      style={({ pressed }) => ({ backgroundColor: bg, minHeight: 52, paddingHorizontal: 18, borderRadius: 26, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', opacity: disabled ? 0.4 : pressed ? 0.75 : 1 })}>
       {icon ? <Ionicons name={icon} size={20} color={fg} /> : null}
       <Text style={{ color: fg, fontWeight: '700', fontSize: type.body, textAlign: 'center' }}>{title}</Text>
     </Pressable>
@@ -186,12 +198,12 @@ export const Gap = ({ h = 10 }: { h?: number }) => <View style={{ height: h }} /
 export function Segmented<T extends string | number>({ value, options, onChange }: { value: T; options: { label: string; value: T }[]; onChange: (v: T) => void }) {
   const c = useColors();
   return (
-    <View accessibilityRole="radiogroup" style={{ flexDirection: 'row', backgroundColor: c.fill, borderRadius: 11, padding: 3, marginBottom: 16 }}>
+    <View accessibilityRole="radiogroup" style={{ flexDirection: 'row', backgroundColor: c.fill, borderRadius: 14, padding: 3, marginBottom: 16 }}>
       {options.map((o) => {
         const on = o.value === value;
         return (
           <Pressable key={String(o.value)} accessibilityRole="radio" accessibilityState={{ selected: on }} onPress={() => onChange(o.value)}
-            style={{ flex: 1, minHeight: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 9, backgroundColor: on ? c.card : 'transparent' }}>
+            style={{ flex: 1, minHeight: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 11, backgroundColor: on ? c.card : 'transparent' }}>
             <Text style={{ fontSize: type.subhead, fontWeight: on ? '700' : '500', color: on ? c.text : c.muted }}>{o.label}</Text>
           </Pressable>
         );
@@ -200,12 +212,12 @@ export function Segmented<T extends string | number>({ value, options, onChange 
   );
 }
 
-export function SearchBar({ value, onChangeText, placeholder }: { value: string; onChangeText: (v: string) => void; placeholder: string }) {
+export function SearchBar({ value, onChangeText, placeholder, autoFocus }: { value: string; onChangeText: (v: string) => void; placeholder: string; autoFocus?: boolean }) {
   const c = useColors();
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: c.fill, borderRadius: 12, paddingHorizontal: 12, gap: 8, marginBottom: 14, minHeight: 44 }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: c.card, borderRadius: 22, paddingHorizontal: 14, gap: 8, marginBottom: 14, minHeight: 48 }}>
       <Ionicons name="search" size={18} color={c.muted} />
-      <TextInput accessibilityLabel={placeholder} value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor={c.muted} autoCorrect={false}
+      <TextInput accessibilityLabel={placeholder} value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor={c.muted} autoCorrect={false} autoFocus={autoFocus}
         style={{ flex: 1, color: c.text, fontSize: type.body, paddingVertical: 10 }} />
       {value ? <Pressable accessibilityLabel="Suche löschen" onPress={() => onChangeText('')} hitSlop={10}><Ionicons name="close-circle" size={18} color={c.muted} /></Pressable> : null}
     </View>
