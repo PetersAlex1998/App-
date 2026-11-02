@@ -154,8 +154,8 @@ export function BestandImport({ navigation }: any) {
       <Text accessibilityRole="header" style={{ fontSize: 30, fontWeight: '800', color: c.text, letterSpacing: -0.6, marginTop: 6, marginBottom: 6 }}>Bestand importieren</Text>
       <Text style={{ color: c.muted, fontSize: type.body, marginBottom: 20 }}>Trage Häuser, Einheiten und Mieter in einer Tabelle ein und lade sie hoch. So legst du alles auf einmal an.</Text>
 
-      <Section title="1. Vorlage" footer="Öffne die Vorlage in Excel, Numbers oder Google Sheets, trage deine Einheiten ein und speichere sie als CSV. Pro Zeile eine Einheit; leere Mieter-Spalten bedeuten Leerstand.">
-        <ListRow icon="download-outline" title="Vorlage herunterladen" subtitle="CSV mit Beispielzeilen" onPress={() => saveText('bestand-vorlage.csv', BESTAND_TEMPLATE).catch((e) => notify(String(e?.message ?? e)))} />
+      <Section title="1. Vorlage" footer="Öffne die Vorlage in Excel, Numbers oder Google Sheets, trage deine Einheiten ein und speichere sie als CSV. Pro Zeile eine Einheit; leere Mieter-Spalten bedeuten Leerstand. Nur Haus und Einheit sind Pflicht, alle anderen Spalten sind optional. Leere Zellen ändern bei einem erneuten Import nichts.">
+        <ListRow icon="download-outline" title="Vorlage herunterladen" subtitle="CSV mit allen Spalten und Beispielzeilen" onPress={() => saveText('bestand-vorlage.csv', BESTAND_TEMPLATE).catch((e) => notify(String(e?.message ?? e)))} />
       </Section>
 
       <Section title="2. Datei hochladen">

@@ -1,4 +1,4 @@
-import { DB, Payment, Tenant } from './types';
+import { DB, Payment, Tenant, UnitKind } from './types';
 import { addDays, openItems, today, unitDue } from './calc';
 import { uid } from './store';
 
@@ -65,18 +65,18 @@ export function parseAmount(s: string): number | null {
   let t = String(s ?? '').replace(/[€\s]|EUR/gi, '').replace(/^\+/, '');
   if (!t) return null;
   if (t.includes(',')) t = t.replace(/\./g, '').replace(',', '.');
+  else if (/^-?\d{1,3}(\.\d{3})+$/.test(t)) t = t.replace(/\./g, ''); // 1.250 = tausendzweihundertfünfzig
   const v = Number(t);
   return isFinite(v) ? v : null;
 }
 export function parseDate(s: string): string | null {
   const t = String(s ?? '').trim();
+  let y = '', mo = '', d = '';
   let m = t.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4}|\d{2})/);
-  if (m) {
-    const y = m[3].length === 2 ? '20' + m[3] : m[3];
-    return `${y}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
-  }
-  m = t.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  return m ? `${m[1]}-${m[2]}-${m[3]}` : null;
+  if (m) { y = m[3].length === 2 ? '20' + m[3] : m[3]; mo = m[2].padStart(2, '0'); d = m[1].padStart(2, '0'); }
+  else { m = t.match(/^(\d{4})-(\d{2})-(\d{2})/); if (!m) return null; [y, mo, d] = [m[1], m[2], m[3]]; }
+  const dt = new Date(`${y}-${mo}-${d}T00:00:00Z`);
+  return !isNaN(dt.getTime()) && dt.toISOString().slice(0, 10) === `${y}-${mo}-${d}` ? `${y}-${mo}-${d}` : null;
 }
 const findCol = (headers: string[], pred: (k: string) => boolean) => headers.findIndex((h) => pred(normKey(h)));
 
@@ -184,11 +184,26 @@ export function paymentsFromMatches(rows: MatchRow[]): Payment[] {
 
 /* ───────── Bestand (Häuser, Einheiten, Mieter) ───────── */
 
+const BESTAND_HEADER = [
+  'Haus', 'Straße', 'PLZ', 'Ort', 'Einheit', 'Typ', 'Fläche', 'Zimmer', 'Kaltmiete', 'Nebenkosten', 'USt',
+  'Mieter', 'E-Mail', 'Telefon', 'IBAN', 'Einzug', 'Kaution', 'Offene Posten ab',
+  // Objekt
+  'Baujahr', 'Grundstück', 'Etagen', 'Heizung', 'Baujahr Heizung', 'Energieträger',
+  'EA Art', 'EA Kennwert', 'EA Klasse', 'EA ausgestellt', 'EA gültig bis',
+  'Grundbuch', 'Flurstück', 'Kaufdatum', 'Kaufpreis', 'Versicherer', 'Policennummer', 'Jahresprämie', 'Ansprechpartner', 'Ansprechpartner Telefon', 'Notizen Haus',
+  // Einheit
+  'Etage', 'Lage', 'Balkon', 'Keller', 'Stellplatz', 'Küche', 'Ausstattung', 'Notizen Einheit',
+  // Mieter
+  'Anrede', 'Mobil', 'Postanschrift', 'Notfallkontakt', 'Befristet bis', 'Kündigungsfrist', 'Mietanpassung', 'Nächste Anpassung', 'Kautionsart', 'Kautionskonto', 'Notizen Mieter',
+];
+const row = (o: Record<string, string>) => BESTAND_HEADER.map((h) => o[h] ?? '').join(';');
 export const BESTAND_TEMPLATE =
-  'Haus;Straße;PLZ;Ort;Einheit;Typ;Fläche;Zimmer;Kaltmiete;Nebenkosten;USt;Mieter;E-Mail;Telefon;IBAN;Einzug;Kaution;Offene Posten ab\n' +
-  'Haus Lindenstraße;Lindenstr. 12;50667;Köln;WE 1 EG links;Wohnung;62;2;640,00;160,00;;Anna Schmidt;anna@example.de;0171 1234567;;01.06.2024;1920,00;\n' +
-  'Haus Lindenstraße;Lindenstr. 12;50667;Köln;Laden EG;Gewerbe;85;3;1200,00;250,00;19;Muster Bäckerei GmbH;;;;01.01.2023;3600,00;\n' +
-  'Haus Lindenstraße;Lindenstr. 12;50667;Köln;WE 3 1. OG;Wohnung;70;3;;;;;;;;;;\n';
+  BESTAND_HEADER.join(';') + '\n' +
+  row({ Haus: 'Haus Lindenstraße', Straße: 'Lindenstr. 12', PLZ: '50667', Ort: 'Köln', Einheit: 'WE 1 EG links', Typ: 'Wohnung', Fläche: '62', Zimmer: '2', Kaltmiete: '640,00', Nebenkosten: '160,00', Mieter: 'Anna Schmidt', 'E-Mail': 'anna@example.de', Telefon: '0221 123456', Einzug: '01.06.2024', Kaution: '1920,00',
+    Baujahr: '1998', Grundstück: '450', Etagen: '4', Heizung: 'Gas', 'Baujahr Heizung': '2015', Energieträger: 'Erdgas H', 'EA Art': 'Bedarf', 'EA Kennwert': '112', 'EA Klasse': 'C', 'EA ausgestellt': '15.03.2020', Versicherer: 'Muster Versicherung', Policennummer: 'GV-123456', Jahresprämie: '1850,00', Ansprechpartner: 'Hausmeister Meier', 'Ansprechpartner Telefon': '0171 555555',
+    Etage: 'EG', Lage: 'links', Balkon: 'Terrasse', Keller: 'Ja', Küche: 'Einbauküche', Anrede: 'Frau', Mobil: '0171 1234567', Kündigungsfrist: '3', Mietanpassung: 'Indexmiete', 'Nächste Anpassung': '01.06.2027', Kautionsart: 'Kautionskonto' }) + '\n' +
+  row({ Haus: 'Haus Lindenstraße', Einheit: 'Laden EG', Typ: 'Gewerbe', Fläche: '85', Zimmer: '3', Kaltmiete: '1200,00', Nebenkosten: '250,00', USt: '19', Mieter: 'Muster Bäckerei GmbH', Einzug: '01.01.2023', Kaution: '3600,00', 'Befristet bis': '31.12.2027', Stellplatz: 'Hof 2' }) + '\n' +
+  row({ Haus: 'Haus Lindenstraße', Einheit: 'WE 3 1. OG', Typ: 'Wohnung', Fläche: '70', Zimmer: '3', Etage: '1. OG' }) + '\n';
 
 export interface BestandPlan { db: DB; summary: { properties: number; units: number; tenants: number; updated: number }; warnings: string[]; error?: string }
 
@@ -203,40 +218,97 @@ export function planBestandImport(db: DB, text: string): BestandPlan {
     einheit: col('Einheit', 'Wohnung', 'Bezeichnung'), typ: col('Typ', 'Art', 'Nutzung'), flaeche: col('Fläche', 'Flaeche', 'Wohnfläche', 'm²', 'qm'), zimmer: col('Zimmer'),
     kalt: col('Kaltmiete', 'Nettokaltmiete', 'Miete'), nk: col('Nebenkosten', 'NK', 'NK-Vorauszahlung', 'Vorauszahlung'), ust: col('USt', 'MwSt', 'Umsatzsteuer'),
     mieter: col('Mieter', 'Name'), mail: col('E-Mail', 'Email', 'Mail'), tel: col('Telefon', 'Tel'), iban: col('IBAN'), einzug: col('Einzug', 'Mietbeginn'), kaution: col('Kaution'), ab: col('Offene Posten ab', 'Konto ab', 'Mietkonto ab'),
+    // Objekt
+    baujahr: col('Baujahr'), grundstueck: col('Grundstück', 'Grundstueck', 'Grundstücksfläche'), etagen: col('Etagen', 'Geschosse'), heizung: col('Heizung', 'Heizungsart'), heizBj: col('Baujahr Heizung', 'Heizung Baujahr'), traeger: col('Energieträger', 'Energietraeger'),
+    eaArt: col('EA Art', 'Energieausweis Art'), eaWert: col('EA Kennwert', 'Energiekennwert'), eaKlasse: col('EA Klasse', 'Effizienzklasse'), eaAus: col('EA ausgestellt', 'EA Ausstellung'), eaBis: col('EA gültig bis', 'EA gueltig bis', 'EA bis'),
+    grundbuch: col('Grundbuch'), flurstueck: col('Flurstück', 'Flurstueck'), kaufdatum: col('Kaufdatum'), kaufpreis: col('Kaufpreis'), versicherer: col('Versicherer', 'Gebäudeversicherung'), police: col('Policennummer', 'Police'), praemie: col('Jahresprämie', 'Praemie', 'Prämie'),
+    kontakt: col('Ansprechpartner', 'Hausmeister'), kontaktTel: col('Ansprechpartner Telefon', 'Hausmeister Telefon'), notizHaus: col('Notizen Haus', 'Notiz Haus'),
+    // Einheit
+    etage: col('Etage', 'Geschoss'), lage: col('Lage'), balkon: col('Balkon', 'Balkon/Terrasse', 'Terrasse'), keller: col('Keller'), stellplatz: col('Stellplatz', 'Garage', 'Stellplatz/Garage'), kueche: col('Küche', 'Kueche'), ausstattung: col('Ausstattung'), notizEinheit: col('Notizen Einheit', 'Notiz Einheit'),
+    // Mieter
+    anrede: col('Anrede'), mobil: col('Mobil', 'Handy'), post: col('Postanschrift', 'Abweichende Postanschrift'), notfall: col('Notfallkontakt'), befristet: col('Befristet bis', 'Mietende', 'Vertragsende'), kuendigung: col('Kündigungsfrist', 'Kuendigungsfrist'),
+    anpassung: col('Mietanpassung'), naechste: col('Nächste Anpassung', 'Naechste Anpassung'), kautionsart: col('Kautionsart'), kautionskonto: col('Kautionskonto'), notizMieter: col('Notizen Mieter', 'Notiz Mieter'),
   };
   if (c.haus < 0 || c.einheit < 0) return none('Die Spalten „Haus“ und „Einheit“ werden mindestens benötigt. Lade die Vorlage herunter und trage deine Daten ein.');
-  const get = (r: string[], i: number) => (i >= 0 ? r[i] ?? '' : '');
-  const next: DB = { properties: [...db.properties], units: [...db.units], tenants: [...db.tenants], payments: db.payments, reminders: db.reminders, costs: db.costs, meters: db.meters, readings: db.readings, documents: db.documents };
-  const sum = { properties: 0, units: 0, tenants: 0, updated: 0 };
   const warnings: string[] = [];
+  let line = 1;
+  const get = (r: string[], i: number) => (i >= 0 ? (r[i] ?? '').trim() : '');
+  /** Nur gefüllte Zellen: Text */
+  const txt = (r: string[], i: number) => get(r, i) || undefined;
+  /** Zahl als Text normalisiert (1.250,50 -> 1250.5) */
+  const numTxt = (r: string[], i: number) => { const v = get(r, i); if (!v) return undefined; const n = parseAmount(v); if (n === null) { warnings.push(`Zeile ${line}: „${v}“ ist keine Zahl – ignoriert.`); return undefined; } return String(n); };
+  const dateIso = (r: string[], i: number) => { const v = get(r, i); if (!v) return undefined; const d = parseDate(v); if (!d) { warnings.push(`Zeile ${line}: Datum „${v}“ nicht lesbar (JJJJ-MM-TT oder TT.MM.JJJJ) – ignoriert.`); return undefined; } return d; };
+  /** Zahl (echter number-Wert), mit Warnung bei Unlesbarem */
+  const numVal = (r: string[], i: number) => { const v = get(r, i); if (!v) return undefined; const n = parseAmount(v); if (n === null) { warnings.push(`Zeile ${line}: „${v}“ ist keine Zahl – ignoriert.`); return undefined; } return n; };
+  /** undefined-Werte entfernen, damit leere Zellen nichts überschreiben */
+  const defined = <T extends object>(o: T): Partial<T> => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as Partial<T>;
+
+  const next: DB = { ...db, properties: [...db.properties], units: [...db.units], tenants: [...db.tenants] };
+  const sum = { properties: 0, units: 0, tenants: 0, updated: 0 };
   all.slice(1).forEach((r, i) => {
-    const line = i + 2;
-    const hausName = get(r, c.haus).trim();
-    const einheitName = get(r, c.einheit).trim();
+    line = i + 2;
+    const hausName = get(r, c.haus);
+    const einheitName = get(r, c.einheit);
     if (!hausName || !einheitName) { warnings.push(`Zeile ${line}: Haus oder Einheit fehlt – übersprungen.`); return; }
+
+    // ── Objekt ──
+    const eaAus = dateIso(r, c.eaAus);
+    const eaBis = dateIso(r, c.eaBis) ?? (eaAus ? `${Number(eaAus.slice(0, 4)) + 10}${eaAus.slice(4)}` : undefined);
+    const propData = defined({
+      street: txt(r, c.str), zip: txt(r, c.plz), city: txt(r, c.ort), yearBuilt: txt(r, c.baujahr), notes: txt(r, c.notizHaus),
+      plotArea: numTxt(r, c.grundstueck), floors: txt(r, c.etagen), heatingType: txt(r, c.heizung), heatingYear: txt(r, c.heizBj), energySource: txt(r, c.traeger),
+      eaType: txt(r, c.eaArt), eaValue: numTxt(r, c.eaWert), eaClass: txt(r, c.eaKlasse)?.toUpperCase(), eaIssued: eaAus, eaValidUntil: eaBis,
+      landRegister: txt(r, c.grundbuch), parcel: txt(r, c.flurstueck), purchaseDate: dateIso(r, c.kaufdatum), purchasePrice: numTxt(r, c.kaufpreis),
+      insurer: txt(r, c.versicherer), policyNo: txt(r, c.police), premium: numTxt(r, c.praemie), contactName: txt(r, c.kontakt), contactPhone: txt(r, c.kontaktTel),
+    });
     let prop = next.properties.find((p) => norm(p.name) === norm(hausName));
     if (!prop) {
-      prop = { id: uid(), name: hausName, street: get(r, c.str), zip: get(r, c.plz), city: get(r, c.ort), yearBuilt: '', notes: '' };
+      prop = { id: uid(), name: hausName, street: '', zip: '', city: '', yearBuilt: '', notes: '', ...propData };
       next.properties.push(prop); sum.properties++;
+    } else if (Object.keys(propData).length) {
+      const merged = { ...prop, ...propData };
+      if (JSON.stringify(merged) !== JSON.stringify(prop)) { next.properties = next.properties.map((p) => (p.id === prop!.id ? merged : p)); prop = merged; sum.updated++; }
     }
+
+    // ── Einheit ──
     const t = norm(get(r, c.typ));
-    const kind = t.startsWith('gew') ? 'gewerbe' : t.startsWith('eig') || t === 'etw' ? 'eigentum' : 'wohnung';
-    const vatRaw = parseAmount(get(r, c.ust)) ?? 0;
-    const unitData = { kind: kind as 'wohnung' | 'gewerbe' | 'eigentum', vat: kind === 'gewerbe' ? vatRaw : 0, area: parseAmount(get(r, c.flaeche)) ?? 0, rooms: parseAmount(get(r, c.zimmer)) ?? 0, coldRent: parseAmount(get(r, c.kalt)) ?? 0, advance: parseAmount(get(r, c.nk)) ?? 0 };
+    const kind: UnitKind | undefined = !t ? undefined : t.startsWith('gew') ? 'gewerbe' : t.startsWith('eig') || t === 'etw' ? 'eigentum' : 'wohnung';
+    const vatRaw = numVal(r, c.ust) ?? null;
+    const unitData = defined({
+      kind, vat: kind === 'gewerbe' ? vatRaw ?? undefined : kind ? 0 : undefined,
+      area: numVal(r, c.flaeche), rooms: numVal(r, c.zimmer), coldRent: numVal(r, c.kalt), advance: numVal(r, c.nk),
+      floor: txt(r, c.etage), position: txt(r, c.lage), balcony: txt(r, c.balkon), cellar: txt(r, c.keller), parking: txt(r, c.stellplatz), kitchen: txt(r, c.kueche), equipment: txt(r, c.ausstattung), notes: txt(r, c.notizEinheit),
+    });
     let unit = next.units.find((u) => u.propertyId === prop!.id && norm(u.name) === norm(einheitName));
-    if (!unit) { unit = { id: uid(), propertyId: prop.id, name: einheitName, ...unitData }; next.units.push(unit); sum.units++; }
-    else { Object.assign(unit, unitData); next.units = next.units.map((u) => (u.id === unit!.id ? { ...unit! } : u)); sum.updated++; }
-    const tenantName = get(r, c.mieter).trim();
+    if (!unit) { unit = { id: uid(), propertyId: prop.id, name: einheitName, area: 0, rooms: 0, coldRent: 0, advance: 0, ...unitData }; next.units.push(unit); sum.units++; }
+    else if (Object.keys(unitData).length) {
+      const merged = { ...unit, ...unitData };
+      if (JSON.stringify(merged) !== JSON.stringify(unit)) { next.units = next.units.map((u) => (u.id === unit!.id ? merged : u)); unit = merged; sum.updated++; }
+    }
+
+    // ── Mieter ──
+    const tenantName = get(r, c.mieter);
     if (tenantName) {
-      const moveIn = parseDate(get(r, c.einzug)) ?? today();
-      if (!parseDate(get(r, c.einzug))) warnings.push(`Zeile ${line}: Einzugsdatum fehlt oder ist unlesbar – heutiges Datum verwendet.`);
-      const abRaw = get(r, c.ab).trim();
-      const abMonth = (abRaw.match(/^(\d{1,2})\.(\d{4})$/) ? `${abRaw.split('.')[1]}-${abRaw.split('.')[0].padStart(2, '0')}` : parseDate(abRaw)?.slice(0, 7)) || today().slice(0, 7);
-      const td = { trackFrom: abMonth, name: tenantName, email: get(r, c.mail), phone: get(r, c.tel), iban: get(r, c.iban).replace(/\s/g, '').toUpperCase(), moveIn, deposit: parseAmount(get(r, c.kaution)) ?? 0 };
+      const einzugRaw = get(r, c.einzug);
+      const einzug = parseDate(einzugRaw);
+      if (!einzug) warnings.push(`Zeile ${line}: Einzugsdatum ${einzugRaw ? `„${einzugRaw}“ ist ungültig` : 'fehlt'} – heutiges Datum verwendet.`);
+      const abRaw = get(r, c.ab);
+      const ab = abRaw.match(/^(\d{1,2})\.(\d{4})$/) ? `${abRaw.split('.')[1]}-${abRaw.split('.')[0].padStart(2, '0')}` : parseDate(abRaw)?.slice(0, 7);
+      const tenData = defined({
+        email: txt(r, c.mail), phone: txt(r, c.tel), iban: get(r, c.iban) ? get(r, c.iban).replace(/\s/g, '').toUpperCase() : undefined, deposit: numVal(r, c.kaution),
+        salutation: txt(r, c.anrede), mobile: txt(r, c.mobil), postalAddress: txt(r, c.post), emergencyContact: txt(r, c.notfall),
+        contractEnd: dateIso(r, c.befristet), noticeMonths: numTxt(r, c.kuendigung), rentAdjust: txt(r, c.anpassung), nextAdjust: dateIso(r, c.naechste),
+        depositType: txt(r, c.kautionsart), depositAccount: txt(r, c.kautionskonto), notes: txt(r, c.notizMieter),
+      });
       const ex = next.tenants.find((x) => x.unitId === unit!.id && !x.moveOut && norm(x.name) === norm(tenantName));
-      if (ex) { next.tenants = next.tenants.map((x) => (x.id === ex.id ? { ...x, ...td, moveIn: parseDate(get(r, c.einzug)) ?? x.moveIn } : x)); sum.updated++; }
-      else { next.tenants.push({ id: uid(), unitId: unit.id, moveOut: '', ...td }); sum.tenants++; }
+      if (ex) {
+        const merged = { ...ex, ...tenData, ...(einzug ? { moveIn: einzug } : {}) };
+        if (JSON.stringify(merged) !== JSON.stringify(ex)) { next.tenants = next.tenants.map((x) => (x.id === ex.id ? merged : x)); sum.updated++; }
+      } else {
+        next.tenants.push({ id: uid(), unitId: unit.id, name: tenantName, email: '', phone: '', moveIn: einzug ?? today(), moveOut: '', deposit: 0, trackFrom: ab ?? today().slice(0, 7), ...tenData });
+        sum.tenants++;
+      }
     }
   });
-  return { db: next, summary: sum, warnings: warnings.slice(0, 8) };
+  return { db: next, summary: sum, warnings: warnings.slice(0, 10) };
 }
