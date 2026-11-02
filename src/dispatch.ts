@@ -16,7 +16,11 @@ export interface DispatchProvider {
   send(letters: LetterToSend[]): Promise<SendResult>;
 }
 
-export const safeName = (s: string) => s.replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 90);
+/** Dateiname in einfachen Zeichen (ä -> ae, – -> -), damit Download und Teilen überall funktionieren. */
+export const safeName = (s: string) =>
+  s.replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/Ä/g, 'Ae').replace(/Ö/g, 'Oe').replace(/Ü/g, 'Ue').replace(/ß/g, 'ss')
+    .replace(/[\u2010-\u2015]/g, '-').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^A-Za-z0-9 ._()\-]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 90) || 'Brief';
 
 export function downloadBlob(blob: Blob, name: string) {
   const url = URL.createObjectURL(blob);

@@ -4,16 +4,31 @@ import { useSettings } from '../settings';
 import { Button, Field, Gap, ListRow, Note, Screen, Section, Segmented, notify, useColors } from '../ui';
 import { pickLogo } from '../image';
 import { exportPdf, sampleLetterHtml } from '../pdf';
-import { sampleModel } from '../letters';
+import { sampleModel, testLetterMissing, testLetterModel } from '../letters';
+import { filesSupported } from '../files';
+import { storeLetters } from '../outbox';
+import { useStore } from '../store';
 import { modelToPdf } from '../pdfgen';
 import { pdfBlob } from '../outbox';
 import { downloadBlob } from '../dispatch';
 import { num } from '../calc';
 import { type } from '../theme';
 
-export function BriefeSettings() {
+export function BriefeSettings({ navigation }: any) {
   const { s, update } = useSettings();
+  const { save } = useStore();
   const c = useColors();
+  const makeTestLetter = async () => {
+    const missing = testLetterMissing(s);
+    if (missing.length) return notify(`Für den Testbrief fehlen Absenderangaben: ${missing.join(', ')}.`);
+    try {
+      if (!filesSupported()) return exportPdf(sampleLetterHtml(s));
+      const self = { id: 'self', unitId: '', name: s.name, email: '', phone: '', moveIn: '', moveOut: '', deposit: 0 };
+      const [doc] = await storeLetters([{ model: testLetterModel(s), tenant: self, note: 'Testbrief an mich selbst' }]);
+      save('documents', doc);
+      navigation.navigate('Outbox');
+    } catch (e: any) { notify(String(e?.message ?? e)); }
+  };
   const t = (k: 'name' | 'street' | 'zip' | 'city' | 'phone' | 'email' | 'bank' | 'iban' | 'bic') => (v: string) => update({ [k]: v });
   return (
     <Screen>
@@ -58,6 +73,8 @@ export function BriefeSettings() {
         <Field label="1. Mahnung" value={String(s.fee2)} onChangeText={(v) => update({ fee2: Math.max(0, num(v)) })} keyboard="numeric" suffix="€" />
         <Field label="2. Mahnung" value={String(s.fee3)} onChangeText={(v) => update({ fee3: Math.max(0, num(v)) })} keyboard="numeric" suffix="€" />
       </Section>
+      <Button icon="paper-plane-outline" title="Testbrief an mich selbst erstellen" onPress={makeTestLetter} />
+      <Gap h={8} />
       <Button kind="secondary" icon="eye-outline" title="Probe-Brief ansehen" onPress={() => (Platform.OS === 'web' ? modelToPdf(sampleModel(s)).then((b) => { const url = URL.createObjectURL(pdfBlob(b)); const w = window.open(url, '_blank'); if (!w) downloadBlob(pdfBlob(b), 'Probe-Brief.pdf'); }) : exportPdf(sampleLetterHtml(s))).catch((e) => notify(String(e?.message ?? e)))} />
       <Gap h={14} />
       <Note>Die Brieftexte sind Standardformulierungen. Lass sie einmal von einem Anwalt oder deinem Eigentümerverband prüfen.</Note>

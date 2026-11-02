@@ -227,6 +227,12 @@ export async function modelToPdf(m: LetterModel): Promise<Uint8Array> {
   w.line(0, mm(148.5), mm(8), mm(148.5), 0.4, rgb(0.33, 0.33, 0.33));
   w.line(0, mm(210), mm(5), mm(210), 0.4, rgb(0.33, 0.33, 0.33));
 
+  // ── Testbrief: Fensterrahmen (gestrichelt) und Beschriftung ──
+  if (m.guides) {
+    w.page.drawRectangle({ x: mm(20), y: PH - mm(90), width: mm(85), height: mm(45), borderColor: rgb(0.85, 0.2, 0.2), borderWidth: 0.6, borderDashArray: [3, 2], opacity: 0, borderOpacity: 0.9 });
+    w.put(mm(20), mm(90) + 1, 10, 'Fenster 85 × 45 mm', 6.5, false, rgb(0.85, 0.2, 0.2));
+  }
+
   // ── Briefkopf: Logo links, Absender rechts ──
   if (m.logo) {
     try {

@@ -27,7 +27,7 @@ export function Outbox({ navigation }: any) {
   // Standard: im Ausgang alle ausgewählt, bei „Versendet“ keiner
   const isOn = (d: Doc) => (tab === 'bereit' ? !picked[d.id] : !!picked[d.id]);
   const chosen = list.filter(isOn);
-  const tenantName = (d: Doc) => db.tenants.find((t) => t.id === d.ownerId)?.name ?? '';
+  const tenantName = (d: Doc) => (d.ownerId === 'self' ? 'An dich selbst' : db.tenants.find((t) => t.id === d.ownerId)?.name ?? '');
 
   const files = async (docs: Doc[]) => {
     const out: { name: string; blob: Blob }[] = [];

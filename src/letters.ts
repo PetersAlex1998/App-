@@ -22,6 +22,7 @@ export interface LetterModel {
   info: [string, string][]; // Infoblock rechts: [Bezeichnung, Wert]
   blocks: Block[];
   footer: string[];
+  guides?: boolean; // Testbrief: Fensterrahmen einzeichnen (nur im PDF)
 }
 
 const esc = (s: string) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
@@ -128,6 +129,45 @@ export function nkModel(res: NkResult, t: Tenant, unit: Unit, prop: Property, ye
     { t: 'p', small: true, text: 'Die Abrechnung wurde anteilig nach Mietmonaten erstellt.' },
     { t: 'sign', lines: ['Mit freundlichen Grüßen', s.name || 'Ihre Hausverwaltung'] },
   ]);
+}
+
+/** Fehlende Pflichtangaben für den Testbrief (Absender = Empfänger). */
+export function testLetterMissing(s: Settings): string[] {
+  const m: string[] = [];
+  if (!s.name.trim()) m.push('Name oder Firma');
+  if (!s.street.trim()) m.push('Straße');
+  if (!s.zip.trim()) m.push('PLZ');
+  if (!s.city.trim()) m.push('Ort');
+  return m;
+}
+
+/** Testbrief an dich selbst: Empfänger sind die Absenderdaten. Prüft Fensterposition, Marken, Logo und Zeichensatz. */
+export function testLetterModel(s: Settings, date = new Date().toISOString().slice(0, 10)): LetterModel {
+  const prop: Property = { id: 'p', name: 'Testbrief', street: s.street, zip: s.zip, city: s.city, yearBuilt: '', notes: '' };
+  const unit: Unit = { id: 'u', propertyId: 'p', name: '', area: 0, rooms: 0, coldRent: 0, advance: 0 };
+  const t: Tenant = { id: 'self', unitId: 'u', name: s.name, salutation: 'Firma', email: '', phone: '', moveIn: date, moveOut: '', deposit: 0 };
+  const bankKv: Block = { t: 'kv', rows: [['Empfänger', s.name], ['IBAN', s.iban], ...(s.bic ? ([['BIC', s.bic]] as [string, string][]) : [])] };
+  const check: [string, string][] = [
+    ['1', 'Die Anschrift (oben links) ist vollständig im Fenster sichtbar, nichts ist abgeschnitten.'],
+    ['2', 'Die kleine Rücksendezeile über der Anschrift ist lesbar.'],
+    ['3', 'Logo und Absender oben sind gut platziert und nicht beschnitten.'],
+    ['4', 'Am linken Rand sind drei kleine Marken (Falz, Loch, Falz) zu sehen.'],
+    ['5', 'Die Fußzeile mit der Bankverbindung ist vollständig.'],
+    ['6', 'Die Sonderzeichen unten sind korrekt dargestellt.'],
+  ];
+  return {
+    ...frame(s, t, prop, unit, date, [['Art', 'Testbrief']], `Testbrief – ${s.name}`, [
+      { t: 'h1', text: 'Testbrief an Sie selbst' },
+      { t: 'p', text: 'Sehr geehrte Damen und Herren,' },
+      { t: 'p', text: 'dies ist ein Testbrief. Er geht an Ihre eigene Adresse und zeigt, ob Ihre Briefe beim Versand richtig aussehen. Bitte prüfen Sie den ausgedruckten bzw. zugestellten Brief:' },
+      { t: 'table', head: ['Nr.', 'Prüfpunkt'], align: ['l', 'l'], widths: [0.1, 0.9], rows: check.map(([n, x]) => ({ cells: [n, x] })) },
+      { t: 'p', text: 'Sonderzeichen: ä ö ü Ä Ö Ü ß € – „Anführungszeichen“ · m² · m³ · 1.234,56 €' },
+      { t: 'p', small: true, text: 'Die gestrichelte Linie zeigt das Sichtfenster (85 × 45 mm, 20 mm von links, 45 mm von oben). Sie erscheint nur auf diesem Testbrief, nicht auf echten Briefen.' },
+      ...(s.iban ? [bankKv] : []),
+      { t: 'sign', lines: ['Mit freundlichen Grüßen', s.name || 'Ihre Hausverwaltung'] },
+    ]),
+    guides: true,
+  };
 }
 
 export function sampleModel(s: Settings): LetterModel {
