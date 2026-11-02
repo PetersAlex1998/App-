@@ -4,12 +4,15 @@ import { useStore } from '../store';
 import { Badge, EmptyState, LargeHeader, ListRow, Screen, SearchBar, Section, Segmented, Stat, StatGrid, useColors, Button, Gap, FilterChips } from '../ui';
 import { dateDE, eur, initials, monthLabel, monthLong, openItems, totalOpen, today, unitDue, kindOf, kindLabel } from '../calc';
 import { type } from '../theme';
+import { useSettings } from '../settings';
+import { dunningPlans } from '../dunning';
 
 const LIMIT = 5;
 const isActive = (t: { moveOut: string }) => !t.moveOut || t.moveOut >= today();
 
 export function Dashboard({ navigation }: any) {
   const { db } = useStore();
+  const { s: cfg } = useSettings();
   const c = useColors();
   const activeTenants = db.tenants.filter(isActive);
   const rentRoll = activeTenants.reduce((s, t) => {
@@ -26,6 +29,7 @@ export function Dashboard({ navigation }: any) {
   // To-do-Liste: was braucht jetzt Aufmerksamkeit?
   const arrears = activeTenants.filter((t) => openItems(db, t).length > 0);
   const depositMissing = activeTenants.filter((t) => t.deposit > 0 && db.payments.filter((p) => p.tenantId === t.id && p.kind === 'kaution').reduce((s, p) => s + p.amount, 0) < t.deposit);
+  const duePlans = dunningPlans(db, cfg).filter((p) => p.status === 'faellig');
   const todoCount = arrears.length + vacant.length + depositMissing.length;
 
   // Erste Schritte
@@ -63,6 +67,12 @@ export function Dashboard({ navigation }: any) {
             <ListRow key={s.label} title={s.label} icon={s.done ? 'checkmark-circle' : 'ellipse-outline'} iconTone={s.done ? 'ok' : i === firstOpen ? 'primary' : 'neutral'}
               onPress={s.done || i !== firstOpen ? undefined : () => (i === 0 ? navigation.navigate('PropertyForm', {}) : i === 1 ? navigation.navigate('Objekte') : i === 2 ? navigation.navigate('TenantForm', {}) : navigation.navigate('PaymentForm', {}))} />
           ))}
+        </Section>
+      )}
+
+      {duePlans.length > 0 && (
+        <Section>
+          <ListRow icon="mail-unread" iconTone="danger" title={`Mahnlauf starten (${duePlans.length})`} subtitle={`${duePlans.length} Mieter mit überfälliger Miete · ${eur(duePlans.reduce((a, p) => a + p.open, 0))}`} onPress={() => navigation.navigate('Mahnlauf')} />
         </Section>
       )}
 

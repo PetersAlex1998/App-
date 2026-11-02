@@ -57,6 +57,7 @@ export interface Reminder {
   amount: number; // offener Betrag
   fee: number; // Mahngebühr
   deadline: string;
+  items?: { month: string; due: number; paid: number; open: number }[]; // Stand zum Zeitpunkt der Mahnung
 }
 
 export type CostKey = 'area' | 'units';

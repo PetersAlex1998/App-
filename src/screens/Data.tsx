@@ -41,6 +41,10 @@ export function DataScreen({ navigation }: any) {
         <ListRow icon="card" title="Zahlungen" right={String(db.payments.length)} />
       </Section>
 
+      <Section title="Briefe und Mahnwesen">
+        <ListRow icon="mail-outline" title="Absender und Mahnregeln" subtitle="Adresse, IBAN, Gebühren, Fristen" onPress={() => navigation.navigate('Briefe')} />
+      </Section>
+
       <Section title="Importieren">
         <ListRow icon="albums-outline" title="Bestand aus CSV importieren" subtitle="Häuser, Einheiten und Mieter auf einmal anlegen" onPress={() => navigation.navigate('BestandImport')} />
         <ListRow icon="swap-vertical-outline" title="Kontoauszug importieren" subtitle="Zahlungseingänge automatisch zuordnen" onPress={() => navigation.navigate('StatementImport')} />

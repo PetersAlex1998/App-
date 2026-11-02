@@ -4,6 +4,8 @@ import { useStore, uid } from '../store';
 import { Avatar, Badge, Button, EmptyState, Gap, ListRow, Note, Row, Screen, Section, Segmented, Stat, StatGrid, confirm, notify, useColors } from '../ui';
 import { addDays, dateDE, eur, initials, kindLabel, kindOf, monthLabel, unitDue, nkStatement, openItems, reminderLabel, today, totalOpen } from '../calc';
 import { exportPdf, nkHtml, reminderHtml } from '../pdf';
+import { useSettings } from '../settings';
+import { dunningPlans, feeFor, makeReminder, overdueItems, relevantReminders } from '../dunning';
 import { type } from '../theme';
 
 
@@ -81,6 +83,7 @@ export function PropertyDetail({ route, navigation }: any) {
 export function TenantDetail({ route, navigation }: any) {
   const { db, save } = useStore();
   const c = useColors();
+  const { s: cfg } = useSettings();
   const t = db.tenants.find((x) => x.id === route.params.id);
   const [year, setYear] = useState(new Date().getFullYear() - 1);
   useHeaderAction(navigation, 'Bearbeiten', () => t && navigation.navigate('TenantForm', { id: t.id }));
@@ -92,24 +95,27 @@ export function TenantDetail({ route, navigation }: any) {
   const open = totalOpen(db, t);
   const reminders = db.reminders.filter((r) => r.tenantId === t.id).sort((a, b) => b.date.localeCompare(a.date));
   const paidDeposit = db.payments.filter((p) => p.tenantId === t.id && p.kind === 'kaution').reduce((s, p) => s + p.amount, 0);
-  const nextLevel = Math.min(3, reminders.length + 1) as 1 | 2 | 3;
+  const dueNow = overdueItems(db, t, cfg);
+  const nextLevel = Math.min(3, relevantReminders(db, t, dueNow).length + 1) as 1 | 2 | 3;
   const ended = !!t.moveOut && t.moveOut < today();
   const nk = unit ? nkStatement(db, t, unit, year) : null;
   const years = [0, 1, 2, 3].map((o) => new Date().getFullYear() - o);
 
   const link = (url: string) => Linking.openURL(url).catch(() => notify('Das konnte nicht geöffnet werden.'));
   const createReminder = () => {
-    if (!unit || !prop || open <= 0) return;
-    confirm(`${reminderLabel(nextLevel)} erstellen?`, async () => {
-      const r = { id: uid(), tenantId: t.id, date: today(), level: nextLevel, amount: open, fee: nextLevel === 1 ? 0 : nextLevel === 2 ? 5 : 10, deadline: addDays(today(), 7) };
+    if (!unit || !prop) return;
+    const plan = dunningPlans(db, cfg).find((p) => p.tenant.id === t.id);
+    if (!plan) return notify('Aktuell ist keine Miete überfällig. Die Miete des laufenden Monats gilt erst nach Fälligkeit und Karenz als überfällig.');
+    confirm(`${reminderLabel(plan.level)} erstellen?`, async () => {
+      const r = makeReminder(uid(), plan, cfg);
       save('reminders', r);
-      await exportPdf(reminderHtml(db, r, t, unit, prop));
-    }, 'Erstellen', `Offen: ${eur(open)}${nextLevel > 1 ? ` · Mahngebühr ${nextLevel === 2 ? '5' : '10'} €` : ''}. Frist: 7 Tage. Das PDF kannst du danach teilen oder drucken.`);
+      await exportPdf(reminderHtml(db, r, t, unit, prop, cfg));
+    }, 'Erstellen', `Überfällig: ${eur(plan.open)}${plan.fee ? ` · Mahngebühr ${eur(plan.fee)}` : ''}. Frist: ${cfg.deadlineDays} Tage. Das PDF kannst du danach teilen oder drucken.`);
   };
   const createNk = async () => {
     if (!unit || !prop || !nk) return;
     if (nk.lines.length === 0) return notify(`Für ${year} sind noch keine Betriebskosten erfasst. Trage sie im Objekt ein.`);
-    await exportPdf(nkHtml(nk, t, unit, prop, year));
+    await exportPdf(nkHtml(nk, t, unit, prop, year, cfg));
   };
 
   return (
@@ -135,13 +141,13 @@ export function TenantDetail({ route, navigation }: any) {
         ))}
         {items.length > 1 && <Row bold left="Summe offen" right={eur(open)} color={c.danger} />}
       </Section>
-      {open > 0 && !ended && <><Button kind="destructive" icon="document-text" title={`${reminderLabel(nextLevel)} erstellen`} onPress={createReminder} /><Gap h={22} /></>}
+      {dueNow.length > 0 && !ended && <><Button kind="destructive" icon="document-text" title={`${reminderLabel(nextLevel)} erstellen`} onPress={createReminder} /><Gap h={22} /></>}
 
       {reminders.length > 0 && (
         <Section title="Mahnhistorie" footer="Antippen, um das PDF erneut zu erzeugen.">
           {reminders.map((r) => (
             <ListRow key={r.id} icon="mail-unread-outline" iconTone="warn" title={reminderLabel(r.level)} subtitle={`${dateDE(r.date)} · Frist ${dateDE(r.deadline)}`} right={eur(r.amount + r.fee)}
-              onPress={() => unit && prop && exportPdf(reminderHtml(db, r, t, unit, prop))} />
+              onPress={() => unit && prop && exportPdf(reminderHtml(db, r, t, unit, prop, cfg))} />
           ))}
         </Section>
       )}
