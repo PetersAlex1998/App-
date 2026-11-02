@@ -3,6 +3,43 @@ import { NkResult, dateDE, eur, monthLabel, openItems } from './calc';
 import type { Settings } from './settings';
 
 const esc = (s: string) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+/** Nachname aus „Anna Schmidt“, „Schmidt, Anna“ oder „Dr. Anna Schmidt“. */
+export function lastName(name: string): string {
+  const n = name.trim();
+  if (n.includes(',')) return n.split(',')[0].trim();
+  const parts = n.split(/\s+/);
+  return parts[parts.length - 1] ?? n;
+}
+/** „Schmidt, Anna“ -> „Anna Schmidt“ für die Adresszeile. */
+const displayName = (name: string) => (name.includes(',') && !isMultiName(name) ? name.split(',').reverse().map((x) => x.trim()).join(' ') : name.trim());
+const isMultiName = (name: string) => /( und | & |\+|\/)/i.test(name);
+const isMulti = (name: string) => /( und | & |\+|\/)/i.test(name);
+
+/** Briefanrede nach Anrede-Feld; bei mehreren Mietern oder Firmen neutral. */
+export function salutationLine(t: Tenant): string {
+  const sal = (t.salutation ?? '').trim();
+  const nm = lastName(t.name);
+  if (!nm || isMulti(t.name) || sal === 'Firma' || !sal) return 'Sehr geehrte Damen und Herren,';
+  if (sal === 'Herr') return `Sehr geehrter Herr ${esc(nm)},`;
+  if (sal === 'Frau') return `Sehr geehrte Frau ${esc(nm)},`;
+  if (sal === 'Familie') return `Sehr geehrte Familie ${esc(nm)},`;
+  return 'Sehr geehrte Damen und Herren,';
+}
+
+/** Empfängerblock: Postanschrift, falls hinterlegt, sonst Adresse des Objekts. */
+export function addressLines(t: Tenant, prop: Property, unit: Unit): { lines: string[]; unitNote?: string } {
+  const sal = (t.salutation ?? '').trim();
+  const nm = displayName(t.name);
+  const nameLine = isMulti(t.name) || sal === 'Firma' || !sal ? nm : sal === 'Herr' ? `Herrn ${nm}` : sal === 'Frau' ? `Frau ${nm}` : sal === 'Familie' && !/^familie/i.test(nm) ? `Familie ${lastName(t.name)}` : nm;
+  const post = (t.postalAddress ?? '').split(/\r?\n|;/).map((x) => x.trim()).filter(Boolean);
+  if (post.length) return { lines: [nameLine, ...post] };
+  return { lines: [nameLine, prop.street, `${prop.zip} ${prop.city}`.trim()].filter((x) => x && x.trim()), unitNote: unit.name };
+}
+function addressBlock(s: Settings, t: Tenant, prop: Property, unit: Unit) {
+  const a = addressLines(t, prop, unit);
+  return `<div style="margin-top:24px">${returnLine(s)}<br>${a.lines.map(esc).join('<br>')}${a.unitNote ? `<br><span class="small">${esc(a.unitNote)}</span>` : ''}</div>`;
+}
+
 const levelTitle = ['', 'Zahlungserinnerung', '1. Mahnung', '2. Mahnung – letzte Zahlungsaufforderung'];
 
 function senderBlock(s: Settings) {
@@ -19,11 +56,11 @@ function returnLine(s: Settings) {
   const t = [s.name, s.street, `${s.zip} ${s.city}`.trim()].filter((x) => x && x.trim()).join(' · ');
   return t ? `<div class="small" style="border-bottom:1px solid #999;display:inline-block;margin-bottom:4px">${esc(t)}</div>` : '';
 }
-function bankBlock(s: Settings, unit: Unit, t: Tenant) {
+function bankBlock(s: Settings, unit: Unit, t: Tenant, purpose = 'Miete') {
   if (!s.iban) return '<p class="small">Bitte überweisen Sie auf das Ihnen bekannte Mietkonto.</p>';
   return `<table style="width:auto"><tr><td class="small">Empfänger</td><td>${esc(s.name || '')}</td></tr>
 <tr><td class="small">IBAN</td><td>${esc(s.iban)}</td></tr>${s.bic ? `<tr><td class="small">BIC</td><td>${esc(s.bic)}</td></tr>` : ''}${s.bank ? `<tr><td class="small">Bank</td><td>${esc(s.bank)}</td></tr>` : ''}
-<tr><td class="small">Verwendungszweck</td><td>Miete ${esc(unit.name)} – ${esc(t.name)}</td></tr></table>`;
+<tr><td class="small">Verwendungszweck</td><td>${esc(purpose)} ${esc(unit.name)} – ${esc(t.name)}</td></tr></table>`;
 }
 
 /** Ein Mahnbrief als HTML-Abschnitt (eine Seite). */
@@ -38,11 +75,11 @@ export function reminderHtml(db: DB, r: Reminder, t: Tenant, unit: Unit, prop: P
   ][r.level];
   return `<div class="page">
 ${senderBlock(s)}
-<div style="margin-top:24px">${returnLine(s)}<br>${esc(t.name)}<br>${esc(prop.street)}<br>${esc(prop.zip)} ${esc(prop.city)}<br><span class="small">${esc(unit.name)}</span></div>
+${addressBlock(s, t, prop, unit)}
 <p style="text-align:right;margin-top:24px">${dateDE(r.date)}</p>
 <h1>${levelTitle[r.level]}</h1>
 <p class="small">Mietverhältnis: ${esc(prop.name)}, ${esc(unit.name)}</p>
-<p>Sehr geehrte Damen und Herren,</p>
+<p>${salutationLine(t)}</p>
 <p>${intro}</p>
 <table><tr><th>Monat</th><th class="r">Soll</th><th class="r">Gezahlt</th><th class="r">Offen</th></tr>${rows}
 ${r.fee ? `<tr><td colspan="3">Mahngebühr</td><td class="r">${eur(r.fee)}</td></tr>` : ''}
@@ -55,16 +92,26 @@ ${footerBlock(s)}
 }
 
 export function nkHtml(res: NkResult, t: Tenant, unit: Unit, prop: Property, year: number, s: Settings): string {
-  const rows = res.lines.map((l) => `<tr><td>${esc(l.category)}</td><td>${l.key}</td><td class="r">${eur(l.total)}</td><td class="r">${eur(l.share)}</td></tr>`).join('');
+  const rows = res.lines.map((l) => `<tr><td>${esc(l.category)}</td><td>${esc(l.key)}</td><td class="r">${eur(l.total)}</td><td class="r">${eur(l.share)}</td></tr>`).join('');
   const verdict = res.balance > 0 ? `Nachzahlung: ${eur(res.balance)}` : `Guthaben: ${eur(-res.balance)}`;
+  const outro = res.balance > 0
+    ? `Bitte überweisen Sie die Nachzahlung von <b>${eur(res.balance)}</b> innerhalb von 30 Tagen nach Zugang dieser Abrechnung.`
+    : res.balance < 0 ? `Das Guthaben von <b>${eur(-res.balance)}</b> erstatten wir Ihnen bzw. verrechnen es mit der nächsten Miete.` : 'Die Abrechnung ist ausgeglichen.';
   return `<div class="page">${senderBlock(s)}
-<h1 style="margin-top:24px">Nebenkostenabrechnung ${year}</h1>
-<p>${esc(prop.name)}, ${esc(prop.street)}, ${esc(prop.zip)} ${esc(prop.city)}<br>Mieter: ${esc(t.name)} · ${esc(unit.name)} (${unit.area} m²)<br>Abrechnungszeitraum: ${res.months} Monat(e)</p>
-<table><tr><th>Kostenart</th><th>Schlüssel</th><th class="r">Gesamt</th><th class="r">Ihr Anteil</th></tr>${rows}
+${addressBlock(s, t, prop, unit)}
+<p style="text-align:right;margin-top:24px">${dateDE(new Date().toISOString().slice(0, 10))}</p>
+<h1>Nebenkostenabrechnung ${year}</h1>
+<p class="small">Mietverhältnis: ${esc(prop.name)}, ${esc(unit.name)} (${unit.area} m²) · Abrechnungszeitraum: ${res.months} Monat(e)</p>
+<p>${salutationLine(t)}</p>
+<p>nachfolgend erhalten Sie die Abrechnung der Betriebskosten für das Jahr ${year}.</p>
+<table><tr><th>Kostenart</th><th>Verteilung</th><th class="r">Gesamt</th><th class="r">Ihr Anteil</th></tr>${rows}
 <tr class="sum"><td colspan="3">Summe Ihrer Kosten</td><td class="r">${eur(res.costs)}</td></tr>
 <tr><td colspan="3">abzgl. Vorauszahlungen</td><td class="r">${eur(res.advances)}</td></tr>
 <tr class="sum"><td colspan="3">${verdict}</td><td class="r">${eur(res.balance)}</td></tr></table>
+<p>${outro}</p>
+${res.balance > 0 ? bankBlock(s, unit, t, `Nebenkosten ${year}`) : ''}
 <p class="small">Die Abrechnung wurde anteilig nach Mietmonaten erstellt.</p>
+<p style="margin-top:20px">Mit freundlichen Grüßen<br>${esc(s.name || 'Ihre Hausverwaltung')}</p>
 ${footerBlock(s)}</div>`;
 }
 
@@ -72,7 +119,7 @@ ${footerBlock(s)}</div>`;
 export function sampleLetterHtml(s: Settings): string {
   const prop: Property = { id: 'p', name: 'Haus Lindenstraße', street: 'Lindenstr. 12', zip: '50667', city: 'Köln', yearBuilt: '', notes: '' };
   const unit: Unit = { id: 'u', propertyId: 'p', name: 'WE 2, 1. OG', area: 70, rooms: 3, coldRent: 700, advance: 160 };
-  const t: Tenant = { id: 't', unitId: 'u', name: 'Erika Mustermann', email: '', phone: '', moveIn: '2024-01-01', moveOut: '', deposit: 0 };
+  const t: Tenant = { id: 't', unitId: 'u', name: 'Erika Mustermann', salutation: 'Frau', email: '', phone: '', moveIn: '2024-01-01', moveOut: '', deposit: 0 };
   const items = [{ month: '2026-09', due: 860, paid: 0, open: 860 }, { month: '2026-10', due: 860, paid: 0, open: 860 }];
   const r: Reminder = { id: 'x', tenantId: 't', date: new Date().toISOString().slice(0, 10), level: 2, amount: 1720, fee: s.fee2, deadline: new Date(Date.now() + s.deadlineDays * 86400000).toISOString().slice(0, 10), items };
   return reminderHtml({ properties: [prop], units: [unit], tenants: [t], payments: [], reminders: [], costs: [], meters: [], readings: [], documents: [] }, r, t, unit, prop, s);
