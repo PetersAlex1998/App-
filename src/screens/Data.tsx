@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Platform } from 'react-native';
 import { useStore } from '../store';
 import { Btn, Card, Field, Muted, Screen, Title, confirm, notify } from '../ui';
+import { demoData } from '../demo';
 import { exportBackup, parseBackup, pickBackupFile } from '../backup';
 
 export function DataScreen() {
@@ -31,6 +32,10 @@ export function DataScreen() {
         <Muted>Die Daten liegen nur auf diesem Gerät. Exportiere regelmäßig eine Sicherung, z. B. in iCloud Drive oder Google Drive.</Muted>
       </Card>
       <Btn title={Platform.OS === 'web' ? 'Sicherung herunterladen' : 'Sicherung exportieren'} onPress={() => exportBackup(db).catch((e) => notify(String(e?.message ?? e)))} />
+
+      <Title>Beispieldaten</Title>
+      <Muted>Lädt ein Beispiel-Objekt mit Wohnungen, Mietern und Zahlungen, damit du alle Funktionen ausprobieren kannst.</Muted>
+      <Btn kind="ghost" title="Beispieldaten laden" onPress={() => confirm('Beispieldaten laden? Die aktuellen Daten werden ersetzt.', () => replaceAll(demoData()), 'Laden')} />
 
       <Title>Wiederherstellen</Title>
       {Platform.OS === 'web' && (

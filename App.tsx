@@ -21,7 +21,7 @@ const icon = (name: React.ComponentProps<typeof Ionicons>['name']) => ({ color, 
 function Tabs() {
   const c = useColors();
   return (
-    <Tab.Navigator screenOptions={{ tabBarActiveTintColor: c.primary, tabBarInactiveTintColor: c.muted, tabBarStyle: { backgroundColor: c.card }, tabBarLabelStyle: { fontSize: 11 }, headerStyle: { backgroundColor: c.card }, headerTintColor: c.text }}>
+    <Tab.Navigator screenOptions={{ tabBarActiveTintColor: c.primary, tabBarInactiveTintColor: c.muted, tabBarStyle: { backgroundColor: c.card, height: 64, paddingTop: 6, paddingBottom: 8 }, tabBarLabelStyle: { fontSize: 11 }, headerStyle: { backgroundColor: c.card }, headerTintColor: c.text }}>
       <Tab.Screen name="Übersicht" component={Dashboard} options={{ tabBarIcon: icon('stats-chart') }} />
       <Tab.Screen name="Objekte" component={Properties} options={{ tabBarIcon: icon('business') }} />
       <Tab.Screen name="Mieter" component={Tenants} options={{ tabBarIcon: icon('people') }} />

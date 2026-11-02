@@ -16,7 +16,6 @@ export function Dashboard({ navigation }: any) {
   const vacant = db.units.filter((u) => !db.tenants.some((t) => t.unitId === u.id && !t.moveOut)).length;
   return (
     <Screen>
-      <Title>Übersicht</Title>
       <Card>
         <Row left="Objekte" right={String(db.properties.length)} />
         <Row left="Wohneinheiten" right={`${db.units.length} (${vacant} frei)`} />
