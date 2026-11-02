@@ -60,7 +60,22 @@ export interface Reminder {
   items?: { month: string; due: number; paid: number; open: number }[]; // Stand zum Zeitpunkt der Mahnung
 }
 
-export type CostKey = 'area' | 'units';
+export type CostKey = 'area' | 'units' | 'consumption';
+export type MeterType = 'wasser_kalt' | 'wasser_warm' | 'heizung' | 'strom' | 'gas';
+
+export interface Meter {
+  id: ID;
+  propertyId: ID;
+  unitId: ID; // '' = Allgemein (Haus)
+  type: MeterType;
+  number: string;
+}
+export interface Reading {
+  id: ID;
+  meterId: ID;
+  date: string; // YYYY-MM-DD
+  value: number;
+}
 
 export interface Cost {
   id: ID;
@@ -69,6 +84,7 @@ export interface Cost {
   category: string;
   amount: number;
   key: CostKey; // Verteilerschlüssel
+  meterType?: MeterType; // bei key = 'consumption'
 }
 
 export interface DB {
@@ -78,6 +94,8 @@ export interface DB {
   payments: Payment[];
   reminders: Reminder[];
   costs: Cost[];
+  meters: Meter[];
+  readings: Reading[];
 }
 
 export type Kind = keyof DB;
@@ -88,4 +106,6 @@ export const emptyDB: DB = {
   payments: [],
   reminders: [],
   costs: [],
+  meters: [],
+  readings: [],
 };

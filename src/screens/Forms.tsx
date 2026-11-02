@@ -4,7 +4,8 @@ import { useStore, uid } from '../store';
 import { Button, DateField, Field, Gap, Note, OptionRow, Screen, Section, Segmented, confirm } from '../ui';
 import { Cost, Kind, Payment, Property, Tenant, Unit } from '../types';
 import { eur, monthLabel, num, suggestPayment, today } from '../calc';
-import { UnitKind } from '../types';
+import { MeterType, UnitKind } from '../types';
+import { METER_TYPES, meterTypeLabel } from '../meters';
 
 function useItem<T extends { id: string }>(kind: Kind, id?: string): T | undefined {
   const { db } = useStore();
@@ -207,6 +208,7 @@ export function CostForm({ route, navigation }: any) {
   const { save } = useStore();
   const old = useItem<Cost>('costs', route.params?.id);
   const [f, setF] = useState({ category: old?.category ?? '', amount: old ? String(old.amount) : '', year: String(old?.year ?? new Date().getFullYear() - 1), key: (old?.key ?? 'area') as Cost['key'] });
+  const [mtype, setMtype] = useState<MeterType>(old?.meterType ?? 'wasser_kalt');
   const [err, setErr] = useState<Errors>({});
   const set = (k: keyof typeof f) => (v: string) => setF({ ...f, [k]: v });
   const submit = () => {
@@ -216,7 +218,7 @@ export function CostForm({ route, navigation }: any) {
     if (!/^\d{4}$/.test(f.year)) e.year = 'Bitte ein Jahr wie 2025 eingeben.';
     setErr(e);
     if (Object.keys(e).length) return false;
-    save('costs', { id: old?.id ?? uid(), propertyId: old?.propertyId ?? route.params.propertyId, year: Number(f.year), category: f.category.trim(), amount: num(f.amount), key: f.key });
+    save('costs', { id: old?.id ?? uid(), propertyId: old?.propertyId ?? route.params.propertyId, year: Number(f.year), category: f.category.trim(), amount: num(f.amount), key: f.key, meterType: f.key === 'consumption' ? mtype : undefined });
     return true;
   };
   return (
@@ -229,7 +231,13 @@ export function CostForm({ route, navigation }: any) {
       <Section title="Verteilung auf die Mieter">
         <OptionRow selected={f.key === 'area'} onPress={() => setF({ ...f, key: 'area' })} title="Nach Wohnfläche" subtitle="Anteil = Wohnfläche der Wohnung ÷ Gesamtfläche" />
         <OptionRow selected={f.key === 'units'} onPress={() => setF({ ...f, key: 'units' })} title="Je Wohneinheit" subtitle="Alle Wohnungen zahlen den gleichen Anteil" />
+        <OptionRow selected={f.key === 'consumption'} onPress={() => setF({ ...f, key: 'consumption' })} title="Nach Verbrauch" subtitle="Anteil nach Zählerständen (z. B. Wasser, Heizung)" />
       </Section>
+      {f.key === 'consumption' && (
+        <Section title="Welcher Zähler?" footer="Dafür müssen Zähler und Stände im Objekt erfasst sein.">
+          {METER_TYPES.map((t) => <OptionRow key={t} selected={mtype === t} onPress={() => setMtype(t)} title={meterTypeLabel(t)} />)}
+        </Section>
+      )}
       <Footer kind="costs" id={old?.id} nav={navigation} onSave={submit} />
     </Screen>
   );

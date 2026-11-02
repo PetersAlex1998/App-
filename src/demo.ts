@@ -29,10 +29,18 @@ export function demoData(): DB {
       ...pay('demo-b', 'demo-t2', months, 1100),
       { id: 'demo-k1', tenantId: 'demo-t1', date: moveIn, month: moveIn.slice(0, 7), amount: 1920, kind: 'kaution' as const, note: '' },
     ],
+    meters: [
+      { id: 'demo-m1', propertyId: 'demo-p1', unitId: 'demo-u1', type: 'wasser_kalt', number: 'W-1001' },
+      { id: 'demo-m2', propertyId: 'demo-p1', unitId: 'demo-u2', type: 'wasser_kalt', number: 'W-1002' },
+    ],
+    readings: [
+      { id: 'demo-r1', meterId: 'demo-m1', date: `${y - 1}-12-31`, value: 410 }, { id: 'demo-r2', meterId: 'demo-m1', date: `${y}-12-31`, value: 462 },
+      { id: 'demo-r3', meterId: 'demo-m2', date: `${y - 1}-12-31`, value: 880 }, { id: 'demo-r4', meterId: 'demo-m2', date: `${y}-12-31`, value: 1004 },
+    ],
     reminders: [],
     costs: [
       { id: 'demo-c1', propertyId: 'demo-p1', year: y, category: 'Müllabfuhr', amount: 1200, key: 'area' },
-      { id: 'demo-c2', propertyId: 'demo-p1', year: y, category: 'Wasser/Abwasser', amount: 3100, key: 'units' },
+      { id: 'demo-c2', propertyId: 'demo-p1', year: y, category: 'Wasser/Abwasser', amount: 3100, key: 'consumption', meterType: 'wasser_kalt' },
       { id: 'demo-c3', propertyId: 'demo-p1', year: y, category: 'Grundsteuer', amount: 1850, key: 'area' },
     ],
   };

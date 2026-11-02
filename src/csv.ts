@@ -206,7 +206,7 @@ export function planBestandImport(db: DB, text: string): BestandPlan {
   };
   if (c.haus < 0 || c.einheit < 0) return none('Die Spalten „Haus“ und „Einheit“ werden mindestens benötigt. Lade die Vorlage herunter und trage deine Daten ein.');
   const get = (r: string[], i: number) => (i >= 0 ? r[i] ?? '' : '');
-  const next: DB = { properties: [...db.properties], units: [...db.units], tenants: [...db.tenants], payments: db.payments, reminders: db.reminders, costs: db.costs };
+  const next: DB = { properties: [...db.properties], units: [...db.units], tenants: [...db.tenants], payments: db.payments, reminders: db.reminders, costs: db.costs, meters: db.meters, readings: db.readings };
   const sum = { properties: 0, units: 0, tenants: 0, updated: 0 };
   const warnings: string[] = [];
   all.slice(1).forEach((r, i) => {

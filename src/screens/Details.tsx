@@ -7,6 +7,7 @@ import { exportPdf, nkHtml, reminderHtml } from '../pdf';
 import { useSettings } from '../settings';
 import { dunningPlans, feeFor, makeReminder, overdueItems, relevantReminders } from '../dunning';
 import { type } from '../theme';
+import { fmtVal, latestReading, meterIcon, meterLabel, meterTypeLabel, meterUnitLabel } from '../meters';
 
 
 function useHeaderAction(navigation: any, label: string, onPress: () => void) {
@@ -34,6 +35,7 @@ export function PropertyDetail({ route, navigation }: any) {
   const rent = units.filter((u) => active(u.id)).reduce((s, u) => s + unitDue(u), 0);
   const occ = units.length ? Math.round((units.filter((u) => active(u.id)).length / units.length) * 100) : 0;
   const years = [...new Set(db.costs.filter((x) => x.propertyId === p.id).map((x) => x.year))].sort((a, b) => b - a);
+  const meters = db.meters.filter((m) => m.propertyId === p.id);
 
   return (
     <Screen>
@@ -61,6 +63,16 @@ export function PropertyDetail({ route, navigation }: any) {
         })}
       </Section>
 
+      <Section title="Zähler" action={{ label: '+ Hinzufügen', onPress: () => navigation.navigate('MeterForm', { propertyId: p.id }) }}
+        footer={meters.length ? 'Die Verbrauchswerte fließen in die Nebenkostenabrechnung ein, wenn eine Kostenposition „nach Verbrauch“ verteilt wird.' : undefined}>
+        {meters.length === 0 && <Note>Noch keine Zähler. Lege Wasser-, Heiz- oder Stromzähler an, um nach Verbrauch abzurechnen.</Note>}
+        {meters.map((m) => {
+          const last = latestReading(db, m.id);
+          return <ListRow key={m.id} icon={meterIcon(m.type)} title={meterLabel(db, m)} subtitle={`Nr. ${m.number}${last ? ` · Stand ${fmtVal(last.value)} ${meterUnitLabel(m.type)} (${dateDE(last.date)})` : ' · noch kein Stand'}`} onPress={() => navigation.navigate('MeterDetail', { id: m.id })} />;
+        })}
+      </Section>
+      {meters.length > 0 && <><Button kind="secondary" icon="create-outline" title="Zählerstände erfassen" onPress={() => navigation.navigate('Ablesung', { propertyId: p.id })} /><Gap h={22} /></>}
+
       <Section title="Betriebskosten" action={{ label: '+ Hinzufügen', onPress: () => navigation.navigate('CostForm', { propertyId: p.id }) }}
         footer="Aus diesen Positionen entsteht die Nebenkostenabrechnung der Mieter.">
         {years.length === 0 && <Note>Noch keine Kosten erfasst.</Note>}
@@ -70,7 +82,7 @@ export function PropertyDetail({ route, navigation }: any) {
             <View key={y}>
               <Row bold left={`Abrechnungsjahr ${y}`} right={eur(list.reduce((s, x) => s + x.amount, 0))} />
               {list.map((x) => (
-                <ListRow key={x.id} title={x.category} subtitle={x.key === 'area' ? 'nach Wohnfläche' : 'je Einheit'} right={eur(x.amount)} onPress={() => navigation.navigate('CostForm', { id: x.id })} />
+                <ListRow key={x.id} title={x.category} subtitle={x.key === 'area' ? 'nach Wohnfläche' : x.key === 'consumption' ? `nach Verbrauch (${x.meterType ? meterTypeLabel(x.meterType) : ''})` : 'je Einheit'} right={eur(x.amount)} onPress={() => navigation.navigate('CostForm', { id: x.id })} />
               ))}
             </View>
           );
@@ -172,6 +184,9 @@ export function TenantDetail({ route, navigation }: any) {
             </View>
           ) : (
             <Text style={{ color: c.muted, fontSize: type.subhead }}>Für {year} sind keine Betriebskosten erfasst.</Text>
+          )}
+          {nk && nk.warnings.length > 0 && (
+            <View style={{ marginTop: 10, gap: 6 }}>{nk.warnings.map((w) => <Text key={w} style={{ color: c.warn, fontSize: type.footnote }}>⚠ {w}</Text>)}</View>
           )}
         </View>
       </Section>

@@ -1,4 +1,5 @@
 import { Cost, DB, Tenant, Unit, UnitKind } from './types';
+import { consumption, fmtVal, meterTypeLabel, meterUnitLabel, yearRange } from './meters';
 
 export const eur = (n: number) =>
   (isFinite(n) ? n : 0).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' });
@@ -78,9 +79,10 @@ export interface NkResult {
   advances: number;
   balance: number; // >0 Nachzahlung, <0 Guthaben
   months: number;
+  warnings: string[];
 }
 
-/** Nebenkostenabrechnung für einen Mieter und ein Jahr (anteilig nach Mietmonaten). */
+/** Nebenkostenabrechnung für einen Mieter und ein Jahr (anteilig nach Mietmonaten, Verbrauch nach Zählerständen). */
 export function nkStatement(db: DB, tenant: Tenant, unit: Unit, year: number): NkResult {
   const propUnits = db.units.filter((u) => u.propertyId === unit.propertyId);
   const totalArea = propUnits.reduce((s, u) => s + u.area, 0) || 1;
@@ -90,18 +92,36 @@ export function nkStatement(db: DB, tenant: Tenant, unit: Unit, year: number): N
   const end = endIso ? Number(endIso.slice(5, 7)) : 12;
   const months = tenant.moveIn.slice(0, 4) > String(year) ? 0 : Math.max(0, end - start + 1);
   const f = months / 12;
+  const warnings: string[] = [];
+  const { from: yFrom, to: yTo } = yearRange(year);
+  // Zeitraum des Mieters für Verbrauch
+  const tFrom = tenant.moveIn > yFrom ? new Date(new Date(tenant.moveIn).getTime() - 86400000).toISOString().slice(0, 10) : yFrom;
+  const tTo = endIso || yTo;
+
   const lines = costs.map((c) => {
-    const base = c.key === 'area' ? (unit.area / totalArea) : 1 / (propUnits.length || 1);
-    return {
-      category: c.category,
-      total: c.amount,
-      key: c.key === 'area' ? 'nach m²' : 'je Einheit',
-      share: Math.round(c.amount * base * f * vatFactor(unit) * 100) / 100,
-    };
+    const v = vatFactor(unit);
+    if (c.key === 'consumption' && c.meterType) {
+      const type = c.meterType;
+      const mine = consumption(db, unit.id, type, tFrom, tTo);
+      const all = propUnits.map((u) => ({ u, c: consumption(db, u.id, type, yFrom, yTo) }));
+      const total = all.reduce((s, x) => s + (x.c.value ?? 0), 0);
+      const missing = all.filter((x) => x.c.value === null).map((x) => x.u.name);
+      if (total <= 0) warnings.push(`${c.category}: Für ${year} sind keine Zählerstände (${meterTypeLabel(type)}) erfasst.`);
+      else {
+        if (mine.value === null) warnings.push(`${c.category}: Für ${unit.name} fehlt der Verbrauch (${meterTypeLabel(type)}). Der Anteil ist 0 €.`);
+        if (mine.estimatedStart) warnings.push(`${c.category}: Anfangsstand für ${unit.name} geschätzt (erste Ablesung im Jahr).`);
+        if (missing.length) warnings.push(`${c.category}: Kein Verbrauch erfasst für ${missing.slice(0, 4).join(', ')}${missing.length > 4 ? ` und ${missing.length - 4} weitere` : ''}.`);
+      }
+      const share = total > 0 && mine.value ? (c.amount * mine.value) / total : 0;
+      const u = meterUnitLabel(type);
+      return { category: c.category, total: c.amount, key: `nach Verbrauch: ${fmtVal(mine.value ?? 0)} von ${fmtVal(total)} ${u}`, share: Math.round(share * v * 100) / 100 };
+    }
+    const base = c.key === 'area' ? unit.area / totalArea : 1 / (propUnits.length || 1);
+    return { category: c.category, total: c.amount, key: c.key === 'area' ? 'nach m²' : 'je Einheit', share: Math.round(c.amount * base * f * v * 100) / 100 };
   });
   const costSum = lines.reduce((s, l) => s + l.share, 0);
   const advances = unit.advance * vatFactor(unit) * months;
-  return { lines, costs: costSum, advances, balance: Math.round((costSum - advances) * 100) / 100, months };
+  return { lines, costs: costSum, advances, balance: Math.round((costSum - advances) * 100) / 100, months, warnings };
 }
 
 const MONTHS = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];

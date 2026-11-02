@@ -51,11 +51,19 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         const unitIds = d.units.filter((u) => u.propertyId === id).map((u) => u.id);
         n.units = d.units.filter((u) => u.propertyId !== id);
         n.costs = d.costs.filter((c) => c.propertyId !== id);
+        const mIds = d.meters.filter((m) => m.propertyId === id).map((m) => m.id);
+        n.meters = d.meters.filter((m) => m.propertyId !== id);
+        n.readings = d.readings.filter((r) => !mIds.includes(r.meterId));
         const tIds = d.tenants.filter((t) => unitIds.includes(t.unitId)).map((t) => t.id);
         n.tenants = d.tenants.filter((t) => !tIds.includes(t.id));
         n.payments = d.payments.filter((p) => !tIds.includes(p.tenantId));
         n.reminders = d.reminders.filter((r) => !tIds.includes(r.tenantId));
+      } else if (kind === 'meters') {
+        n.readings = d.readings.filter((r) => r.meterId !== id);
       } else if (kind === 'units') {
+        const mIds = d.meters.filter((m) => m.unitId === id).map((m) => m.id);
+        n.meters = d.meters.filter((m) => m.unitId !== id);
+        n.readings = d.readings.filter((r) => !mIds.includes(r.meterId));
         const tIds = d.tenants.filter((t) => t.unitId === id).map((t) => t.id);
         n.tenants = d.tenants.filter((t) => t.unitId !== id);
         n.payments = d.payments.filter((p) => !tIds.includes(p.tenantId));
