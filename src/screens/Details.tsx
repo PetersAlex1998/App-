@@ -82,7 +82,7 @@ export function PropertyDetail({ route, navigation }: any) {
             <View key={y}>
               <Row bold left={`Abrechnungsjahr ${y}`} right={eur(list.reduce((s, x) => s + x.amount, 0))} />
               {list.map((x) => (
-                <ListRow key={x.id} title={x.category} subtitle={x.key === 'area' ? 'nach Wohnfläche' : x.key === 'consumption' ? `nach Verbrauch (${x.meterType ? meterTypeLabel(x.meterType) : ''})` : 'je Einheit'} right={eur(x.amount)} onPress={() => navigation.navigate('CostForm', { id: x.id })} />
+                <ListRow key={x.id} title={x.category} subtitle={x.key === 'area' ? 'nach Wohnfläche' : x.key === 'consumption' ? `nach Verbrauch (${x.meterType ? meterTypeLabel(x.meterType) : ''}${x.consumptionShare && x.consumptionShare < 100 ? `, ${x.consumptionShare} % Verbrauch / ${100 - x.consumptionShare} % Fläche` : ''})` : 'je Einheit'} right={eur(x.amount)} onPress={() => navigation.navigate('CostForm', { id: x.id })} />
               ))}
             </View>
           );

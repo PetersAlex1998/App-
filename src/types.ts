@@ -85,6 +85,7 @@ export interface Cost {
   amount: number;
   key: CostKey; // Verteilerschlüssel
   meterType?: MeterType; // bei key = 'consumption'
+  consumptionShare?: number; // % nach Verbrauch (Rest = Grundkosten nach Wohnfläche); fehlt = 100
 }
 
 export interface DB {

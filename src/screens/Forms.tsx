@@ -5,6 +5,7 @@ import { Button, DateField, Field, Gap, Note, OptionRow, Screen, Section, Segmen
 import { Cost, Kind, Payment, Property, Tenant, Unit } from '../types';
 import { eur, monthLabel, num, suggestPayment, today } from '../calc';
 import { MeterType, UnitKind } from '../types';
+import { View } from 'react-native';
 import { METER_TYPES, meterTypeLabel } from '../meters';
 
 function useItem<T extends { id: string }>(kind: Kind, id?: string): T | undefined {
@@ -209,6 +210,7 @@ export function CostForm({ route, navigation }: any) {
   const old = useItem<Cost>('costs', route.params?.id);
   const [f, setF] = useState({ category: old?.category ?? '', amount: old ? String(old.amount) : '', year: String(old?.year ?? new Date().getFullYear() - 1), key: (old?.key ?? 'area') as Cost['key'] });
   const [mtype, setMtype] = useState<MeterType>(old?.meterType ?? 'wasser_kalt');
+  const [cshare, setCshare] = useState<number>(old?.consumptionShare ?? 100);
   const [err, setErr] = useState<Errors>({});
   const set = (k: keyof typeof f) => (v: string) => setF({ ...f, [k]: v });
   const submit = () => {
@@ -218,7 +220,7 @@ export function CostForm({ route, navigation }: any) {
     if (!/^\d{4}$/.test(f.year)) e.year = 'Bitte ein Jahr wie 2025 eingeben.';
     setErr(e);
     if (Object.keys(e).length) return false;
-    save('costs', { id: old?.id ?? uid(), propertyId: old?.propertyId ?? route.params.propertyId, year: Number(f.year), category: f.category.trim(), amount: num(f.amount), key: f.key, meterType: f.key === 'consumption' ? mtype : undefined });
+    save('costs', { id: old?.id ?? uid(), propertyId: old?.propertyId ?? route.params.propertyId, year: Number(f.year), category: f.category.trim(), amount: num(f.amount), key: f.key, meterType: f.key === 'consumption' ? mtype : undefined, consumptionShare: f.key === 'consumption' && cshare < 100 ? cshare : undefined });
     return true;
   };
   return (
@@ -235,7 +237,14 @@ export function CostForm({ route, navigation }: any) {
       </Section>
       {f.key === 'consumption' && (
         <Section title="Welcher Zähler?" footer="Dafür müssen Zähler und Stände im Objekt erfasst sein.">
-          {METER_TYPES.map((t) => <OptionRow key={t} selected={mtype === t} onPress={() => setMtype(t)} title={meterTypeLabel(t)} />)}
+          {METER_TYPES.map((t) => <OptionRow key={t} selected={mtype === t} onPress={() => { setMtype(t); if ((t === 'heizung' || t === 'wasser_warm') && cshare === 100) setCshare(70); }} title={meterTypeLabel(t)} />)}
+        </Section>
+      )}
+      {f.key === 'consumption' && (
+        <Section title="Anteil nach Verbrauch" footer={mtype === 'heizung' || mtype === 'wasser_warm' ? 'Die Heizkostenverordnung verlangt 50–70 % nach Verbrauch, der Rest (Grundkosten) wird nach Wohnfläche verteilt.' : 'Der Rest (Grundkosten) wird nach Wohnfläche verteilt. Bei Wasser meist 100 % nach Verbrauch.'}>
+          <View style={{ padding: 12 }}>
+            <Segmented value={cshare} onChange={setCshare} options={[{ label: '100 %', value: 100 }, { label: '70 %', value: 70 }, { label: '60 %', value: 60 }, { label: '50 %', value: 50 }]} />
+          </View>
         </Section>
       )}
       <Footer kind="costs" id={old?.id} nav={navigation} onSave={submit} />

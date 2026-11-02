@@ -112,9 +112,14 @@ export function nkStatement(db: DB, tenant: Tenant, unit: Unit, year: number): N
         if (mine.estimatedStart) warnings.push(`${c.category}: Anfangsstand für ${unit.name} geschätzt (erste Ablesung im Jahr).`);
         if (missing.length) warnings.push(`${c.category}: Kein Verbrauch erfasst für ${missing.slice(0, 4).join(', ')}${missing.length > 4 ? ` und ${missing.length - 4} weitere` : ''}.`);
       }
-      const share = total > 0 && mine.value ? (c.amount * mine.value) / total : 0;
+      const cs = Math.min(100, Math.max(0, c.consumptionShare ?? 100)) / 100;
+      if ((type === 'heizung' || type === 'wasser_warm') && (cs < 0.5 || cs > 0.7) && cs !== 1) warnings.push(`${c.category}: Nach der Heizkostenverordnung sollen 50–70 % der Kosten nach Verbrauch verteilt werden (hier ${Math.round(cs * 100)} %).`);
+      const consumptionPart = total > 0 && mine.value ? (c.amount * cs * mine.value) / total : 0;
+      const basePart = cs < 1 ? c.amount * (1 - cs) * (unit.area / totalArea) * f : 0;
+      const share = consumptionPart + basePart;
       const u = meterUnitLabel(type);
-      return { category: c.category, total: c.amount, key: `nach Verbrauch: ${fmtVal(mine.value ?? 0)} von ${fmtVal(total)} ${u}`, share: Math.round(share * v * 100) / 100 };
+      const label = `nach Verbrauch: ${fmtVal(mine.value ?? 0)} von ${fmtVal(total)} ${u}`;
+      return { category: c.category, total: c.amount, key: cs < 1 ? `${Math.round(cs * 100)} % ${label}; ${Math.round((1 - cs) * 100)} % nach m²` : label, share: Math.round(share * v * 100) / 100 };
     }
     const base = c.key === 'area' ? unit.area / totalArea : 1 / (propUnits.length || 1);
     return { category: c.category, total: c.amount, key: c.key === 'area' ? 'nach m²' : 'je Einheit', share: Math.round(c.amount * base * f * v * 100) / 100 };
