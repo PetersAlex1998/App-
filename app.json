@@ -11,9 +11,8 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#0E6B63",
         "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false
@@ -22,7 +21,9 @@
       "favicon": "./assets/favicon.png",
       "output": "single",
       "name": "Immo Verwaltung",
-      "shortName": "Immo"
+      "shortName": "Immo",
+      "backgroundColor": "#F3F4F6",
+      "themeColor": "#0E6B63"
     },
     "experiments": {
       "baseUrl": "/App-"

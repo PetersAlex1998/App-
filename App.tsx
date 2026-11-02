@@ -21,12 +21,12 @@ const icon = (name: React.ComponentProps<typeof Ionicons>['name']) => ({ color, 
 function Tabs() {
   const c = useColors();
   return (
-    <Tab.Navigator screenOptions={{ tabBarActiveTintColor: c.primary, tabBarInactiveTintColor: c.muted, tabBarStyle: { backgroundColor: c.card, height: 64, paddingTop: 6, paddingBottom: 8 }, tabBarLabelStyle: { fontSize: 11 }, headerStyle: { backgroundColor: c.card }, headerTintColor: c.text }}>
+    <Tab.Navigator screenOptions={{ headerShown: false, tabBarActiveTintColor: c.primary, tabBarInactiveTintColor: c.muted, tabBarStyle: { backgroundColor: c.card, borderTopColor: c.line, height: 76, paddingTop: 8, paddingBottom: 14 }, tabBarLabelStyle: { fontSize: 11, fontWeight: '600' } }}>
       <Tab.Screen name="Übersicht" component={Dashboard} options={{ tabBarIcon: icon('stats-chart') }} />
       <Tab.Screen name="Objekte" component={Properties} options={{ tabBarIcon: icon('business') }} />
       <Tab.Screen name="Mieter" component={Tenants} options={{ tabBarIcon: icon('people') }} />
       <Tab.Screen name="Zahlungen" component={Payments} options={{ tabBarIcon: icon('card') }} />
-      <Tab.Screen name="Daten" component={DataScreen} options={{ tabBarIcon: icon('cloud-download') }} />
+      <Tab.Screen name="Daten" component={DataScreen} options={{ tabBarIcon: icon('file-tray-full') }} />
     </Tab.Navigator>
   );
 }
@@ -37,15 +37,15 @@ function Root() {
   if (!ready) return <ActivityIndicator style={{ flex: 1 }} />;
   return (
     <NavigationContainer theme={{ dark: c.bg === "#000000", colors: { primary: c.primary, background: c.bg, card: c.card, text: c.text, border: c.line, notification: c.danger }, fonts: DefaultTheme.fonts }}>
-      <Stack.Navigator screenOptions={{ headerStyle: { backgroundColor: c.card }, headerTintColor: c.primary, headerTitleStyle: { color: c.text }, headerBackTitle: 'Zurück' }}>
+      <Stack.Navigator screenOptions={{ headerStyle: { backgroundColor: c.bg }, headerShadowVisible: false, headerTintColor: c.primary, headerTitleStyle: { color: c.text, fontWeight: '700' }, headerBackTitle: 'Zurück', contentStyle: { backgroundColor: c.bg } }}>
         <Stack.Screen name="Tabs" component={Tabs} options={{ headerShown: false }} />
-        <Stack.Screen name="PropertyForm" component={PropertyForm} options={{ title: 'Objekt' }} />
-        <Stack.Screen name="PropertyDetail" component={PropertyDetail} options={{ title: 'Objekt' }} />
-        <Stack.Screen name="UnitForm" component={UnitForm} options={{ title: 'Wohnung' }} />
-        <Stack.Screen name="CostForm" component={CostForm} options={{ title: 'Betriebskosten' }} />
-        <Stack.Screen name="TenantForm" component={TenantForm} options={{ title: 'Mieter' }} />
-        <Stack.Screen name="TenantDetail" component={TenantDetail} options={{ title: 'Mieter' }} />
-        <Stack.Screen name="PaymentForm" component={PaymentForm} options={{ title: 'Zahlung' }} />
+        <Stack.Screen name="PropertyForm" component={PropertyForm} options={({ route }: any) => ({ title: route.params?.id ? 'Objekt bearbeiten' : 'Neues Objekt' })} />
+        <Stack.Screen name="PropertyDetail" component={PropertyDetail} options={({ route }: any) => ({ title: 'Objekt' })} />
+        <Stack.Screen name="UnitForm" component={UnitForm} options={({ route }: any) => ({ title: route.params?.id ? 'Wohnung bearbeiten' : 'Neue Wohnung' })} />
+        <Stack.Screen name="CostForm" component={CostForm} options={({ route }: any) => ({ title: route.params?.id ? 'Kostenposition bearbeiten' : 'Neue Kostenposition' })} />
+        <Stack.Screen name="TenantForm" component={TenantForm} options={({ route }: any) => ({ title: route.params?.id ? 'Mieter bearbeiten' : 'Neuer Mieter' })} />
+        <Stack.Screen name="TenantDetail" component={TenantDetail} options={({ route }: any) => ({ title: 'Mieter' })} />
+        <Stack.Screen name="PaymentForm" component={PaymentForm} options={({ route }: any) => ({ title: route.params?.id ? 'Zahlung bearbeiten' : 'Zahlung erfassen' })} />
       </Stack.Navigator>
     </NavigationContainer>
   );

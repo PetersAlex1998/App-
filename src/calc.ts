@@ -91,3 +91,20 @@ export function nkStatement(db: DB, tenant: Tenant, unit: Unit, year: number): N
   const advances = unit.advance * months;
   return { lines, costs: costSum, advances, balance: Math.round((costSum - advances) * 100) / 100, months };
 }
+
+const MONTHS = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+const MONTHS_LONG = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+/** '2026-10' → 'Okt 2026' */
+export const monthLabel = (m: string) => (m ? `${MONTHS[Number(m.slice(5, 7)) - 1] ?? ''} ${m.slice(0, 4)}` : '–');
+/** '2026-10' → 'Oktober 2026' */
+export const monthLong = (m: string) => (m ? `${MONTHS_LONG[Number(m.slice(5, 7)) - 1] ?? ''} ${m.slice(0, 4)}` : '–');
+export const initials = (name: string) =>
+  name.trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? '').join('') || '?';
+export const reminderLabel = (level: number) => ['', 'Zahlungserinnerung', '1. Mahnung', '2. Mahnung'][level] ?? '';
+/** Vorbelegung für „Zahlung erfassen“: ältester offener Monat und dessen offener Betrag. */
+export function suggestPayment(db: DB, t: Tenant): { month: string; amount: number } {
+  const first = openItems(db, t)[0];
+  if (first) return { month: first.month, amount: first.open };
+  const u = db.units.find((x) => x.id === t.unitId);
+  return { month: today().slice(0, 7), amount: u ? u.coldRent + u.advance : 0 };
+}

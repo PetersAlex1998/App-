@@ -1,22 +1,30 @@
 import React, { useState } from 'react';
-import { View } from 'react-native';
+
 import { useStore, uid } from '../store';
-import { Btn, Choice, Field, Screen, confirm, notify } from '../ui';
-import { Cost, Kind, Payment, Property, Reminder, Tenant, Unit } from '../types';
-import { num, today } from '../calc';
+import { Button, DateField, Field, Gap, Note, OptionRow, Screen, Section, Segmented, confirm } from '../ui';
+import { Cost, Kind, Payment, Property, Tenant, Unit } from '../types';
+import { eur, monthLabel, num, suggestPayment, today } from '../calc';
 
 function useItem<T extends { id: string }>(kind: Kind, id?: string): T | undefined {
   const { db } = useStore();
   return (db[kind] as unknown as T[]).find((x) => x.id === id);
 }
+type Errors = Record<string, string>;
+const isDate = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(Date.parse(s));
+const isMonth = (s: string) => /^\d{4}-(0[1-9]|1[0-2])$/.test(s);
 
-function Actions({ kind, id, onSave, nav }: { kind: Kind; id?: string; onSave: () => boolean | void; nav: any }) {
+function Footer({ kind, id, nav, onSave, label = 'Speichern', deleteText }: { kind: Kind; id?: string; nav: any; onSave: () => boolean; label?: string; deleteText?: string }) {
   const { remove } = useStore();
   return (
-    <View>
-      <Btn title="Speichern" onPress={() => onSave() !== false && nav.goBack()} />
-      {id ? <Btn kind="danger" title="Löschen" onPress={() => confirm('Wirklich löschen? Abhängige Daten werden mit entfernt.', () => { remove(kind, id); nav.goBack(); })} /> : null}
-    </View>
+    <>
+      <Button title={label} icon="checkmark" onPress={() => onSave() && nav.goBack()} />
+      {id ? (
+        <>
+          <Gap h={22} />
+          <Button kind="destructive" icon="trash-outline" title="Löschen" onPress={() => confirm('Wirklich löschen?', () => { remove(kind, id); nav.goBack(); }, 'Löschen', deleteText ?? 'Das kann nicht rückgängig gemacht werden.')} />
+        </>
+      ) : null}
+    </>
   );
 }
 
@@ -24,16 +32,31 @@ export function PropertyForm({ route, navigation }: any) {
   const { save } = useStore();
   const old = useItem<Property>('properties', route.params?.id);
   const [f, setF] = useState<Property>(old ?? { id: uid(), name: '', street: '', zip: '', city: '', yearBuilt: '', notes: '' });
+  const [err, setErr] = useState<Errors>({});
   const set = (k: keyof Property) => (v: string) => setF({ ...f, [k]: v });
+  const submit = () => {
+    const e: Errors = {};
+    if (!f.name.trim()) e.name = 'Bitte eine Bezeichnung eingeben, z. B. „Haus Lindenstraße“.';
+    setErr(e);
+    if (Object.keys(e).length) return false;
+    save('properties', f);
+    return true;
+  };
   return (
     <Screen>
-      <Field label="Bezeichnung *" value={f.name} onChangeText={set('name')} />
-      <Field label="Straße / Nr." value={f.street} onChangeText={set('street')} />
-      <Field label="PLZ" value={f.zip} onChangeText={set('zip')} keyboard="numeric" />
-      <Field label="Ort" value={f.city} onChangeText={set('city')} />
-      <Field label="Baujahr" value={f.yearBuilt} onChangeText={set('yearBuilt')} keyboard="numeric" />
-      <Field label="Notizen" value={f.notes} onChangeText={set('notes')} multiline />
-      <Actions kind="properties" id={old?.id} nav={navigation} onSave={() => { if (!f.name.trim()) { notify('Bitte Bezeichnung angeben'); return false; } save('properties', f); }} />
+      <Section title="Objekt">
+        <Field label="Bezeichnung" value={f.name} onChangeText={set('name')} placeholder="z. B. Haus Lindenstraße" error={err.name} />
+        <Field label="Baujahr" value={f.yearBuilt} onChangeText={set('yearBuilt')} keyboard="numeric" placeholder="optional" />
+      </Section>
+      <Section title="Adresse">
+        <Field label="Straße und Hausnummer" value={f.street} onChangeText={set('street')} />
+        <Field label="PLZ" value={f.zip} onChangeText={set('zip')} keyboard="numeric" />
+        <Field label="Ort" value={f.city} onChangeText={set('city')} />
+      </Section>
+      <Section title="Notizen">
+        <Field label="Notizen" value={f.notes} onChangeText={set('notes')} multiline placeholder="optional" />
+      </Section>
+      <Footer kind="properties" id={old?.id} nav={navigation} onSave={submit} deleteText="Alle Wohnungen, Mieter, Zahlungen und Kosten dieses Objekts werden ebenfalls gelöscht." />
     </Screen>
   );
 }
@@ -41,19 +64,32 @@ export function PropertyForm({ route, navigation }: any) {
 export function UnitForm({ route, navigation }: any) {
   const { save } = useStore();
   const old = useItem<Unit>('units', route.params?.id);
-  const [f, setF] = useState({ name: old?.name ?? '', area: String(old?.area ?? ''), rooms: String(old?.rooms ?? ''), coldRent: String(old?.coldRent ?? ''), advance: String(old?.advance ?? '') });
+  const [f, setF] = useState({ name: old?.name ?? '', area: old ? String(old.area) : '', rooms: old ? String(old.rooms) : '', coldRent: old ? String(old.coldRent) : '', advance: old ? String(old.advance) : '' });
+  const [err, setErr] = useState<Errors>({});
   const set = (k: keyof typeof f) => (v: string) => setF({ ...f, [k]: v });
+  const total = num(f.coldRent) + num(f.advance);
+  const submit = () => {
+    const e: Errors = {};
+    if (!f.name.trim()) e.name = 'Bitte eine Bezeichnung eingeben, z. B. „WE 2, 1. OG links“.';
+    if (num(f.area) <= 0) e.area = 'Die Wohnfläche wird für die Nebenkostenabrechnung gebraucht.';
+    if (num(f.coldRent) <= 0) e.coldRent = 'Bitte die Kaltmiete eingeben.';
+    setErr(e);
+    if (Object.keys(e).length) return false;
+    save('units', { id: old?.id ?? uid(), propertyId: old?.propertyId ?? route.params.propertyId, name: f.name.trim(), area: num(f.area), rooms: num(f.rooms), coldRent: num(f.coldRent), advance: num(f.advance) });
+    return true;
+  };
   return (
     <Screen>
-      <Field label="Bezeichnung * (z. B. WE 2, 1. OG links)" value={f.name} onChangeText={set('name')} />
-      <Field label="Fläche (m²)" value={f.area} onChangeText={set('area')} keyboard="numeric" />
-      <Field label="Zimmer" value={f.rooms} onChangeText={set('rooms')} keyboard="numeric" />
-      <Field label="Kaltmiete / Monat (€)" value={f.coldRent} onChangeText={set('coldRent')} keyboard="numeric" />
-      <Field label="NK-Vorauszahlung / Monat (€)" value={f.advance} onChangeText={set('advance')} keyboard="numeric" />
-      <Actions kind="units" id={old?.id} nav={navigation} onSave={() => {
-        if (!f.name.trim()) { notify('Bitte Bezeichnung angeben'); return false; }
-        save('units', { id: old?.id ?? uid(), propertyId: old?.propertyId ?? route.params.propertyId, name: f.name, area: num(f.area), rooms: num(f.rooms), coldRent: num(f.coldRent), advance: num(f.advance) });
-      }} />
+      <Section title="Wohnung">
+        <Field label="Bezeichnung" value={f.name} onChangeText={set('name')} placeholder="z. B. WE 2, 1. OG links" error={err.name} />
+        <Field label="Wohnfläche" value={f.area} onChangeText={set('area')} keyboard="numeric" suffix="m²" error={err.area} />
+        <Field label="Zimmer" value={f.rooms} onChangeText={set('rooms')} keyboard="numeric" />
+      </Section>
+      <Section title="Miete" footer={total > 0 ? `Gesamtmiete pro Monat: ${eur(total)}` : undefined}>
+        <Field label="Kaltmiete pro Monat" value={f.coldRent} onChangeText={set('coldRent')} keyboard="numeric" suffix="€" error={err.coldRent} />
+        <Field label="Nebenkosten-Vorauszahlung pro Monat" value={f.advance} onChangeText={set('advance')} keyboard="numeric" suffix="€" />
+      </Section>
+      <Footer kind="units" id={old?.id} nav={navigation} onSave={submit} deleteText="Der Mieter dieser Wohnung und seine Zahlungen werden ebenfalls gelöscht." />
     </Screen>
   );
 }
@@ -61,22 +97,45 @@ export function UnitForm({ route, navigation }: any) {
 export function TenantForm({ route, navigation }: any) {
   const { db, save } = useStore();
   const old = useItem<Tenant>('tenants', route.params?.id);
-  const [f, setF] = useState({ name: old?.name ?? '', email: old?.email ?? '', phone: old?.phone ?? '', moveIn: old?.moveIn ?? today(), moveOut: old?.moveOut ?? '', deposit: String(old?.deposit ?? ''), unitId: old?.unitId ?? route.params?.unitId ?? '' });
+  const [f, setF] = useState({ name: old?.name ?? '', email: old?.email ?? '', phone: old?.phone ?? '', moveIn: old?.moveIn ?? today(), moveOut: old?.moveOut ?? '', deposit: old ? String(old.deposit || '') : '', unitId: old?.unitId ?? route.params?.unitId ?? '' });
+  const [err, setErr] = useState<Errors>({});
   const set = (k: keyof typeof f) => (v: string) => setF({ ...f, [k]: v });
+  const submit = () => {
+    const e: Errors = {};
+    if (!f.unitId) e.unitId = 'Bitte eine Wohnung auswählen.';
+    if (!f.name.trim()) e.name = 'Bitte den Namen eingeben.';
+    if (!isDate(f.moveIn)) e.moveIn = 'Bitte ein gültiges Einzugsdatum wählen.';
+    if (f.moveOut && (!isDate(f.moveOut) || f.moveOut < f.moveIn)) e.moveOut = 'Der Auszug muss nach dem Einzug liegen.';
+    if (f.email && !/^\S+@\S+\.\S+$/.test(f.email)) e.email = 'Das sieht nicht nach einer E-Mail-Adresse aus.';
+    setErr(e);
+    if (Object.keys(e).length) return false;
+    save('tenants', { id: old?.id ?? uid(), unitId: f.unitId, name: f.name.trim(), email: f.email.trim(), phone: f.phone.trim(), moveIn: f.moveIn, moveOut: f.moveOut, deposit: num(f.deposit) });
+    return true;
+  };
   return (
     <Screen>
-      <Choice label="Wohnung *" value={f.unitId} onChange={(v) => setF({ ...f, unitId: v })}
-        options={db.units.map((u) => ({ label: `${db.properties.find((p) => p.id === u.propertyId)?.name ?? ''} – ${u.name}`, value: u.id }))} />
-      <Field label="Name *" value={f.name} onChangeText={set('name')} />
-      <Field label="E-Mail" value={f.email} onChangeText={set('email')} keyboard="email-address" />
-      <Field label="Telefon" value={f.phone} onChangeText={set('phone')} keyboard="phone-pad" />
-      <Field label="Einzug (JJJJ-MM-TT)" value={f.moveIn} onChangeText={set('moveIn')} />
-      <Field label="Auszug (JJJJ-MM-TT, leer = aktiv)" value={f.moveOut} onChangeText={set('moveOut')} />
-      <Field label="Kaution (€)" value={f.deposit} onChangeText={set('deposit')} keyboard="numeric" />
-      <Actions kind="tenants" id={old?.id} nav={navigation} onSave={() => {
-        if (!f.name.trim() || !f.unitId) { notify('Name und Wohnung sind Pflicht'); return false; }
-        save('tenants', { id: old?.id ?? uid(), unitId: f.unitId, name: f.name, email: f.email, phone: f.phone, moveIn: f.moveIn, moveOut: f.moveOut, deposit: num(f.deposit) });
-      }} />
+      {db.units.length === 0 ? (
+        <Section title="Wohnung"><Note>Es gibt noch keine Wohnung. Lege zuerst in einem Objekt eine Wohnung an.</Note></Section>
+      ) : (
+        <Section title="Wohnung" footer={err.unitId}>
+          {db.units.map((u) => {
+            const p = db.properties.find((x) => x.id === u.propertyId);
+            const cur = db.tenants.find((t) => t.unitId === u.id && (!t.moveOut || t.moveOut >= today()) && t.id !== old?.id);
+            return <OptionRow key={u.id} selected={f.unitId === u.id} onPress={() => setF({ ...f, unitId: u.id })} title={`${p?.name ?? ''} – ${u.name}`} subtitle={cur ? `Derzeit: ${cur.name}` : 'Frei'} />;
+          })}
+        </Section>
+      )}
+      <Section title="Kontakt">
+        <Field label="Name" value={f.name} onChangeText={set('name')} error={err.name} placeholder="Vor- und Nachname" />
+        <Field label="E-Mail" value={f.email} onChangeText={set('email')} keyboard="email-address" error={err.email} placeholder="optional" />
+        <Field label="Telefon" value={f.phone} onChangeText={set('phone')} keyboard="phone-pad" placeholder="optional" />
+      </Section>
+      <Section title="Mietverhältnis">
+        <DateField label="Einzug" value={f.moveIn} onChange={set('moveIn')} error={err.moveIn} />
+        <DateField label="Auszug (leer lassen, wenn aktiv)" value={f.moveOut} onChange={set('moveOut')} error={err.moveOut} optional />
+        <Field label="Kaution" value={f.deposit} onChangeText={set('deposit')} keyboard="numeric" suffix="€" placeholder="optional" />
+      </Section>
+      <Footer kind="tenants" id={old?.id} nav={navigation} onSave={submit} deleteText="Alle Zahlungen und Mahnungen dieses Mieters werden ebenfalls gelöscht." />
     </Screen>
   );
 }
@@ -84,20 +143,46 @@ export function TenantForm({ route, navigation }: any) {
 export function PaymentForm({ route, navigation }: any) {
   const { db, save } = useStore();
   const old = useItem<Payment>('payments', route.params?.id);
-  const [f, setF] = useState({ tenantId: old?.tenantId ?? route.params?.tenantId ?? '', date: old?.date ?? today(), month: old?.month ?? today().slice(0, 7), amount: String(old?.amount ?? ''), kind: (old?.kind ?? 'miete') as Payment['kind'], note: old?.note ?? '' });
+  const pre = route.params ?? {};
+  const [f, setF] = useState(() => {
+    if (old) return { tenantId: old.tenantId, date: old.date, month: old.month, amount: String(old.amount), kind: old.kind as Payment['kind'], note: old.note };
+    const t = db.tenants.find((x) => x.id === pre.tenantId);
+    const sug = t ? suggestPayment(db, t) : null;
+    return { tenantId: pre.tenantId ?? '', date: today(), month: pre.month ?? sug?.month ?? today().slice(0, 7), amount: pre.amount ? String(pre.amount) : sug ? String(sug.amount) : '', kind: 'miete' as Payment['kind'], note: '' };
+  });
+  const [err, setErr] = useState<Errors>({});
   const set = (k: keyof typeof f) => (v: string) => setF({ ...f, [k]: v });
+  const pickTenant = (id: string) => {
+    const t = db.tenants.find((x) => x.id === id);
+    const sug = t ? suggestPayment(db, t) : null;
+    setF({ ...f, tenantId: id, ...(sug && !old ? { month: sug.month, amount: String(sug.amount) } : {}) });
+  };
+  const tenants = db.tenants.filter((t) => !t.moveOut || t.moveOut >= today() || t.id === f.tenantId);
+  const submit = () => {
+    const e: Errors = {};
+    if (!f.tenantId) e.tenantId = 'Bitte einen Mieter auswählen.';
+    if (num(f.amount) <= 0) e.amount = 'Bitte einen Betrag größer als 0 eingeben.';
+    if (!isDate(f.date)) e.date = 'Bitte ein gültiges Datum wählen.';
+    if (f.kind === 'miete' && !isMonth(f.month)) e.month = 'Bitte den Monat wählen, für den gezahlt wurde.';
+    setErr(e);
+    if (Object.keys(e).length) return false;
+    save('payments', { id: old?.id ?? uid(), tenantId: f.tenantId, date: f.date, month: f.kind === 'miete' ? f.month : f.date.slice(0, 7), amount: num(f.amount), kind: f.kind, note: f.note });
+    return true;
+  };
   return (
     <Screen>
-      <Choice label="Mieter *" value={f.tenantId} onChange={(v) => setF({ ...f, tenantId: v })} options={db.tenants.map((t) => ({ label: t.name, value: t.id }))} />
-      <Choice label="Art" value={f.kind} onChange={(v) => setF({ ...f, kind: v })} options={[{ label: 'Miete', value: 'miete' }, { label: 'Kaution', value: 'kaution' }, { label: 'NK-Nachzahlung', value: 'nachzahlung' }]} />
-      <Field label="Betrag (€) *" value={f.amount} onChangeText={set('amount')} keyboard="numeric" />
-      <Field label="Zahlungsdatum (JJJJ-MM-TT)" value={f.date} onChangeText={set('date')} />
-      {f.kind === 'miete' && <Field label="Für Monat (JJJJ-MM)" value={f.month} onChangeText={set('month')} />}
-      <Field label="Notiz" value={f.note} onChangeText={set('note')} />
-      <Actions kind="payments" id={old?.id} nav={navigation} onSave={() => {
-        if (!f.tenantId || num(f.amount) <= 0) { notify('Mieter und Betrag sind Pflicht'); return false; }
-        save('payments', { id: old?.id ?? uid(), tenantId: f.tenantId, date: f.date, month: f.month, amount: num(f.amount), kind: f.kind, note: f.note });
-      }} />
+      <Segmented value={f.kind} onChange={(v) => setF({ ...f, kind: v })} options={[{ label: 'Miete', value: 'miete' }, { label: 'Kaution', value: 'kaution' }, { label: 'Nachzahlung', value: 'nachzahlung' }]} />
+      <Section title="Mieter" footer={err.tenantId}>
+        {tenants.length === 0 && <Note>Lege zuerst einen Mieter an.</Note>}
+        {tenants.map((t) => <OptionRow key={t.id} selected={f.tenantId === t.id} onPress={() => pickTenant(t.id)} title={t.name} subtitle={db.units.find((u) => u.id === t.unitId)?.name} />)}
+      </Section>
+      <Section title="Zahlung" footer={f.kind === 'miete' && f.tenantId ? 'Betrag und Monat sind mit dem ältesten offenen Posten vorbelegt.' : undefined}>
+        <Field label="Betrag" value={f.amount} onChangeText={set('amount')} keyboard="numeric" suffix="€" error={err.amount} />
+        <DateField label="Zahlungsdatum" value={f.date} onChange={set('date')} error={err.date} />
+        {f.kind === 'miete' && <DateField label="Miete für Monat" value={f.month} onChange={set('month')} mode="month" error={err.month} />}
+        <Field label="Notiz" value={f.note} onChangeText={set('note')} placeholder="optional" />
+      </Section>
+      <Footer kind="payments" id={old?.id} nav={navigation} onSave={submit} label={f.amount && num(f.amount) > 0 ? `${eur(num(f.amount))} buchen` : 'Buchen'} />
     </Screen>
   );
 }
@@ -105,20 +190,31 @@ export function PaymentForm({ route, navigation }: any) {
 export function CostForm({ route, navigation }: any) {
   const { save } = useStore();
   const old = useItem<Cost>('costs', route.params?.id);
-  const [f, setF] = useState({ category: old?.category ?? '', amount: String(old?.amount ?? ''), year: String(old?.year ?? new Date().getFullYear() - 1), key: (old?.key ?? 'area') as Cost['key'] });
+  const [f, setF] = useState({ category: old?.category ?? '', amount: old ? String(old.amount) : '', year: String(old?.year ?? new Date().getFullYear() - 1), key: (old?.key ?? 'area') as Cost['key'] });
+  const [err, setErr] = useState<Errors>({});
   const set = (k: keyof typeof f) => (v: string) => setF({ ...f, [k]: v });
+  const submit = () => {
+    const e: Errors = {};
+    if (!f.category.trim()) e.category = 'Bitte eine Kostenart eingeben, z. B. „Müllabfuhr“.';
+    if (num(f.amount) <= 0) e.amount = 'Bitte den Gesamtbetrag eingeben.';
+    if (!/^\d{4}$/.test(f.year)) e.year = 'Bitte ein Jahr wie 2025 eingeben.';
+    setErr(e);
+    if (Object.keys(e).length) return false;
+    save('costs', { id: old?.id ?? uid(), propertyId: old?.propertyId ?? route.params.propertyId, year: Number(f.year), category: f.category.trim(), amount: num(f.amount), key: f.key });
+    return true;
+  };
   return (
     <Screen>
-      <Field label="Kostenart * (z. B. Müllabfuhr, Wasser, Grundsteuer)" value={f.category} onChangeText={set('category')} />
-      <Field label="Gesamtbetrag (€) *" value={f.amount} onChangeText={set('amount')} keyboard="numeric" />
-      <Field label="Abrechnungsjahr" value={f.year} onChangeText={set('year')} keyboard="numeric" />
-      <Choice label="Verteilerschlüssel" value={f.key} onChange={(v) => setF({ ...f, key: v })} options={[{ label: 'Nach Wohnfläche', value: 'area' }, { label: 'Je Einheit', value: 'units' }]} />
-      <Actions kind="costs" id={old?.id} nav={navigation} onSave={() => {
-        if (!f.category.trim() || num(f.amount) <= 0) { notify('Kostenart und Betrag sind Pflicht'); return false; }
-        save('costs', { id: old?.id ?? uid(), propertyId: old?.propertyId ?? route.params.propertyId, year: Math.round(num(f.year)), category: f.category, amount: num(f.amount), key: f.key });
-      }} />
+      <Section title="Kostenposition">
+        <Field label="Kostenart" value={f.category} onChangeText={set('category')} placeholder="z. B. Müllabfuhr, Wasser, Grundsteuer" error={err.category} />
+        <Field label="Gesamtbetrag für das ganze Haus" value={f.amount} onChangeText={set('amount')} keyboard="numeric" suffix="€" error={err.amount} />
+        <Field label="Abrechnungsjahr" value={f.year} onChangeText={set('year')} keyboard="numeric" error={err.year} />
+      </Section>
+      <Section title="Verteilung auf die Mieter">
+        <OptionRow selected={f.key === 'area'} onPress={() => setF({ ...f, key: 'area' })} title="Nach Wohnfläche" subtitle="Anteil = Wohnfläche der Wohnung ÷ Gesamtfläche" />
+        <OptionRow selected={f.key === 'units'} onPress={() => setF({ ...f, key: 'units' })} title="Je Wohneinheit" subtitle="Alle Wohnungen zahlen den gleichen Anteil" />
+      </Section>
+      <Footer kind="costs" id={old?.id} nav={navigation} onSave={submit} />
     </Screen>
   );
 }
-
-export type { Reminder };

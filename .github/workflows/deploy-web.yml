@@ -18,6 +18,7 @@ jobs:
           node-version: 22
       - run: npm ci --legacy-peer-deps
       - run: npx expo export --platform web
+      - run: node scripts/postbuild-web.js
       - name: Publish to gh-pages branch
         run: |
           cd dist
