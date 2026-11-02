@@ -1,7 +1,7 @@
 import React from 'react';
 import { ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useColors } from './src/theme';
+import { ThemeProvider, useColors, useIsDark } from './src/theme';
 import { StatusBar } from 'expo-status-bar';
 import { DefaultTheme, NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -34,9 +34,11 @@ function Tabs() {
 function Root() {
   const { ready } = useStore();
   const c = useColors();
+  const dark = useIsDark();
   if (!ready) return <ActivityIndicator style={{ flex: 1 }} />;
   return (
-    <NavigationContainer theme={{ dark: c.bg === "#000000", colors: { primary: c.primary, background: c.bg, card: c.card, text: c.text, border: c.line, notification: c.danger }, fonts: DefaultTheme.fonts }}>
+    <NavigationContainer theme={{ dark, colors: { primary: c.primary, background: c.bg, card: c.card, text: c.text, border: c.line, notification: c.danger }, fonts: DefaultTheme.fonts }}>
+      <StatusBar style={dark ? 'light' : 'dark'} />
       <Stack.Navigator screenOptions={{ headerStyle: { backgroundColor: c.bg }, headerShadowVisible: false, headerTintColor: c.primary, headerTitleStyle: { color: c.text, fontWeight: '700' }, headerBackTitle: 'Zurück', contentStyle: { backgroundColor: c.bg } }}>
         <Stack.Screen name="Tabs" component={Tabs} options={{ headerShown: false }} />
         <Stack.Screen name="PropertyForm" component={PropertyForm} options={({ route }: any) => ({ title: route.params?.id ? 'Objekt bearbeiten' : 'Neues Objekt' })} />
@@ -54,10 +56,11 @@ function Root() {
 export default function App() {
   return (
     <SafeAreaProvider>
-      <StoreProvider>
-        <Root />
-        <StatusBar style="auto" />
-      </StoreProvider>
+      <ThemeProvider>
+        <StoreProvider>
+          <Root />
+        </StoreProvider>
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }

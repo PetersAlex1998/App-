@@ -23,7 +23,7 @@ const head = `
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="Immo" />
-<style>html,body{background:#F3F4F6}@media(prefers-color-scheme:dark){html,body{background:#0B0F14}}body{overscroll-behavior-y:none}</style>`;
+<style>html,body{background:#F3F4F6}body{overscroll-behavior-y:none}</style>`;
 html = html.replace('</head>', `${head}\n</head>`);
 fs.writeFileSync(path.join(dist, 'index.html'), html);
 console.log('PWA-Dateien geschrieben (base ' + base + ')');

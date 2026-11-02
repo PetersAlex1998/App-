@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
 import { Platform } from 'react-native';
 import { useStore } from '../store';
-import { Button, Field, Gap, LargeHeader, ListRow, Note, Screen, Section, confirm, notify } from '../ui';
+import { useThemePref } from '../theme';
+import { Button, Field, Segmented, Gap, LargeHeader, ListRow, Note, Screen, Section, confirm, notify } from '../ui';
 import { demoData } from '../demo';
 import { exportBackup, parseBackup, pickBackupFile } from '../backup';
 
 export function DataScreen() {
   const { db, replaceAll } = useStore();
   const [text, setText] = useState('');
+  const { pref, setPref } = useThemePref();
   const empty = db.properties.length === 0;
 
   const doImport = (content: string) => {
@@ -28,6 +30,9 @@ export function DataScreen() {
   return (
     <Screen tab>
       <LargeHeader title="Daten" subtitle="Sicherung und Einstellungen" />
+      <Section title="Darstellung">
+        <Segmented value={pref} onChange={setPref} options={[{ label: 'Hell', value: 'hell' }, { label: 'Dunkel', value: 'dunkel' }, { label: 'Automatisch', value: 'auto' }]} />
+      </Section>
       <Section title="Aktueller Bestand" footer="Deine Daten liegen nur auf diesem Gerät. Sichere sie regelmäßig, z. B. in iCloud Drive oder Google Drive.">
         <ListRow icon="business" title="Objekte" right={String(db.properties.length)} />
         <ListRow icon="home" title="Wohnungen" right={String(db.units.length)} />
