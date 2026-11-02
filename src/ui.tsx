@@ -83,12 +83,12 @@ export function Row({ left, right, bold, color }: { left: string; right: string;
     </View>
   );
 }
-export function confirm(title: string, onYes: () => void) {
+export function confirm(title: string, onYes: () => void, yesLabel = 'Löschen') {
   if (Platform.OS === 'web') {
     if (window.confirm(title)) onYes();
     return;
   }
-  Alert.alert(title, undefined, [{ text: 'Abbrechen', style: 'cancel' }, { text: 'Löschen', style: 'destructive', onPress: onYes }]);
+  Alert.alert(title, undefined, [{ text: 'Abbrechen', style: 'cancel' }, { text: yesLabel, style: yesLabel === 'Löschen' ? 'destructive' : 'default', onPress: onYes }]);
 }
 export function notify(msg: string) {
   if (Platform.OS === 'web') window.alert(msg);

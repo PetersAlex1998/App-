@@ -9,6 +9,7 @@ interface Ctx {
   ready: boolean;
   save: <K extends Kind>(kind: K, item: DB[K][number]) => void;
   remove: (kind: Kind, id: string) => void;
+  replaceAll: (next: DB) => void;
 }
 
 const StoreCtx = createContext<Ctx>(null as unknown as Ctx);
@@ -67,5 +68,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  return <StoreCtx.Provider value={{ db, ready, save, remove }}>{children}</StoreCtx.Provider>;
+  const replaceAll = useCallback((next: DB) => setDb(next), []);
+
+  return <StoreCtx.Provider value={{ db, ready, save, remove, replaceAll }}>{children}</StoreCtx.Provider>;
 }

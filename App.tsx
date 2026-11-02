@@ -10,6 +10,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StoreProvider, useStore } from './src/store';
 import { Dashboard, Payments, Properties, Tenants } from './src/screens/Lists';
 import { CostForm, PaymentForm, PropertyForm, TenantForm, UnitForm } from './src/screens/Forms';
+import { DataScreen } from './src/screens/Data';
 import { PropertyDetail, TenantDetail } from './src/screens/Details';
 
 const Tab = createBottomTabNavigator();
@@ -25,6 +26,7 @@ function Tabs() {
       <Tab.Screen name="Objekte" component={Properties} options={{ tabBarIcon: icon('business') }} />
       <Tab.Screen name="Mieter" component={Tenants} options={{ tabBarIcon: icon('people') }} />
       <Tab.Screen name="Zahlungen" component={Payments} options={{ tabBarIcon: icon('card') }} />
+      <Tab.Screen name="Daten" component={DataScreen} options={{ tabBarIcon: icon('cloud-download') }} />
     </Tab.Navigator>
   );
 }
