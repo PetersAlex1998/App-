@@ -1,10 +1,11 @@
 import React from 'react';
 import { View, Text } from 'react-native';
 import { useStore } from '../store';
-import { Btn, Card, Empty, Muted, Row, Screen, Title, colors } from '../ui';
+import { Btn, Card, Empty, Body, Muted, Row, Screen, Title, useColors } from '../ui';
 import { dateDE, eur, openItems, totalOpen } from '../calc';
 
 export function Dashboard({ navigation }: any) {
+  const colors = useColors();
   const { db } = useStore();
   const rentRoll = db.tenants.filter((t) => !t.moveOut || t.moveOut >= new Date().toISOString().slice(0, 10)).reduce((s, t) => {
     const u = db.units.find((x) => x.id === t.unitId);
@@ -27,9 +28,9 @@ export function Dashboard({ navigation }: any) {
       {arrears.length === 0 && <Empty text="Keine offenen Mieten 🎉" />}
       {arrears.map((t) => (
         <Card key={t.id} onPress={() => navigation.navigate('TenantDetail', { id: t.id })}>
-          <Text style={{ fontWeight: '600' }}>{t.name}</Text>
+          <Body bold>{t.name}</Body>
           <Muted>{openItems(db, t).length} Monat(e) offen</Muted>
-          <Text style={{ color: colors.danger, fontWeight: '700' }}>{eur(totalOpen(db, t))}</Text>
+          <Body bold color={colors.danger}>{eur(totalOpen(db, t))}</Body>
         </Card>
       ))}
       {db.properties.length === 0 && <Btn title="Erstes Objekt anlegen" onPress={() => navigation.navigate('PropertyForm', {})} />}
@@ -45,7 +46,7 @@ export function Properties({ navigation }: any) {
       {db.properties.length === 0 && <Empty text="Noch keine Objekte." />}
       {db.properties.map((p) => (
         <Card key={p.id} onPress={() => navigation.navigate('PropertyDetail', { id: p.id })}>
-          <Text style={{ fontWeight: '700', fontSize: 16 }}>{p.name}</Text>
+          <Body bold>{p.name}</Body>
           <Muted>{p.street}, {p.zip} {p.city}</Muted>
           <Muted>{db.units.filter((u) => u.propertyId === p.id).length} Einheit(en)</Muted>
         </Card>
@@ -55,6 +56,7 @@ export function Properties({ navigation }: any) {
 }
 
 export function Tenants({ navigation }: any) {
+  const colors = useColors();
   const { db } = useStore();
   return (
     <Screen>
@@ -65,9 +67,9 @@ export function Tenants({ navigation }: any) {
         const o = totalOpen(db, t);
         return (
           <Card key={t.id} onPress={() => navigation.navigate('TenantDetail', { id: t.id })}>
-            <Text style={{ fontWeight: '700', fontSize: 16 }}>{t.name}</Text>
+            <Body bold>{t.name}</Body>
             <Muted>{u?.name ?? '–'} · seit {dateDE(t.moveIn)}{t.moveOut ? ` bis ${dateDE(t.moveOut)}` : ''}</Muted>
-            <Text style={{ color: o > 0 ? colors.danger : colors.ok }}>{o > 0 ? `Offen: ${eur(o)}` : 'Ausgeglichen'}</Text>
+            <Body color={o > 0 ? colors.danger : colors.ok}>{o > 0 ? `Offen: ${eur(o)}` : 'Ausgeglichen'}</Body>
           </Card>
         );
       })}
@@ -76,6 +78,7 @@ export function Tenants({ navigation }: any) {
 }
 
 export function Payments({ navigation }: any) {
+  const colors = useColors();
   const { db } = useStore();
   const list = [...db.payments].sort((a, b) => b.date.localeCompare(a.date));
   return (
@@ -85,8 +88,8 @@ export function Payments({ navigation }: any) {
       {list.map((p) => (
         <Card key={p.id} onPress={() => navigation.navigate('PaymentForm', { id: p.id })}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-            <Text style={{ fontWeight: '600' }}>{db.tenants.find((t) => t.id === p.tenantId)?.name ?? '?'}</Text>
-            <Text style={{ fontWeight: '700', color: colors.ok }}>{eur(p.amount)}</Text>
+            <Body bold>{db.tenants.find((t) => t.id === p.tenantId)?.name ?? '?'}</Body>
+            <Body bold color={colors.ok}>{eur(p.amount)}</Body>
           </View>
           <Muted>{dateDE(p.date)} · {p.kind}{p.kind === 'miete' ? ` ${p.month}` : ''}</Muted>
         </Card>

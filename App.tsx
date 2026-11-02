@@ -1,7 +1,9 @@
 import React from 'react';
-import { ActivityIndicator, Text } from 'react-native';
+import { ActivityIndicator } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useColors } from './src/theme';
 import { StatusBar } from 'expo-status-bar';
-import { NavigationContainer } from '@react-navigation/native';
+import { DefaultTheme, NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -13,25 +15,27 @@ import { PropertyDetail, TenantDetail } from './src/screens/Details';
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
-const icon = (e: string) => () => <Text style={{ fontSize: 18 }}>{e}</Text>;
+const icon = (name: React.ComponentProps<typeof Ionicons>['name']) => ({ color, size }: { color: string; size: number }) => <Ionicons name={name} size={size} color={color} />;
 
 function Tabs() {
+  const c = useColors();
   return (
-    <Tab.Navigator>
-      <Tab.Screen name="Übersicht" component={Dashboard} options={{ tabBarIcon: icon('📊') }} />
-      <Tab.Screen name="Objekte" component={Properties} options={{ tabBarIcon: icon('🏢') }} />
-      <Tab.Screen name="Mieter" component={Tenants} options={{ tabBarIcon: icon('👤') }} />
-      <Tab.Screen name="Zahlungen" component={Payments} options={{ tabBarIcon: icon('💶') }} />
+    <Tab.Navigator screenOptions={{ tabBarActiveTintColor: c.primary, tabBarInactiveTintColor: c.muted, tabBarStyle: { backgroundColor: c.card }, tabBarLabelStyle: { fontSize: 11 }, headerStyle: { backgroundColor: c.card }, headerTintColor: c.text }}>
+      <Tab.Screen name="Übersicht" component={Dashboard} options={{ tabBarIcon: icon('stats-chart') }} />
+      <Tab.Screen name="Objekte" component={Properties} options={{ tabBarIcon: icon('business') }} />
+      <Tab.Screen name="Mieter" component={Tenants} options={{ tabBarIcon: icon('people') }} />
+      <Tab.Screen name="Zahlungen" component={Payments} options={{ tabBarIcon: icon('card') }} />
     </Tab.Navigator>
   );
 }
 
 function Root() {
   const { ready } = useStore();
+  const c = useColors();
   if (!ready) return <ActivityIndicator style={{ flex: 1 }} />;
   return (
-    <NavigationContainer>
-      <Stack.Navigator>
+    <NavigationContainer theme={{ dark: c.bg === "#000000", colors: { primary: c.primary, background: c.bg, card: c.card, text: c.text, border: c.line, notification: c.danger }, fonts: DefaultTheme.fonts }}>
+      <Stack.Navigator screenOptions={{ headerStyle: { backgroundColor: c.card }, headerTintColor: c.primary, headerTitleStyle: { color: c.text }, headerBackTitle: 'Zurück' }}>
         <Stack.Screen name="Tabs" component={Tabs} options={{ headerShown: false }} />
         <Stack.Screen name="PropertyForm" component={PropertyForm} options={{ title: 'Objekt' }} />
         <Stack.Screen name="PropertyDetail" component={PropertyDetail} options={{ title: 'Objekt' }} />

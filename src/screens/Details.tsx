@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
 import { useStore, uid } from '../store';
-import { Btn, Card, Choice, Empty, Field, Muted, Row, Screen, Title, colors, notify } from '../ui';
+import { Btn, Card, Choice, Empty, Field, Muted, Row, Screen, Title, useColors, notify, Body } from '../ui';
 import { addDays, dateDE, eur, nkStatement, num, openItems, today, totalOpen } from '../calc';
 import { exportPdf, nkHtml, reminderHtml } from '../pdf';
 
 export function PropertyDetail({ route, navigation }: any) {
+  const colors = useColors();
   const { db } = useStore();
   const p = db.properties.find((x) => x.id === route.params.id);
   if (!p) return <Screen><Empty text="Objekt nicht gefunden" /></Screen>;
@@ -23,9 +24,9 @@ export function PropertyDetail({ route, navigation }: any) {
         const t = db.tenants.find((x) => x.unitId === u.id && !x.moveOut);
         return (
           <Card key={u.id} onPress={() => navigation.navigate('UnitForm', { id: u.id })}>
-            <Text style={{ fontWeight: '600' }}>{u.name}</Text>
+            <Body bold>{u.name}</Body>
             <Muted>{u.area} m² · {u.rooms} Zi. · {eur(u.coldRent)} + {eur(u.advance)} NK</Muted>
-            <Text style={{ color: t ? colors.text : colors.muted }}>{t ? `Mieter: ${t.name}` : 'Leerstand'}</Text>
+            <Body color={t ? colors.text : colors.muted}>{t ? `Mieter: ${t.name}` : 'Leerstand'}</Body>
           </Card>
         );
       })}
@@ -44,6 +45,7 @@ export function PropertyDetail({ route, navigation }: any) {
 }
 
 export function TenantDetail({ route, navigation }: any) {
+  const colors = useColors();
   const { db, save } = useStore();
   const t = db.tenants.find((x) => x.id === route.params.id);
   const [year, setYear] = useState(new Date().getFullYear() - 1);
@@ -82,7 +84,7 @@ export function TenantDetail({ route, navigation }: any) {
 
       <Title>Offene Posten</Title>
       <Card>
-        {items.length === 0 && <Text style={{ color: colors.ok }}>Alles bezahlt</Text>}
+        {items.length === 0 && <Body color={colors.ok}>Alles bezahlt</Body>}
         {items.map((i) => <Row key={i.month} left={i.month} right={eur(i.open)} color={colors.danger} />)}
         {items.length > 0 && <Row bold left="Summe" right={eur(open)} color={colors.danger} />}
       </Card>
