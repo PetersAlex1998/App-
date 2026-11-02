@@ -8,6 +8,16 @@ export interface Property {
   city: string;
   yearBuilt: string;
   notes: string;
+  // Gebäude und Technik
+  plotArea?: string; floors?: string; heatingType?: string; heatingYear?: string; energySource?: string;
+  // Energieausweis
+  eaType?: string; eaValue?: string; eaClass?: string; eaIssued?: string; eaValidUntil?: string;
+  // Grundbuch und Kauf
+  landRegister?: string; parcel?: string; purchaseDate?: string; purchasePrice?: string;
+  // Versicherung
+  insurer?: string; policyNo?: string; premium?: string;
+  // Ansprechpartner (Hausmeister, Verwalter)
+  contactName?: string; contactPhone?: string;
 }
 
 export type UnitKind = 'wohnung' | 'gewerbe' | 'eigentum';
@@ -22,6 +32,7 @@ export interface Unit {
   rooms: number;
   coldRent: number; // Kaltmiete / Monat
   advance: number; // NK-Vorauszahlung / Monat
+  floor?: string; position?: string; balcony?: string; cellar?: string; parking?: string; kitchen?: string; equipment?: string; notes?: string;
 }
 
 export interface Tenant {
@@ -34,6 +45,9 @@ export interface Tenant {
   moveOut: string; // YYYY-MM-DD oder ''
   deposit: number;
   iban?: string; // für die automatische Zuordnung von Kontoauszügen
+  salutation?: string; mobile?: string; postalAddress?: string; emergencyContact?: string;
+  contractEnd?: string; noticeMonths?: string; rentAdjust?: string; nextAdjust?: string;
+  depositType?: string; depositAccount?: string; notes?: string;
   trackFrom?: string; // YYYY-MM: erst ab diesem Monat zählen Mieten als offen (ältere Monate sind außerhalb der App erledigt)
 }
 
@@ -88,6 +102,21 @@ export interface Cost {
   consumptionShare?: number; // % nach Verbrauch (Rest = Grundkosten nach Wohnfläche); fehlt = 100
 }
 
+export type DocOwner = 'property' | 'unit' | 'tenant';
+export type DocCategory = 'energieausweis' | 'mietvertrag' | 'foto' | 'versicherung' | 'grundbuch' | 'rechnung' | 'protokoll' | 'sonstiges';
+export interface Doc {
+  id: ID;
+  ownerKind: DocOwner;
+  ownerId: ID;
+  category: DocCategory;
+  name: string;
+  mime: string;
+  size: number;
+  added: string; // YYYY-MM-DD
+  validUntil?: string; // z. B. Energieausweis, Versicherung
+  note?: string;
+}
+
 export interface DB {
   properties: Property[];
   units: Unit[];
@@ -97,6 +126,7 @@ export interface DB {
   costs: Cost[];
   meters: Meter[];
   readings: Reading[];
+  documents: Doc[];
 }
 
 export type Kind = keyof DB;
@@ -109,4 +139,5 @@ export const emptyDB: DB = {
   costs: [],
   meters: [],
   readings: [],
+  documents: [],
 };

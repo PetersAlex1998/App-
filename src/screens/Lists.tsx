@@ -6,6 +6,7 @@ import { dateDE, eur, initials, monthLabel, monthLong, openItems, totalOpen, tod
 import { type } from '../theme';
 import { useSettings } from '../settings';
 import { dunningPlans } from '../dunning';
+import { daysUntil, expiryState } from '../docs';
 
 const LIMIT = 5;
 const isActive = (t: { moveOut: string }) => !t.moveOut || t.moveOut >= today();
@@ -30,7 +31,25 @@ export function Dashboard({ navigation }: any) {
   const arrears = activeTenants.filter((t) => openItems(db, t).length > 0);
   const depositMissing = activeTenants.filter((t) => t.deposit > 0 && db.payments.filter((p) => p.tenantId === t.id && p.kind === 'kaution').reduce((s, p) => s + p.amount, 0) < t.deposit);
   const duePlans = dunningPlans(db, cfg).filter((p) => p.status === 'faellig');
-  const todoCount = arrears.length + vacant.length + depositMissing.length;
+  // Fristen: Energieausweis, Dokumente mit Ablaufdatum, befristete Mietverträge, Mietanpassungen
+  type Due = { key: string; icon: any; tone: 'danger' | 'warn'; title: string; subtitle: string; go: () => void };
+  const dues: Due[] = [];
+  const propName = (id?: string) => db.properties.find((p) => p.id === id)?.name ?? '';
+  db.properties.forEach((p) => {
+    const hasDoc = db.documents.some((d) => d.ownerKind === 'property' && d.ownerId === p.id && d.category === 'energieausweis');
+    const ex = expiryState(p.eaValidUntil);
+    if (ex && ex.tone !== 'ok') dues.push({ key: 'ea' + p.id, icon: 'leaf', tone: ex.tone, title: `Energieausweis: ${p.name}`, subtitle: ex.text, go: () => navigation.navigate('PropertyDetail', { id: p.id }) });
+    else if (!p.eaValidUntil && !hasDoc && !p.eaClass) dues.push({ key: 'eafehlt' + p.id, icon: 'leaf-outline', tone: 'warn', title: `Energieausweis fehlt: ${p.name}`, subtitle: 'Beim Vermieten und Verkaufen vorgeschrieben', go: () => navigation.navigate('PropertyDetail', { id: p.id }) });
+  });
+  db.documents.forEach((d) => {
+    const ex = expiryState(d.validUntil);
+    if (ex && ex.tone !== 'ok' && d.category !== 'energieausweis') dues.push({ key: 'doc' + d.id, icon: 'document-text', tone: ex.tone, title: `${d.name}`, subtitle: ex.text, go: () => navigation.navigate('DocumentViewer', { id: d.id }) });
+  });
+  activeTenants.forEach((t) => {
+    if (t.contractEnd && daysUntil(t.contractEnd) <= 180) dues.push({ key: 'ce' + t.id, icon: 'calendar', tone: daysUntil(t.contractEnd) < 0 ? 'danger' : 'warn', title: `Befristung endet: ${t.name}`, subtitle: daysUntil(t.contractEnd) < 0 ? `Seit ${dateDE(t.contractEnd)} abgelaufen` : `Am ${dateDE(t.contractEnd)}`, go: () => navigation.navigate('TenantDetail', { id: t.id }) });
+    if (t.nextAdjust && daysUntil(t.nextAdjust) <= 60) dues.push({ key: 'na' + t.id, icon: 'trending-up', tone: 'warn', title: `Mietanpassung: ${t.name}`, subtitle: `${t.rentAdjust ?? 'Anpassung'} am ${dateDE(t.nextAdjust)}`, go: () => navigation.navigate('TenantDetail', { id: t.id }) });
+  });
+  const todoCount = dues.length + arrears.length + vacant.length + depositMissing.length;
 
   // Erste Schritte
   if (db.properties.length === 0) {
@@ -95,6 +114,10 @@ export function Dashboard({ navigation }: any) {
           <ListRow key={'v' + u.id} icon="key-outline" iconTone="warn" title={`Leerstand: ${u.name}`} subtitle={db.properties.find((p) => p.id === u.propertyId)?.name}
             right={eur(unitDue(u))} rightSub="Soll / Monat" onPress={() => navigation.navigate('TenantForm', { unitId: u.id })} />
         ))}
+        {dues.slice(0, LIMIT).map((d) => (
+          <ListRow key={d.key} icon={d.icon} iconTone={d.tone} title={d.title} subtitle={d.subtitle} onPress={d.go} />
+        ))}
+        {dues.length > LIMIT && <ListRow icon="list" title={`Weitere ${dues.length - LIMIT} Fristen`} onPress={() => navigation.navigate('Objekte')} />}
         {depositMissing.slice(0, LIMIT).map((t) => (
           <ListRow key={'d' + t.id} icon="shield-checkmark-outline" iconTone="warn" title={`Kaution offen: ${t.name}`} subtitle={`Vereinbart: ${eur(t.deposit)}`} onPress={() => navigation.navigate('TenantDetail', { id: t.id })} />
         ))}

@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Platform, Text } from 'react-native';
 import { useStore } from '../store';
 import { useThemePref } from '../theme';
 import { useSettings } from '../settings';
 import { Button, Field, Segmented, Gap, ListRow, Note, Screen, Section, confirm, notify, useColors } from '../ui';
 import { demoData } from '../demo';
-import { exportBackup, parseBackup, pickBackupFile } from '../backup';
+import { exportBackup, parseBackup, pickBackupFile, restoreFiles } from '../backup';
+import { filesSupported, fmtSize, requestPersistence, storageInfo } from '../files';
 
 export function DataScreen({ navigation }: any) {
   const { db, replaceAll } = useStore();
@@ -14,17 +15,22 @@ export function DataScreen({ navigation }: any) {
   const { s: cfg, update: updateCfg } = useSettings();
   const c = useColors();
   const empty = db.properties.length === 0;
+  const [store, setStore] = useState<Awaited<ReturnType<typeof storageInfo>>>(null);
+  const refreshStore = () => { if (filesSupported()) storageInfo().then(setStore); };
+  useEffect(refreshStore, [db.documents.length]);
+  const docBytes = db.documents.reduce((a, d) => a + d.size, 0);
 
   const doImport = (content: string) => {
     try {
-      const { db: next, settings } = parseBackup(content);
+      const { db: next, settings, files } = parseBackup(content);
       const n = `${next.properties.length} Objekte, ${next.tenants.length} Mieter, ${next.payments.length} Zahlungen`;
       confirm('Sicherung einspielen?', () => {
         replaceAll(next);
         if (settings) updateCfg(settings);
+        if (files) restoreFiles(files).then(refreshStore);
         setText('');
         notify('Die Sicherung wurde eingespielt.');
-      }, 'Einspielen', `Enthält ${n}${settings ? ' sowie Absenderdaten und Mahnregeln' : ''}. Die aktuellen Daten werden ersetzt.`);
+      }, 'Einspielen', `Enthält ${n}${settings ? ', Absenderdaten und Mahnregeln' : ''}${files ? ` und ${Object.keys(files).length} Dokumente` : ''}. Die aktuellen Daten werden ersetzt.`);
     } catch (e: any) {
       notify(e.message);
     }
@@ -44,6 +50,14 @@ export function DataScreen({ navigation }: any) {
         <ListRow icon="card" title="Zahlungen" right={String(db.payments.length)} />
       </Section>
 
+      {filesSupported() && (
+        <Section title="Speicher" footer={store && !store.persisted ? 'Der Browser darf diese Daten im Notfall löschen, z. B. bei Speichermangel. Lege die App auf den Home-Bildschirm und fordere dauerhaften Speicher an. Sichere außerdem regelmäßig.' : undefined}>
+          <ListRow icon="document-attach" title="Dokumente und Fotos" right={`${db.documents.length}`} rightSub={fmtSize(docBytes)} />
+          {store ? <ListRow icon="server-outline" title="Belegter Speicher" right={fmtSize(store.usage)} rightSub={`von ${fmtSize(store.quota)}`} /> : null}
+          {store ? <ListRow icon={store.persisted ? 'shield-checkmark' : 'shield-outline'} iconTone={store.persisted ? 'ok' : 'warn'} title={store.persisted ? 'Dauerhaft gesichert' : 'Dauerhaften Speicher anfordern'} subtitle={store.persisted ? 'Der Browser löscht die Daten nicht von selbst.' : 'Schützt vor automatischem Löschen'} onPress={store.persisted ? undefined : () => requestPersistence().then((ok) => { refreshStore(); if (!ok) notify('Der Browser hat den Antrag abgelehnt. Lege die App auf den Home-Bildschirm und versuche es erneut.'); })} /> : null}
+        </Section>
+      )}
+
       <Section title="Briefe und Mahnwesen">
         <ListRow icon="mail-outline" title="Absender und Mahnregeln" subtitle="Adresse, IBAN, Gebühren, Fristen" onPress={() => navigation.navigate('Briefe')} />
       </Section>
@@ -57,6 +71,12 @@ export function DataScreen({ navigation }: any) {
         <Note>Die Sicherung enthält alle Daten, deine Absenderdaten, das Logo und die Mahnregeln in einer Datei.</Note>
       </Section>
       <Button icon="download-outline" title={Platform.OS === 'web' ? 'Sicherung herunterladen' : 'Sicherung exportieren'} onPress={() => exportBackup(db, cfg).catch(fail)} disabled={empty} />
+      {filesSupported() && db.documents.length > 0 && (
+        <>
+          <Gap h={8} />
+          <Button kind="secondary" icon="albums-outline" title={`Vollsicherung mit ${db.documents.length} Dokumenten (${fmtSize(docBytes)})`} onPress={() => exportBackup(db, cfg, true).catch(fail)} />
+        </>
+      )}
       <Gap h={22} />
 
       <Section title="Wiederherstellen">

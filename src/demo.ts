@@ -37,6 +37,7 @@ export function demoData(): DB {
       { id: 'demo-r1', meterId: 'demo-m1', date: `${y - 1}-12-31`, value: 410 }, { id: 'demo-r2', meterId: 'demo-m1', date: `${y}-12-31`, value: 462 },
       { id: 'demo-r3', meterId: 'demo-m2', date: `${y - 1}-12-31`, value: 880 }, { id: 'demo-r4', meterId: 'demo-m2', date: `${y}-12-31`, value: 1004 },
     ],
+    documents: [],
     reminders: [],
     costs: [
       { id: 'demo-c1', propertyId: 'demo-p1', year: y, category: 'Müllabfuhr', amount: 1200, key: 'area' },

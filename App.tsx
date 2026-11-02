@@ -16,8 +16,10 @@ import { Mahnlauf } from './src/screens/Mahnlauf';
 import { Ablesung, MeterDetail, MeterForm, ReadingForm } from './src/screens/Meters';
 import { BriefeSettings } from './src/screens/BriefeSettings';
 import { SettingsProvider } from './src/settings';
+import { filesSupported, requestPersistence } from './src/files';
 import { FloatingTabBar } from './src/FloatingTabBar';
-import { PropertyDetail, TenantDetail } from './src/screens/Details';
+import { PropertyDetail, TenantDetail, UnitDetail } from './src/screens/Details';
+import { DocumentForm, DocumentViewer } from './src/screens/Documents';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -36,6 +38,7 @@ function Tabs() {
 
 function Root() {
   const { ready } = useStore();
+  React.useEffect(() => { if (filesSupported()) requestPersistence(); }, []);
   const c = useColors();
   const dark = useIsDark();
   if (!ready) return <ActivityIndicator style={{ flex: 1 }} />;
@@ -47,6 +50,9 @@ function Root() {
         <Stack.Screen name="Search" component={SearchScreen} options={{ title: 'Suche' }} />
         <Stack.Screen name="StatementImport" component={StatementImport} options={{ title: 'Kontoauszug' }} />
         <Stack.Screen name="BestandImport" component={BestandImport} options={{ title: 'Bestand importieren' }} />
+        <Stack.Screen name="UnitDetail" component={UnitDetail} options={{ title: 'Wohnung' }} />
+        <Stack.Screen name="DocumentForm" component={DocumentForm} options={({ route }: any) => ({ title: route.params?.id ? 'Dokument bearbeiten' : 'Dokument hinzufügen' })} />
+        <Stack.Screen name="DocumentViewer" component={DocumentViewer} options={{ title: 'Dokument' }} />
         <Stack.Screen name="MeterForm" component={MeterForm} options={({ route }: any) => ({ title: route.params?.id ? 'Zähler bearbeiten' : 'Neuer Zähler' })} />
         <Stack.Screen name="MeterDetail" component={MeterDetail} options={{ title: 'Zähler' }} />
         <Stack.Screen name="ReadingForm" component={ReadingForm} options={({ route }: any) => ({ title: route.params?.id ? 'Stand bearbeiten' : 'Zählerstand' })} />

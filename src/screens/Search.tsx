@@ -27,7 +27,7 @@ export function SearchScreen({ navigation }: any) {
       )}
       {units.length > 0 && (
         <Section title="Wohnungen">
-          {units.map((u) => <ListRow key={u.id} icon="home" title={u.name} subtitle={db.properties.find((p) => p.id === u.propertyId)?.name} right={eur(unitDue(u))} onPress={() => navigation.navigate('UnitForm', { id: u.id })} />)}
+          {units.map((u) => <ListRow key={u.id} icon="home" title={u.name} subtitle={db.properties.find((p) => p.id === u.propertyId)?.name} right={eur(unitDue(u))} onPress={() => navigation.navigate('UnitDetail', { id: u.id })} />)}
         </Section>
       )}
       {tenants.length > 0 && (

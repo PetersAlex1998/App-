@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DB, Kind, emptyDB } from './types';
+import { deleteBlob, filesSupported } from './files';
 
 const KEY = 'immo-db-v1';
 
@@ -46,6 +47,16 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   const remove = useCallback((kind: Kind, id: string) => {
     setDb((d) => {
+      // zugehörige Dokumente (samt Dateien) mit entfernen
+      const ownerIds = new Set<string>([id]);
+      if (kind === 'properties') {
+        const unitIds = d.units.filter((u) => u.propertyId === id).map((u) => u.id);
+        unitIds.forEach((x) => ownerIds.add(x));
+        d.tenants.filter((t) => unitIds.includes(t.unitId)).forEach((t) => ownerIds.add(t.id));
+      } else if (kind === 'units') d.tenants.filter((t) => t.unitId === id).forEach((t) => ownerIds.add(t.id));
+      const gone = d.documents.filter((x) => (kind === 'documents' ? x.id === id : ownerIds.has(x.ownerId)));
+      if (gone.length && filesSupported()) gone.forEach((x) => deleteBlob(x.id).catch(() => {}));
+
       let n = { ...d, [kind]: (d[kind] as { id: string }[]).filter((x) => x.id !== id) } as DB;
       if (kind === 'properties') {
         const unitIds = d.units.filter((u) => u.propertyId === id).map((u) => u.id);
@@ -72,6 +83,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         n.payments = d.payments.filter((p) => p.tenantId !== id);
         n.reminders = d.reminders.filter((r) => r.tenantId !== id);
       }
+      n.documents = d.documents.filter((x) => !gone.includes(x));
       return n;
     });
   }, []);

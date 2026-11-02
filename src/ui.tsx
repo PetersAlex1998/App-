@@ -356,3 +356,61 @@ export function FilterChips<T extends string>({ value, options, onChange }: { va
     </ScrollView>
   );
 }
+
+/* ───────── Stammdaten-Bausteine ───────── */
+
+/** Einklappbarer Bereich für viele optionale Felder. Offen, wenn schon etwas darin ausgefüllt ist. */
+export function Disclosure({ title, children, filled, hint }: { title: string; children: React.ReactNode; filled?: boolean; hint?: string }) {
+  const c = useColors();
+  const [open, setOpen] = React.useState(!!filled);
+  return (
+    <View style={{ marginBottom: 14 }}>
+      <Pressable accessibilityRole="button" accessibilityState={{ expanded: open }} onPress={() => setOpen(!open)}
+        style={[{ backgroundColor: c.card, borderRadius: 22, borderWidth: 1, borderColor: c.glassBorder, paddingHorizontal: 16, minHeight: 56, flexDirection: 'row', alignItems: 'center', gap: 10 }, cardShadow as object]}>
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontSize: type.body, fontWeight: '600', color: c.text }}>{title}</Text>
+          {hint && !open ? <Text style={{ fontSize: type.footnote, color: c.muted }}>{hint}</Text> : null}
+        </View>
+        {filled && !open ? <Ionicons name="checkmark-circle" size={18} color={c.ok} /> : null}
+        <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={18} color={c.muted} />
+      </Pressable>
+      {open ? <View style={{ marginTop: 8 }}><Section>{children}</Section></View> : null}
+    </View>
+  );
+}
+
+/** Auswahl aus wenigen Werten als Chips (erneutes Antippen hebt die Auswahl auf). */
+export function ChipField({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (v: string) => void }) {
+  const c = useColors();
+  return (
+    <FieldShell label={label}>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingTop: 6, paddingBottom: 2 }}>
+        {options.map((o) => {
+          const on = o === value;
+          return (
+            <Pressable key={o} accessibilityRole="radio" accessibilityState={{ selected: on }} onPress={() => onChange(on ? '' : o)}
+              style={{ minHeight: 38, paddingHorizontal: 14, borderRadius: 19, justifyContent: 'center', backgroundColor: on ? c.ink : c.fill }}>
+              <Text style={{ fontSize: type.subhead, fontWeight: '600', color: on ? c.onInk : c.text }}>{o}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </FieldShell>
+  );
+}
+
+/** Nur ausgefüllte Werte als Zeilen (als Funktion aufrufen, damit Section Trennlinien setzt): <Section>{infoRows([...])}</Section> */
+export function infoRows(rows: [string, string | undefined | false][]): React.ReactElement[] {
+  return rows
+    .filter(([, v]) => v && String(v).trim())
+    .map(([k, v]) => <InfoRow key={k} k={k} v={v as string} />);
+}
+function InfoRow({ k, v }: { k: string; v: string }) {
+  const c = useColors();
+  return (
+    <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 14, paddingHorizontal: 14, paddingVertical: 11 }}>
+      <Text style={{ fontSize: type.subhead, color: c.muted, maxWidth: '45%' }}>{k}</Text>
+      <Text selectable style={{ fontSize: type.subhead, color: c.text, fontWeight: '500', flex: 1, textAlign: 'right' }}>{v}</Text>
+    </View>
+  );
+}

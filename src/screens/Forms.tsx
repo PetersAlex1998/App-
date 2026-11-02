@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 
 import { useStore, uid } from '../store';
-import { Button, DateField, Field, Gap, Note, OptionRow, Screen, Section, Segmented, confirm } from '../ui';
+import { Button, ChipField, DateField, Disclosure, Field, Gap, Note, OptionRow, Screen, Section, Segmented, confirm } from '../ui';
 import { Cost, Kind, Payment, Property, Tenant, Unit } from '../types';
 import { eur, monthLabel, num, suggestPayment, today } from '../calc';
 import { MeterType, UnitKind } from '../types';
@@ -31,12 +31,16 @@ function Footer({ kind, id, nav, onSave, label = 'Speichern', deleteText }: { ki
   );
 }
 
+const addYears = (iso: string, y: number) => (/^\d{4}-\d{2}-\d{2}$/.test(iso) ? `${Number(iso.slice(0, 4)) + y}${iso.slice(4)}` : '');
+const filled = (...v: (string | undefined)[]) => v.some((x) => x && x.trim());
+
 export function PropertyForm({ route, navigation }: any) {
   const { save } = useStore();
   const old = useItem<Property>('properties', route.params?.id);
   const [f, setF] = useState<Property>(old ?? { id: uid(), name: '', street: '', zip: '', city: '', yearBuilt: '', notes: '' });
   const [err, setErr] = useState<Errors>({});
   const set = (k: keyof Property) => (v: string) => setF({ ...f, [k]: v });
+  const setIssued = (v: string) => setF({ ...f, eaIssued: v, eaValidUntil: !f.eaValidUntil || f.eaValidUntil === addYears(f.eaIssued ?? '', 10) ? addYears(v, 10) : f.eaValidUntil });
   const submit = () => {
     const e: Errors = {};
     if (!f.name.trim()) e.name = 'Bitte eine Bezeichnung eingeben, z. B. „Haus Lindenstraße“.';
@@ -56,10 +60,39 @@ export function PropertyForm({ route, navigation }: any) {
         <Field label="PLZ" value={f.zip} onChangeText={set('zip')} keyboard="numeric" />
         <Field label="Ort" value={f.city} onChangeText={set('city')} />
       </Section>
+      <Disclosure title="Gebäude und Technik" filled={filled(f.plotArea, f.floors, f.heatingType, f.heatingYear, f.energySource)} hint="Grundstück, Etagen, Heizung">
+        <Field label="Grundstücksfläche" value={f.plotArea ?? ''} onChangeText={set('plotArea')} keyboard="numeric" suffix="m²" />
+        <Field label="Anzahl Etagen" value={f.floors ?? ''} onChangeText={set('floors')} keyboard="numeric" />
+        <ChipField label="Heizungsart" value={f.heatingType ?? ''} options={['Gas', 'Öl', 'Fernwärme', 'Wärmepumpe', 'Pellets', 'Strom', 'Sonstige']} onChange={set('heatingType')} />
+        <Field label="Baujahr der Heizung" value={f.heatingYear ?? ''} onChangeText={set('heatingYear')} keyboard="numeric" />
+        <Field label="Energieträger" value={f.energySource ?? ''} onChangeText={set('energySource')} placeholder="z. B. Erdgas H" />
+      </Disclosure>
+      <Disclosure title="Energieausweis" filled={filled(f.eaType, f.eaValue, f.eaClass, f.eaIssued, f.eaValidUntil)} hint="Art, Kennwert, Effizienzklasse, Gültigkeit">
+        <ChipField label="Art" value={f.eaType ?? ''} options={['Verbrauch', 'Bedarf']} onChange={set('eaType')} />
+        <Field label="Energiekennwert" value={f.eaValue ?? ''} onChangeText={set('eaValue')} keyboard="numeric" suffix="kWh/(m²·a)" />
+        <ChipField label="Effizienzklasse" value={f.eaClass ?? ''} options={['A+', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']} onChange={set('eaClass')} />
+        <DateField label="Ausgestellt am" value={f.eaIssued ?? ''} onChange={setIssued} optional />
+        <DateField label="Gültig bis (10 Jahre)" value={f.eaValidUntil ?? ''} onChange={set('eaValidUntil')} optional />
+      </Disclosure>
+      <Disclosure title="Grundbuch und Kauf" filled={filled(f.landRegister, f.parcel, f.purchaseDate, f.purchasePrice)} hint="Grundbuch, Flurstück, Kaufpreis">
+        <Field label="Grundbuch (Amtsgericht, Blatt)" value={f.landRegister ?? ''} onChangeText={set('landRegister')} />
+        <Field label="Flurstück" value={f.parcel ?? ''} onChangeText={set('parcel')} />
+        <DateField label="Kaufdatum" value={f.purchaseDate ?? ''} onChange={set('purchaseDate')} optional />
+        <Field label="Kaufpreis" value={f.purchasePrice ?? ''} onChangeText={set('purchasePrice')} keyboard="numeric" suffix="€" />
+      </Disclosure>
+      <Disclosure title="Versicherung" filled={filled(f.insurer, f.policyNo, f.premium)} hint="Gebäudeversicherung">
+        <Field label="Versicherer" value={f.insurer ?? ''} onChangeText={set('insurer')} />
+        <Field label="Policennummer" value={f.policyNo ?? ''} onChangeText={set('policyNo')} />
+        <Field label="Jahresprämie" value={f.premium ?? ''} onChangeText={set('premium')} keyboard="numeric" suffix="€" />
+      </Disclosure>
+      <Disclosure title="Ansprechpartner" filled={filled(f.contactName, f.contactPhone)} hint="Hausmeister, Verwalter">
+        <Field label="Name" value={f.contactName ?? ''} onChangeText={set('contactName')} placeholder="z. B. Hausmeister Meier" />
+        <Field label="Telefon" value={f.contactPhone ?? ''} onChangeText={set('contactPhone')} keyboard="phone-pad" />
+      </Disclosure>
       <Section title="Notizen">
         <Field label="Notizen" value={f.notes} onChangeText={set('notes')} multiline placeholder="optional" />
       </Section>
-      <Footer kind="properties" id={old?.id} nav={navigation} onSave={submit} deleteText="Alle Wohnungen, Mieter, Zahlungen und Kosten dieses Objekts werden ebenfalls gelöscht." />
+      <Footer kind="properties" id={old?.id} nav={navigation} onSave={submit} deleteText="Alle Wohnungen, Mieter, Zahlungen, Zähler, Kosten und Dokumente dieses Objekts werden ebenfalls gelöscht." />
     </Screen>
   );
 }
@@ -70,6 +103,8 @@ export function UnitForm({ route, navigation }: any) {
   const [f, setF] = useState({ name: old?.name ?? '', area: old ? String(old.area) : '', rooms: old ? String(old.rooms) : '', coldRent: old ? String(old.coldRent) : '', advance: old ? String(old.advance) : '' });
   const [kind, setKind] = useState<UnitKind>(old?.kind ?? 'wohnung');
   const [vat, setVat] = useState<number>(old?.vat ?? 0);
+  const [x, setX] = useState({ floor: old?.floor ?? '', position: old?.position ?? '', balcony: old?.balcony ?? '', cellar: old?.cellar ?? '', parking: old?.parking ?? '', kitchen: old?.kitchen ?? '', equipment: old?.equipment ?? '', notes: old?.notes ?? '' });
+  const setx = (k: keyof typeof x) => (v: string) => setX({ ...x, [k]: v });
   const [err, setErr] = useState<Errors>({});
   const set = (k: keyof typeof f) => (v: string) => setF({ ...f, [k]: v });
   const net = num(f.coldRent) + num(f.advance);
@@ -81,7 +116,7 @@ export function UnitForm({ route, navigation }: any) {
     if (num(f.coldRent) <= 0) e.coldRent = 'Bitte die Kaltmiete eingeben.';
     setErr(e);
     if (Object.keys(e).length) return false;
-    save('units', { id: old?.id ?? uid(), kind, vat: kind === 'gewerbe' ? vat : 0, propertyId: old?.propertyId ?? route.params.propertyId, name: f.name.trim(), area: num(f.area), rooms: num(f.rooms), coldRent: num(f.coldRent), advance: num(f.advance) });
+    save('units', { ...x, id: old?.id ?? uid(), kind, vat: kind === 'gewerbe' ? vat : 0, propertyId: old?.propertyId ?? route.params.propertyId, name: f.name.trim(), area: num(f.area), rooms: num(f.rooms), coldRent: num(f.coldRent), advance: num(f.advance) });
     return true;
   };
   return (
@@ -99,7 +134,17 @@ export function UnitForm({ route, navigation }: any) {
         <Field label="Kaltmiete pro Monat" value={f.coldRent} onChangeText={set('coldRent')} keyboard="numeric" suffix="€" error={err.coldRent} />
         <Field label="Nebenkosten-Vorauszahlung pro Monat" value={f.advance} onChangeText={set('advance')} keyboard="numeric" suffix="€" />
       </Section>
-      <Footer kind="units" id={old?.id} nav={navigation} onSave={submit} deleteText="Der Mieter dieser Wohnung und seine Zahlungen werden ebenfalls gelöscht." />
+      <Disclosure title="Lage und Ausstattung" filled={filled(...Object.values(x))} hint="Etage, Balkon, Keller, Stellplatz, Küche">
+        <Field label="Etage" value={x.floor} onChangeText={setx('floor')} placeholder="z. B. 2. OG" />
+        <Field label="Lage" value={x.position} onChangeText={setx('position')} placeholder="z. B. links, Hofseite" />
+        <ChipField label="Balkon / Terrasse" value={x.balcony} options={['Balkon', 'Terrasse', 'Loggia', 'Keiner']} onChange={setx('balcony')} />
+        <ChipField label="Keller" value={x.cellar} options={['Ja', 'Nein']} onChange={setx('cellar')} />
+        <Field label="Stellplatz / Garage" value={x.parking} onChangeText={setx('parking')} placeholder="z. B. TG-Platz 14" />
+        <ChipField label="Küche" value={x.kitchen} options={['Einbauküche', 'Keine Küche']} onChange={setx('kitchen')} />
+        <Field label="Ausstattung" value={x.equipment} onChangeText={setx('equipment')} multiline placeholder="z. B. Parkett, Fußbodenheizung, Aufzug" />
+        <Field label="Notizen" value={x.notes} onChangeText={setx('notes')} multiline placeholder="optional" />
+      </Disclosure>
+      <Footer kind="units" id={old?.id} nav={navigation} onSave={submit} deleteText="Der Mieter dieser Wohnung, seine Zahlungen, Zähler und Dokumente werden ebenfalls gelöscht." />
     </Screen>
   );
 }
@@ -111,6 +156,8 @@ export function TenantForm({ route, navigation }: any) {
   const { db, save } = useStore();
   const old = useItem<Tenant>('tenants', route.params?.id);
   const [f, setF] = useState({ name: old?.name ?? '', email: old?.email ?? '', phone: old?.phone ?? '', moveIn: old?.moveIn ?? today(), moveOut: old?.moveOut ?? '', iban: old?.iban ?? '', trackFrom: old ? old.trackFrom ?? '' : defaultTrackFrom(), deposit: old ? String(old.deposit || '') : '', unitId: old?.unitId ?? route.params?.unitId ?? '' });
+  const [x, setX] = useState({ salutation: old?.salutation ?? '', mobile: old?.mobile ?? '', postalAddress: old?.postalAddress ?? '', emergencyContact: old?.emergencyContact ?? '', contractEnd: old?.contractEnd ?? '', noticeMonths: old?.noticeMonths ?? '', rentAdjust: old?.rentAdjust ?? '', nextAdjust: old?.nextAdjust ?? '', depositType: old?.depositType ?? '', depositAccount: old?.depositAccount ?? '', notes: old?.notes ?? '' });
+  const setx = (k: keyof typeof x) => (v: string) => setX({ ...x, [k]: v });
   const [err, setErr] = useState<Errors>({});
   const set = (k: keyof typeof f) => (v: string) => setF({ ...f, [k]: v });
   const submit = () => {
@@ -123,7 +170,7 @@ export function TenantForm({ route, navigation }: any) {
     if (f.email && !/^\S+@\S+\.\S+$/.test(f.email)) e.email = 'Das sieht nicht nach einer E-Mail-Adresse aus.';
     setErr(e);
     if (Object.keys(e).length) return false;
-    save('tenants', { id: old?.id ?? uid(), unitId: f.unitId, name: f.name.trim(), email: f.email.trim(), phone: f.phone.trim(), iban: f.iban.replace(/\s/g, '').toUpperCase(), moveIn: f.moveIn, moveOut: f.moveOut, deposit: num(f.deposit), trackFrom: f.trackFrom || undefined });
+    save('tenants', { ...x, id: old?.id ?? uid(), unitId: f.unitId, name: f.name.trim(), email: f.email.trim(), phone: f.phone.trim(), iban: f.iban.replace(/\s/g, '').toUpperCase(), moveIn: f.moveIn, moveOut: f.moveOut, deposit: num(f.deposit), trackFrom: f.trackFrom || undefined });
     return true;
   };
   return (
@@ -153,7 +200,24 @@ export function TenantForm({ route, navigation }: any) {
       </Section>
       <Note>Frühere Monate gelten nicht als Rückstand. Das ist sinnvoll, wenn der Mieter schon länger wohnt und ältere Mieten außerhalb der App erledigt sind.</Note>
       <Gap h={14} />
-      <Footer kind="tenants" id={old?.id} nav={navigation} onSave={submit} deleteText="Alle Zahlungen und Mahnungen dieses Mieters werden ebenfalls gelöscht." />
+      <Disclosure title="Persönliches" filled={filled(x.salutation, x.mobile, x.postalAddress, x.emergencyContact)} hint="Anrede, Mobil, Postanschrift, Notfallkontakt">
+        <ChipField label="Anrede" value={x.salutation} options={['Herr', 'Frau', 'Familie', 'Firma']} onChange={setx('salutation')} />
+        <Field label="Mobil" value={x.mobile} onChangeText={setx('mobile')} keyboard="phone-pad" />
+        <Field label="Abweichende Postanschrift" value={x.postalAddress} onChangeText={setx('postalAddress')} multiline placeholder="falls Post nicht an die Wohnung geht" />
+        <Field label="Notfallkontakt" value={x.emergencyContact} onChangeText={setx('emergencyContact')} placeholder="Name und Telefon" />
+      </Disclosure>
+      <Disclosure title="Mietvertrag" filled={filled(x.contractEnd, x.noticeMonths, x.rentAdjust, x.nextAdjust, x.depositType, x.depositAccount)} hint="Befristung, Kündigungsfrist, Mietanpassung, Kaution">
+        <DateField label="Befristet bis" value={x.contractEnd} onChange={setx('contractEnd')} optional />
+        <ChipField label="Kündigungsfrist (Monate)" value={x.noticeMonths} options={['3', '6', '9', '12']} onChange={setx('noticeMonths')} />
+        <ChipField label="Mietanpassung" value={x.rentAdjust} options={['Keine', 'Staffelmiete', 'Indexmiete']} onChange={setx('rentAdjust')} />
+        <DateField label="Nächste Anpassung am" value={x.nextAdjust} onChange={setx('nextAdjust')} optional />
+        <ChipField label="Kautionsart" value={x.depositType} options={['Barkaution', 'Kautionskonto', 'Bürgschaft']} onChange={setx('depositType')} />
+        <Field label="Kautionskonto / Bürgschaft" value={x.depositAccount} onChangeText={setx('depositAccount')} placeholder="z. B. IBAN oder Bürgschaftsnummer" />
+      </Disclosure>
+      <Disclosure title="Notizen" filled={filled(x.notes)}>
+        <Field label="Notizen" value={x.notes} onChangeText={setx('notes')} multiline placeholder="z. B. Absprachen, Besonderheiten" />
+      </Disclosure>
+      <Footer kind="tenants" id={old?.id} nav={navigation} onSave={submit} deleteText="Alle Zahlungen, Mahnungen und Dokumente dieses Mieters werden ebenfalls gelöscht." />
     </Screen>
   );
 }

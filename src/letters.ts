@@ -75,5 +75,5 @@ export function sampleLetterHtml(s: Settings): string {
   const t: Tenant = { id: 't', unitId: 'u', name: 'Erika Mustermann', email: '', phone: '', moveIn: '2024-01-01', moveOut: '', deposit: 0 };
   const items = [{ month: '2026-09', due: 860, paid: 0, open: 860 }, { month: '2026-10', due: 860, paid: 0, open: 860 }];
   const r: Reminder = { id: 'x', tenantId: 't', date: new Date().toISOString().slice(0, 10), level: 2, amount: 1720, fee: s.fee2, deadline: new Date(Date.now() + s.deadlineDays * 86400000).toISOString().slice(0, 10), items };
-  return reminderHtml({ properties: [prop], units: [unit], tenants: [t], payments: [], reminders: [], costs: [], meters: [], readings: [] }, r, t, unit, prop, s);
+  return reminderHtml({ properties: [prop], units: [unit], tenants: [t], payments: [], reminders: [], costs: [], meters: [], readings: [], documents: [] }, r, t, unit, prop, s);
 }

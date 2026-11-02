@@ -1,7 +1,9 @@
 import React, { useLayoutEffect, useState } from 'react';
 import { Linking, Pressable, Text, View } from 'react-native';
 import { useStore, uid } from '../store';
-import { Avatar, Badge, Button, EmptyState, Gap, ListRow, Note, Row, Screen, Section, Segmented, Stat, StatGrid, confirm, notify, useColors } from '../ui';
+import { Avatar, Badge, Button, EmptyState, Gap, ListRow, Note, Row, Screen, Section, Segmented, Stat, StatGrid, confirm, infoRows, notify, useColors } from '../ui';
+import { DocumentsSection } from './Documents';
+import { expiryState } from '../docs';
 import { addDays, dateDE, eur, initials, kindLabel, kindOf, monthLabel, unitDue, nkStatement, openItems, reminderLabel, today, totalOpen } from '../calc';
 import { exportPdf, nkHtml, reminderHtml } from '../pdf';
 import { useSettings } from '../settings';
@@ -51,6 +53,30 @@ export function PropertyDetail({ route, navigation }: any) {
         <Stat label="Auslastung" value={`${occ} %`} icon="pie-chart-outline" />
       </StatGrid>
 
+      {(() => {
+        const ea = expiryState(p.eaValidUntil);
+        const rows = infoRows([
+          ['Grundstück', p.plotArea && `${p.plotArea} m²`], ['Etagen', p.floors],
+          ['Heizung', [p.heatingType, p.heatingYear && `Bj. ${p.heatingYear}`].filter(Boolean).join(' · ')], ['Energieträger', p.energySource],
+          ['Grundbuch', p.landRegister], ['Flurstück', p.parcel],
+          ['Kauf', [p.purchaseDate && dateDE(p.purchaseDate), p.purchasePrice && eur(Number(p.purchasePrice.replace(',', '.')) || 0)].filter(Boolean).join(' · ')],
+          ['Versicherung', [p.insurer, p.policyNo].filter(Boolean).join(' · ')], ['Jahresprämie', p.premium && eur(Number(p.premium.replace(',', '.')) || 0)],
+          ['Ansprechpartner', [p.contactName, p.contactPhone].filter(Boolean).join(' · ')],
+        ]);
+        const hasEa = p.eaClass || p.eaValue || p.eaValidUntil || p.eaIssued;
+        return (rows.length > 0 || hasEa) ? (
+          <Section title="Stammdaten">
+            {hasEa ? (
+              <ListRow icon="leaf" title={`Energieausweis${p.eaType ? ` (${p.eaType})` : ''}`}
+                subtitle={[p.eaClass && `Klasse ${p.eaClass}`, p.eaValue && `${p.eaValue} kWh/(m²·a)`, p.eaValidUntil && `gültig bis ${dateDE(p.eaValidUntil)}`].filter(Boolean).join(' · ') || 'Angaben unvollständig'}
+                badge={ea && ea.tone !== 'ok' ? { text: ea.text, tone: ea.tone } : ea ? { text: 'Gültig', tone: 'ok' } : undefined} />
+            ) : null}
+            {rows}
+          </Section>
+        ) : null;
+      })()}
+      <DocumentsSection ownerKind="property" ownerId={p.id} navigation={navigation} />
+
       <Section title="Wohnungen" action={{ label: '+ Hinzufügen', onPress: () => navigation.navigate('UnitForm', { propertyId: p.id }) }}>
         {units.length === 0 && <Note>Noch keine Wohnungen. Füge die erste hinzu.</Note>}
         {units.map((u) => {
@@ -58,7 +84,7 @@ export function PropertyDetail({ route, navigation }: any) {
           return (
             <ListRow key={u.id} icon={kindOf(u) === 'gewerbe' ? 'storefront' : 'home'} title={u.name} subtitle={`${kindOf(u) === 'wohnung' ? '' : kindLabel(kindOf(u)) + ' · '}${u.area} m² · ${eur(u.coldRent)} + ${eur(u.advance)} NK${kindOf(u) === 'gewerbe' && u.vat ? ` + ${u.vat} % USt` : ''}`}
               badge={t ? { text: t.name, tone: 'ok' } : { text: 'Leerstand', tone: 'warn' }}
-              onPress={() => navigation.navigate('UnitForm', { id: u.id })} />
+              onPress={() => navigation.navigate('UnitDetail', { id: u.id })} />
           );
         })}
       </Section>
@@ -171,7 +197,18 @@ export function TenantDetail({ route, navigation }: any) {
         <Row left="Einzug" right={dateDE(t.moveIn)} />
         {t.moveOut ? <Row left="Auszug" right={dateDE(t.moveOut)} /> : null}
         <Row left="Kaution" right={t.deposit ? `${eur(paidDeposit)} von ${eur(t.deposit)}` : '–'} color={t.deposit > paidDeposit ? c.warn : undefined} />
+        {infoRows([
+          ['Befristet bis', t.contractEnd && dateDE(t.contractEnd)], ['Kündigungsfrist', t.noticeMonths && `${t.noticeMonths} Monate`],
+          ['Mietanpassung', [t.rentAdjust, t.nextAdjust && `nächste am ${dateDE(t.nextAdjust)}`].filter(Boolean).join(' · ')],
+          ['Kautionsart', [t.depositType, t.depositAccount].filter(Boolean).join(' · ')],
+        ])}
       </Section>
+      {(t.salutation || t.mobile || t.postalAddress || t.emergencyContact || t.notes || t.iban) ? (
+        <Section title="Persönliches">
+          {infoRows([['Anrede', t.salutation], ['Mobil', t.mobile], ['Postanschrift', t.postalAddress], ['Notfallkontakt', t.emergencyContact], ['IBAN', t.iban], ['Notizen', t.notes]])}
+        </Section>
+      ) : null}
+      <DocumentsSection ownerKind="tenant" ownerId={t.id} navigation={navigation} />
 
       <Section title="Nebenkostenabrechnung" footer="Anteilig nach Mietmonaten. Kosten und Verteilerschlüssel pflegst du im Objekt.">
         <View style={{ padding: 12 }}>
@@ -191,6 +228,45 @@ export function TenantDetail({ route, navigation }: any) {
         </View>
       </Section>
       <Button kind="secondary" icon="document-text-outline" title={`Abrechnung ${year} als PDF`} onPress={createNk} />
+    </Screen>
+  );
+}
+
+export function UnitDetail({ route, navigation }: any) {
+  const { db } = useStore();
+  const c = useColors();
+  const u = db.units.find((x) => x.id === route.params.id);
+  useHeaderAction(navigation, 'Bearbeiten', () => u && navigation.navigate('UnitForm', { id: u.id }));
+  if (!u) return <Screen><EmptyState icon="help-circle" title="Einheit nicht gefunden" text="Sie wurde vermutlich gelöscht." /></Screen>;
+  const prop = db.properties.find((p) => p.id === u.propertyId);
+  const tenant = db.tenants.find((t) => t.unitId === u.id && (!t.moveOut || t.moveOut >= today()));
+  const meters = db.meters.filter((m) => m.unitId === u.id);
+  return (
+    <Screen>
+      <View style={{ marginBottom: 16, marginTop: 4 }}>
+        <Text accessibilityRole="header" style={{ fontSize: 28, fontWeight: '800', color: c.text, letterSpacing: -0.4 }}>{u.name}</Text>
+        <Text style={{ fontSize: type.subhead, color: c.muted, marginTop: 2 }}>{prop?.name} · {kindLabel(kindOf(u))}</Text>
+      </View>
+      <StatGrid>
+        <Stat label="Fläche" value={`${u.area} m²`} icon="resize-outline" />
+        <Stat label="Zimmer" value={String(u.rooms || '–')} icon="bed-outline" />
+        <Stat label="Miete / Monat" value={eur(unitDue(u))} icon="cash-outline" />
+        <Stat label="Kaltmiete" value={eur(u.coldRent)} icon="pricetag-outline" />
+      </StatGrid>
+      <Section title="Mieter">
+        {tenant ? <ListRow avatar={initials(tenant.name)} title={tenant.name} subtitle={`seit ${dateDE(tenant.moveIn)}`} onPress={() => navigation.navigate('TenantDetail', { id: tenant.id })} />
+          : <ListRow icon="key-outline" iconTone="warn" title="Leerstand" subtitle="Mieter hinzufügen" onPress={() => navigation.navigate('TenantForm', { unitId: u.id })} />}
+      </Section>
+      {(() => {
+        const rows = infoRows([['Etage', u.floor], ['Lage', u.position], ['Balkon / Terrasse', u.balcony], ['Keller', u.cellar], ['Stellplatz', u.parking], ['Küche', u.kitchen], ['Ausstattung', u.equipment], ['Notizen', u.notes]]);
+        return rows.length ? <Section title="Lage und Ausstattung">{rows}</Section> : null;
+      })()}
+      {meters.length > 0 && (
+        <Section title="Zähler">
+          {meters.map((m) => <ListRow key={m.id} icon={meterIcon(m.type)} title={meterTypeLabel(m.type)} subtitle={`Nr. ${m.number}${latestReading(db, m.id) ? ` · Stand ${fmtVal(latestReading(db, m.id)!.value)} ${meterUnitLabel(m.type)}` : ''}`} onPress={() => navigation.navigate('MeterDetail', { id: m.id })} />)}
+        </Section>
+      )}
+      <DocumentsSection ownerKind="unit" ownerId={u.id} navigation={navigation} />
     </Screen>
   );
 }
