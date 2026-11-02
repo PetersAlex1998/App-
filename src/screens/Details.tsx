@@ -57,7 +57,6 @@ export function PropertyDetail({ route, navigation }: any) {
       </StatGrid>
 
       {(() => {
-        const ea = expiryState(p.eaValidUntil);
         const rows = infoRows([
           ['Grundstück', p.plotArea && `${p.plotArea} m²`], ['Etagen', p.floors],
           ['Heizung', [p.heatingType, p.heatingYear && `Bj. ${p.heatingYear}`].filter(Boolean).join(' · ')], ['Energieträger', p.energySource],
@@ -66,19 +65,8 @@ export function PropertyDetail({ route, navigation }: any) {
           ['Versicherung', [p.insurer, p.policyNo].filter(Boolean).join(' · ')], ['Jahresprämie', p.premium && eur(Number(p.premium.replace(',', '.')) || 0)],
           ['Ansprechpartner', [p.contactName, p.contactPhone].filter(Boolean).join(' · ')],
         ]);
-        const hasEa = p.eaClass || p.eaValue || p.eaValidUntil || p.eaIssued;
-        return (rows.length > 0 || hasEa) ? (
-          <Section title="Stammdaten">
-            {hasEa ? (
-              <ListRow icon="leaf" title={`Energieausweis${p.eaType ? ` (${p.eaType})` : ''}`}
-                subtitle={[p.eaClass && `Klasse ${p.eaClass}`, p.eaValue && `${p.eaValue} kWh/(m²·a)`, p.eaValidUntil && `gültig bis ${dateDE(p.eaValidUntil)}`].filter(Boolean).join(' · ') || 'Angaben unvollständig'}
-                badge={ea && ea.tone !== 'ok' ? { text: ea.text, tone: ea.tone } : ea ? { text: 'Gültig', tone: 'ok' } : undefined} />
-            ) : null}
-            {rows}
-          </Section>
-        ) : null;
+        return rows.length > 0 ? <Section title="Stammdaten">{rows}</Section> : null;
       })()}
-      <DocumentsSection ownerKind="property" ownerId={p.id} navigation={navigation} />
 
       <Section title="Wohnungen" action={{ label: '+ Hinzufügen', onPress: () => navigation.navigate('UnitForm', { propertyId: p.id }) }}>
         {units.length === 0 && <Note>Noch keine Wohnungen. Füge die erste hinzu.</Note>}
@@ -119,6 +107,21 @@ export function PropertyDetail({ route, navigation }: any) {
           );
         })}
       </Section>
+
+      {(() => {
+        const ea = expiryState(p.eaValidUntil);
+        const hasEa = p.eaClass || p.eaValue || p.eaValidUntil || p.eaIssued || p.eaType;
+        return hasEa ? (
+          <Section title="Energieausweis" action={{ label: 'Bearbeiten', onPress: () => navigation.navigate('PropertyForm', { id: p.id }) }}>
+            <ListRow icon="leaf" title={`Energieausweis${p.eaType ? ` (${p.eaType})` : ''}`}
+              subtitle={[p.eaClass && `Klasse ${p.eaClass}`, p.eaValue && `${p.eaValue} kWh/(m²·a)`, p.eaValidUntil && `gültig bis ${dateDE(p.eaValidUntil)}`].filter(Boolean).join(' · ') || 'Angaben unvollständig'}
+              badge={ea && ea.tone !== 'ok' ? { text: ea.text, tone: ea.tone } : ea ? { text: 'Gültig', tone: 'ok' } : undefined} />
+            {infoRows([['Ausgestellt am', p.eaIssued && dateDE(p.eaIssued)]])}
+          </Section>
+        ) : null;
+      })()}
+
+      <DocumentsSection ownerKind="property" ownerId={p.id} navigation={navigation} />
     </Screen>
   );
 }
