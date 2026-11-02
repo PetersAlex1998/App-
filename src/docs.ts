@@ -2,16 +2,16 @@ import { DocCategory, DocOwner } from './types';
 
 export const CATEGORY_LABEL: Record<DocCategory, string> = {
   energieausweis: 'Energieausweis', mietvertrag: 'Mietvertrag', foto: 'Foto', versicherung: 'Versicherung', grundbuch: 'Grundbuch',
-  rechnung: 'Rechnung', protokoll: 'Protokoll', sonstiges: 'Sonstiges',
+  rechnung: 'Rechnung', protokoll: 'Protokoll', brief: 'Brief', sonstiges: 'Sonstiges',
 };
 export const CATEGORY_ICON: Record<DocCategory, 'leaf'> = {
   energieausweis: 'leaf', mietvertrag: 'document-text', foto: 'image', versicherung: 'shield-checkmark', grundbuch: 'book',
-  rechnung: 'receipt', protokoll: 'clipboard', sonstiges: 'document-attach',
+  rechnung: 'receipt', protokoll: 'clipboard', brief: 'mail', sonstiges: 'document-attach',
 } as never;
 export const CATEGORIES_FOR: Record<DocOwner, DocCategory[]> = {
   property: ['energieausweis', 'foto', 'versicherung', 'grundbuch', 'rechnung', 'sonstiges'],
   unit: ['foto', 'protokoll', 'rechnung', 'sonstiges'],
-  tenant: ['mietvertrag', 'protokoll', 'foto', 'rechnung', 'sonstiges'],
+  tenant: ['mietvertrag', 'protokoll', 'foto', 'rechnung', 'brief', 'sonstiges'],
 };
 /** Kategorien, bei denen ein Ablaufdatum Sinn ergibt. */
 export const HAS_EXPIRY: DocCategory[] = ['energieausweis', 'versicherung', 'mietvertrag', 'sonstiges'];

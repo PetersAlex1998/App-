@@ -104,7 +104,7 @@ export interface Cost {
 }
 
 export type DocOwner = 'property' | 'unit' | 'tenant';
-export type DocCategory = 'energieausweis' | 'mietvertrag' | 'foto' | 'versicherung' | 'grundbuch' | 'rechnung' | 'protokoll' | 'sonstiges';
+export type DocCategory = 'energieausweis' | 'mietvertrag' | 'foto' | 'versicherung' | 'grundbuch' | 'rechnung' | 'protokoll' | 'brief' | 'sonstiges';
 export interface Doc {
   id: ID;
   ownerKind: DocOwner;
@@ -116,6 +116,10 @@ export interface Doc {
   added: string; // YYYY-MM-DD
   validUntil?: string; // z. B. Energieausweis, Versicherung
   note?: string;
+  // Briefe (Kategorie 'brief'): Versandstatus
+  status?: 'bereit' | 'versendet';
+  sentAt?: string;
+  channel?: string;
 }
 
 export interface DB {

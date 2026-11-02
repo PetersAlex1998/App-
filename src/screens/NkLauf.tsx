@@ -6,6 +6,9 @@ import { useSettings } from '../settings';
 import { Badge, Button, EmptyState, FilterChips, Gap, ListRow, Note, Row, Screen, Section, Segmented, confirm, notify, useColors } from '../ui';
 import { nkOverview } from '../nk';
 import { exportPdf, nkHtml } from '../pdf';
+import { nkModel } from '../letters';
+import { storeLetters } from '../outbox';
+import { filesSupported } from '../files';
 import { dateDE, eur } from '../calc';
 import { type } from '../theme';
 
@@ -33,18 +36,27 @@ export function NkLauf({ route, navigation }: any) {
   const run = () => {
     if (chosen.length === 0) return;
     confirm(`${chosen.length} Abrechnung${chosen.length === 1 ? '' : 'en'} für ${year} erstellen?`, async () => {
-      const html = chosen.map((r) => nkHtml(r.res, r.tenant, r.unit, prop, year, cfg)).join('');
       const today = new Date().toISOString().slice(0, 10);
       const ids = new Set(chosen.map((r) => r.tenant.id));
-      replaceAll({ ...db, tenants: db.tenants.map((t) => (ids.has(t.id) ? { ...t, nkDone: { ...(t.nkDone ?? {}), [String(year)]: today } } : t)) });
+      const tenants = db.tenants.map((t) => (ids.has(t.id) ? { ...t, nkDone: { ...(t.nkDone ?? {}), [String(year)]: today } } : t));
+      if (filesSupported()) {
+        try {
+          const docs = await storeLetters(chosen.map((r) => ({ model: nkModel(r.res, r.tenant, r.unit, prop, year, cfg), tenant: r.tenant, note: `Nebenkosten ${year}` })));
+          replaceAll({ ...db, tenants, documents: [...db.documents, ...docs] });
+          navigation.replace('Outbox');
+        } catch (e: any) { notify(`PDF konnte nicht erstellt werden: ${e?.message ?? e}`); }
+        return;
+      }
+      const html = chosen.map((r) => nkHtml(r.res, r.tenant, r.unit, prop, year, cfg)).join('');
+      replaceAll({ ...db, tenants });
       try { await exportPdf(html); } catch (e: any) { notify(String(e?.message ?? e)); }
-    }, 'Erstellen', `Ein PDF mit allen Abrechnungen wird erzeugt. Nachzahlungen: ${eur(sumNach)} · Guthaben: ${eur(sumGut)}.`);
+    }, 'Erstellen', `Jede Abrechnung wird als PDF im Briefausgang abgelegt. Nachzahlungen: ${eur(sumNach)} · Guthaben: ${eur(sumGut)}.`);
   };
 
   return (
     <Screen>
       <Text accessibilityRole="header" style={{ fontSize: 30, fontWeight: '800', color: c.text, letterSpacing: -0.6, marginTop: 6, marginBottom: 6 }}>Nebenkosten-Lauf</Text>
-      <Text style={{ color: c.muted, fontSize: type.body, marginBottom: 16 }}>Alle Mieter eines Hauses für ein Abrechnungsjahr. Prüfe die Ergebnisse, dann entsteht ein PDF mit allen Abrechnungen.</Text>
+      <Text style={{ color: c.muted, fontSize: type.body, marginBottom: 16 }}>Alle Mieter eines Hauses für ein Abrechnungsjahr. Prüfe die Ergebnisse, dann landen alle Abrechnungen als PDF im Briefausgang.</Text>
 
       {db.properties.length > 1 && <FilterChips value={propertyId} onChange={(v) => { setPropertyId(v); setOff({}); setAgain({}); }} options={db.properties.map((p) => ({ label: p.name, value: p.id }))} />}
       <Segmented value={year} onChange={(v) => { setYear(v); setOff({}); setAgain({}); }} options={years.map((y) => ({ label: String(y), value: y }))} />
@@ -104,7 +116,7 @@ export function NkLauf({ route, navigation }: any) {
           <Text style={{ color: c.muted, fontSize: type.subhead, textAlign: 'center' }}>Nachzahlungen {eur(sumNach)} · Guthaben {eur(sumGut)}</Text>
         </View>
       )}
-      <Button icon="document-text" title={chosen.length ? `${chosen.length} Abrechnung${chosen.length === 1 ? '' : 'en'} erstellen (PDF)` : 'Niemand ausgewählt'} onPress={run} disabled={chosen.length === 0} />
+      <Button icon="document-text" title={chosen.length ? `${chosen.length} Abrechnung${chosen.length === 1 ? '' : 'en'} erstellen` : 'Niemand ausgewählt'} onPress={run} disabled={chosen.length === 0} />
       <Gap h={8} />
       <Button kind="plain" title="Briefe und Absender anpassen" onPress={() => navigation.navigate('Briefe')} />
     </Screen>

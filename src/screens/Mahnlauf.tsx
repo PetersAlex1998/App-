@@ -6,6 +6,9 @@ import { useSettings } from '../settings';
 import { Badge, Button, EmptyState, Gap, Note, Screen, Section, confirm, notify, useColors } from '../ui';
 import { dunningPlans, makeReminder } from '../dunning';
 import { exportPdf, reminderHtml } from '../pdf';
+import { reminderModel } from '../letters';
+import { storeLetters } from '../outbox';
+import { filesSupported } from '../files';
 import { dateDE, eur, monthLabel, reminderLabel } from '../calc';
 import { type } from '../theme';
 
@@ -24,14 +27,19 @@ export function Mahnlauf({ navigation }: any) {
     if (selected.length === 0) return;
     confirm(`${selected.length} Mahnung${selected.length === 1 ? '' : 'en'} erstellen?`, async () => {
       const reminders = selected.map((p) => makeReminder(uid(), p, cfg));
+      if (filesSupported()) {
+        try {
+          const docs = await storeLetters(reminders.map((r, i) => ({ model: reminderModel(db, r, selected[i].tenant, selected[i].unit, selected[i].prop, cfg), tenant: selected[i].tenant, note: `Mahnung Stufe ${r.level}` })));
+          replaceAll({ ...db, reminders: [...db.reminders, ...reminders], documents: [...db.documents, ...docs] });
+          navigation.replace('Outbox');
+        } catch (e: any) { notify(`PDF konnte nicht erstellt werden: ${e?.message ?? e}`); }
+        return;
+      }
       replaceAll({ ...db, reminders: [...db.reminders, ...reminders] });
-      const html = reminders.map((r, i) => {
-        const p = selected[i];
-        return reminderHtml(db, r, p.tenant, p.unit, p.prop, cfg);
-      }).join('');
+      const html = reminders.map((r, i) => reminderHtml(db, r, selected[i].tenant, selected[i].unit, selected[i].prop, cfg)).join('');
       try { await exportPdf(html); } catch (e: any) { notify(String(e?.message ?? e)); }
       navigation.goBack();
-    }, 'Erstellen', `Ein PDF mit allen Briefen wird erzeugt und die Mahnungen werden bei den Mietern vermerkt. Gesamtforderung: ${eur(sum)}.`);
+    }, 'Erstellen', `Jeder Brief wird als PDF im Briefausgang abgelegt und die Mahnung beim Mieter vermerkt. Gesamtforderung: ${eur(sum)}.`);
   };
 
   const levelTone = (l: number) => (l === 1 ? 'warn' : 'danger') as 'warn' | 'danger';

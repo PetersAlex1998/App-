@@ -94,6 +94,12 @@ export function Dashboard({ navigation }: any) {
         </Section>
       )}
 
+      {db.documents.some((d) => d.category === 'brief' && (d.status ?? 'bereit') === 'bereit') && (
+        <Section>
+          <ListRow icon="mail" iconTone="warn" title={`Briefausgang (${db.documents.filter((d) => d.category === 'brief' && (d.status ?? 'bereit') === 'bereit').length})`} subtitle="Briefe sind bereit zum Versand" onPress={() => navigation.navigate('Outbox')} />
+        </Section>
+      )}
+
       {duePlans.length > 0 && (
         <Section>
           <ListRow icon="mail-unread" iconTone="danger" title={`Mahnlauf starten (${duePlans.length})`} subtitle={`${duePlans.length} Mieter mit überfälliger Miete · ${eur(duePlans.reduce((a, p) => a + p.open, 0))}`} onPress={() => navigation.navigate('Mahnlauf')} />

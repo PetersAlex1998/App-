@@ -14,6 +14,7 @@ import { SearchScreen } from './src/screens/Search';
 import { BestandImport, StatementImport } from './src/screens/Imports';
 import { Mahnlauf } from './src/screens/Mahnlauf';
 import { NkLauf } from './src/screens/NkLauf';
+import { Outbox } from './src/screens/Outbox';
 import { Ablesung, MeterDetail, MeterForm, ReadingForm } from './src/screens/Meters';
 import { BriefeSettings } from './src/screens/BriefeSettings';
 import { SettingsProvider } from './src/settings';
@@ -58,6 +59,7 @@ function Root() {
         <Stack.Screen name="MeterDetail" component={MeterDetail} options={{ title: 'Zähler' }} />
         <Stack.Screen name="ReadingForm" component={ReadingForm} options={({ route }: any) => ({ title: route.params?.id ? 'Stand bearbeiten' : 'Zählerstand' })} />
         <Stack.Screen name="Ablesung" component={Ablesung} options={{ title: 'Ablesung' }} />
+        <Stack.Screen name="Outbox" component={Outbox} options={{ title: 'Briefausgang' }} />
         <Stack.Screen name="NkLauf" component={NkLauf} options={{ title: 'Nebenkosten-Lauf' }} />
         <Stack.Screen name="Mahnlauf" component={Mahnlauf} options={{ title: 'Mahnlauf' }} />
         <Stack.Screen name="Briefe" component={BriefeSettings} options={{ title: 'Briefe und Regeln' }} />

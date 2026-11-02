@@ -59,6 +59,7 @@ export function DataScreen({ navigation }: any) {
       )}
 
       <Section title="Briefe und Mahnwesen">
+        <ListRow icon="mail-open-outline" title="Briefausgang" subtitle="Erstellte Briefe teilen und als versendet markieren" onPress={() => navigation.navigate('Outbox')} />
         <ListRow icon="mail-outline" title="Absender und Mahnregeln" subtitle="Adresse, IBAN, Gebühren, Fristen" onPress={() => navigation.navigate('Briefe')} />
       </Section>
 

@@ -6,6 +6,9 @@ import { DocumentsSection } from './Documents';
 import { expiryState } from '../docs';
 import { addDays, dateDE, eur, initials, kindLabel, kindOf, monthLabel, unitDue, nkStatement, openItems, reminderLabel, today, totalOpen } from '../calc';
 import { exportPdf, nkHtml, reminderHtml } from '../pdf';
+import { nkModel, reminderModel } from '../letters';
+import { storeLetters } from '../outbox';
+import { filesSupported } from '../files';
 import { useSettings } from '../settings';
 import { dunningPlans, feeFor, makeReminder, overdueItems, relevantReminders } from '../dunning';
 import { type } from '../theme';
@@ -149,13 +152,25 @@ export function TenantDetail({ route, navigation }: any) {
     confirm(`${reminderLabel(plan.level)} erstellen?`, async () => {
       const r = makeReminder(uid(), plan, cfg);
       save('reminders', r);
+      if (filesSupported()) {
+        const [doc] = await storeLetters([{ model: reminderModel(db, r, t, unit, prop, cfg), tenant: t, note: `Mahnung Stufe ${r.level}` }]);
+        save('documents', doc);
+        navigation.navigate('Outbox');
+        return;
+      }
       await exportPdf(reminderHtml(db, r, t, unit, prop, cfg));
-    }, 'Erstellen', `Überfällig: ${eur(plan.open)}${plan.fee ? ` · Mahngebühr ${eur(plan.fee)}` : ''}. Frist: ${cfg.deadlineDays} Tage. Das PDF kannst du danach teilen oder drucken.`);
+    }, 'Erstellen', `Überfällig: ${eur(plan.open)}${plan.fee ? ` · Mahngebühr ${eur(plan.fee)}` : ''}. Frist: ${cfg.deadlineDays} Tage. Der Brief liegt danach als PDF im Briefausgang.`);
   };
   const createNk = async () => {
     if (!unit || !prop || !nk) return;
     if (nk.lines.length === 0) return notify(`Für ${year} sind noch keine Betriebskosten erfasst. Trage sie im Objekt ein.`);
     save('tenants', { ...t, nkDone: { ...(t.nkDone ?? {}), [String(year)]: today() } });
+    if (filesSupported()) {
+      const [doc] = await storeLetters([{ model: nkModel(nk, t, unit, prop, year, cfg), tenant: t, note: `Nebenkosten ${year}` }]);
+      save('documents', doc);
+      navigation.navigate('Outbox');
+      return;
+    }
     await exportPdf(nkHtml(nk, t, unit, prop, year, cfg));
   };
 
@@ -230,7 +245,7 @@ export function TenantDetail({ route, navigation }: any) {
           )}
         </View>
       </Section>
-      <Button kind="secondary" icon="document-text-outline" title={`Abrechnung ${year} als PDF`} onPress={createNk} />
+      <Button kind="secondary" icon="document-text-outline" title={`Abrechnung ${year} erstellen`} onPress={createNk} />
     </Screen>
   );
 }
