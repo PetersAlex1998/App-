@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Text } from 'react-native';
 import { useStore } from '../store';
 import { ListRow, Screen, SearchBar, Section, useColors } from '../ui';
-import { eur, initials } from '../calc';
+import { eur, initials, unitDue } from '../calc';
 import { type } from '../theme';
 
 export function SearchScreen({ navigation }: any) {
@@ -27,7 +27,7 @@ export function SearchScreen({ navigation }: any) {
       )}
       {units.length > 0 && (
         <Section title="Wohnungen">
-          {units.map((u) => <ListRow key={u.id} icon="home" title={u.name} subtitle={db.properties.find((p) => p.id === u.propertyId)?.name} right={eur(u.coldRent + u.advance)} onPress={() => navigation.navigate('UnitForm', { id: u.id })} />)}
+          {units.map((u) => <ListRow key={u.id} icon="home" title={u.name} subtitle={db.properties.find((p) => p.id === u.propertyId)?.name} right={eur(unitDue(u))} onPress={() => navigation.navigate('UnitForm', { id: u.id })} />)}
         </Section>
       )}
       {tenants.length > 0 && (

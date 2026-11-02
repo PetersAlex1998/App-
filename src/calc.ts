@@ -1,4 +1,4 @@
-import { Cost, DB, Tenant, Unit } from './types';
+import { Cost, DB, Tenant, Unit, UnitKind } from './types';
 
 export const eur = (n: number) =>
   (isFinite(n) ? n : 0).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' });
@@ -18,9 +18,10 @@ const ym = (iso: string) => iso.slice(0, 7);
 /** Alle Monate (YYYY-MM), für die Miete fällig ist (Einzug bis Auszug/heute). */
 export function dueMonths(t: Tenant): string[] {
   if (!t.moveIn) return [];
+  const startMonth = t.trackFrom && t.trackFrom > ym(t.moveIn) ? t.trackFrom : ym(t.moveIn);
   const end = t.moveOut && t.moveOut < today() ? ym(t.moveOut) : ym(today());
   const out: string[] = [];
-  let [y, m] = ym(t.moveIn).split('-').map(Number);
+  let [y, m] = startMonth.split('-').map(Number);
   while (`${y}-${String(m).padStart(2, '0')}` <= end) {
     out.push(`${y}-${String(m).padStart(2, '0')}`);
     if (++m > 12) {
@@ -38,15 +39,26 @@ export interface OpenItem {
   open: number;
 }
 
+// Zahlungen nach Mieter+Monat vorab summieren (bei 88 Einheiten und vielen Buchungen sonst zu langsam).
+const paidCache = new WeakMap<object, Map<string, number>>();
+function paidIndex(db: DB): Map<string, number> {
+  let m = paidCache.get(db.payments);
+  if (!m) {
+    m = new Map();
+    for (const p of db.payments) if (p.kind === 'miete') m.set(`${p.tenantId}|${p.month}`, (m.get(`${p.tenantId}|${p.month}`) ?? 0) + p.amount);
+    paidCache.set(db.payments, m);
+  }
+  return m;
+}
+
 export function openItems(db: DB, t: Tenant): OpenItem[] {
   const unit = db.units.find((u) => u.id === t.unitId);
   if (!unit) return [];
-  const due = unit.coldRent + unit.advance;
+  const due = unitDue(unit);
+  const idx = paidIndex(db);
   return dueMonths(t)
     .map((month) => {
-      const paid = db.payments
-        .filter((p) => p.tenantId === t.id && p.kind === 'miete' && p.month === month)
-        .reduce((s, p) => s + p.amount, 0);
+      const paid = idx.get(`${t.id}|${month}`) ?? 0;
       return { month, due, paid, open: Math.round((due - paid) * 100) / 100 };
     })
     .filter((i) => i.open > 0.005);
@@ -84,11 +96,11 @@ export function nkStatement(db: DB, tenant: Tenant, unit: Unit, year: number): N
       category: c.category,
       total: c.amount,
       key: c.key === 'area' ? 'nach m²' : 'je Einheit',
-      share: Math.round(c.amount * base * f * 100) / 100,
+      share: Math.round(c.amount * base * f * vatFactor(unit) * 100) / 100,
     };
   });
   const costSum = lines.reduce((s, l) => s + l.share, 0);
-  const advances = unit.advance * months;
+  const advances = unit.advance * vatFactor(unit) * months;
   return { lines, costs: costSum, advances, balance: Math.round((costSum - advances) * 100) / 100, months };
 }
 
@@ -106,5 +118,12 @@ export function suggestPayment(db: DB, t: Tenant): { month: string; amount: numb
   const first = openItems(db, t)[0];
   if (first) return { month: first.month, amount: first.open };
   const u = db.units.find((x) => x.id === t.unitId);
-  return { month: today().slice(0, 7), amount: u ? u.coldRent + u.advance : 0 };
+  return { month: today().slice(0, 7), amount: unitDue(u) };
 }
+
+export const kindOf = (u?: Unit): UnitKind => u?.kind ?? 'wohnung';
+export const kindLabel = (k: UnitKind) => ({ wohnung: 'Wohnung', gewerbe: 'Gewerbe', eigentum: 'Eigentumswohnung' })[k];
+/** Faktor für Umsatzsteuer (Gewerbe mit USt-Option), sonst 1. */
+export const vatFactor = (u?: Unit) => 1 + (kindOf(u) === 'gewerbe' ? u?.vat ?? 0 : 0) / 100;
+/** Monatlich fällige Gesamtmiete (inkl. USt, falls Gewerbe mit USt). */
+export const unitDue = (u?: Unit) => (u ? Math.round((u.coldRent + u.advance) * vatFactor(u) * 100) / 100 : 0);

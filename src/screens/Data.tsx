@@ -6,7 +6,7 @@ import { Button, Field, Segmented, Gap, ListRow, Note, Screen, Section, confirm,
 import { demoData } from '../demo';
 import { exportBackup, parseBackup, pickBackupFile } from '../backup';
 
-export function DataScreen() {
+export function DataScreen({ navigation }: any) {
   const { db, replaceAll } = useStore();
   const [text, setText] = useState('');
   const { pref, setPref } = useThemePref();
@@ -39,6 +39,11 @@ export function DataScreen() {
         <ListRow icon="home" title="Wohnungen" right={String(db.units.length)} />
         <ListRow icon="people" title="Mieter" right={String(db.tenants.length)} />
         <ListRow icon="card" title="Zahlungen" right={String(db.payments.length)} />
+      </Section>
+
+      <Section title="Importieren">
+        <ListRow icon="albums-outline" title="Bestand aus CSV importieren" subtitle="Häuser, Einheiten und Mieter auf einmal anlegen" onPress={() => navigation.navigate('BestandImport')} />
+        <ListRow icon="swap-vertical-outline" title="Kontoauszug importieren" subtitle="Zahlungseingänge automatisch zuordnen" onPress={() => navigation.navigate('StatementImport')} />
       </Section>
 
       <Section title="Sicherung">

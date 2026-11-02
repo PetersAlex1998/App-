@@ -2,7 +2,7 @@ import React, { useLayoutEffect, useState } from 'react';
 import { Linking, Pressable, Text, View } from 'react-native';
 import { useStore, uid } from '../store';
 import { Avatar, Badge, Button, EmptyState, Gap, ListRow, Note, Row, Screen, Section, Segmented, Stat, StatGrid, confirm, notify, useColors } from '../ui';
-import { addDays, dateDE, eur, initials, monthLabel, nkStatement, openItems, reminderLabel, today, totalOpen } from '../calc';
+import { addDays, dateDE, eur, initials, kindLabel, kindOf, monthLabel, unitDue, nkStatement, openItems, reminderLabel, today, totalOpen } from '../calc';
 import { exportPdf, nkHtml, reminderHtml } from '../pdf';
 import { type } from '../theme';
 
@@ -29,7 +29,7 @@ export function PropertyDetail({ route, navigation }: any) {
   const units = db.units.filter((u) => u.propertyId === p.id);
   const active = (u: string) => db.tenants.find((t) => t.unitId === u && (!t.moveOut || t.moveOut >= today()));
   const area = units.reduce((s, u) => s + u.area, 0);
-  const rent = units.filter((u) => active(u.id)).reduce((s, u) => s + u.coldRent + u.advance, 0);
+  const rent = units.filter((u) => active(u.id)).reduce((s, u) => s + unitDue(u), 0);
   const occ = units.length ? Math.round((units.filter((u) => active(u.id)).length / units.length) * 100) : 0;
   const years = [...new Set(db.costs.filter((x) => x.propertyId === p.id).map((x) => x.year))].sort((a, b) => b - a);
 
@@ -52,7 +52,7 @@ export function PropertyDetail({ route, navigation }: any) {
         {units.map((u) => {
           const t = active(u.id);
           return (
-            <ListRow key={u.id} icon="home" title={u.name} subtitle={`${u.area} m² · ${u.rooms} Zi. · ${eur(u.coldRent)} + ${eur(u.advance)} NK`}
+            <ListRow key={u.id} icon={kindOf(u) === 'gewerbe' ? 'storefront' : 'home'} title={u.name} subtitle={`${kindOf(u) === 'wohnung' ? '' : kindLabel(kindOf(u)) + ' · '}${u.area} m² · ${eur(u.coldRent)} + ${eur(u.advance)} NK${kindOf(u) === 'gewerbe' && u.vat ? ` + ${u.vat} % USt` : ''}`}
               badge={t ? { text: t.name, tone: 'ok' } : { text: 'Leerstand', tone: 'warn' }}
               onPress={() => navigation.navigate('UnitForm', { id: u.id })} />
           );

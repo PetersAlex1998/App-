@@ -1,10 +1,11 @@
 import React, { useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
 import { useStore } from '../store';
-import { Badge, EmptyState, LargeHeader, ListRow, Screen, SearchBar, Section, Segmented, Stat, StatGrid, useColors, Button, Gap } from '../ui';
-import { dateDE, eur, initials, monthLabel, monthLong, openItems, totalOpen, today } from '../calc';
+import { Badge, EmptyState, LargeHeader, ListRow, Screen, SearchBar, Section, Segmented, Stat, StatGrid, useColors, Button, Gap, FilterChips } from '../ui';
+import { dateDE, eur, initials, monthLabel, monthLong, openItems, totalOpen, today, unitDue, kindOf, kindLabel } from '../calc';
 import { type } from '../theme';
 
+const LIMIT = 5;
 const isActive = (t: { moveOut: string }) => !t.moveOut || t.moveOut >= today();
 
 export function Dashboard({ navigation }: any) {
@@ -13,7 +14,7 @@ export function Dashboard({ navigation }: any) {
   const activeTenants = db.tenants.filter(isActive);
   const rentRoll = activeTenants.reduce((s, t) => {
     const u = db.units.find((x) => x.id === t.unitId);
-    return s + (u ? u.coldRent + u.advance : 0);
+    return s + unitDue(u);
   }, 0);
   const open = db.tenants.reduce((s, t) => s + totalOpen(db, t), 0);
   const occupiedUnitIds = new Set(activeTenants.map((t) => t.unitId));
@@ -72,7 +73,7 @@ export function Dashboard({ navigation }: any) {
             <Text style={{ color: c.muted, fontSize: type.subhead, flex: 1 }}>Keine Rückstände, kein Leerstand.</Text>
           </View>
         )}
-        {arrears.map((t) => {
+        {arrears.slice(0, LIMIT).map((t) => {
           const items = openItems(db, t);
           return (
             <ListRow key={'a' + t.id} icon="alert-circle" iconTone="danger" title={t.name}
@@ -80,13 +81,16 @@ export function Dashboard({ navigation }: any) {
               onPress={() => navigation.navigate('TenantDetail', { id: t.id })} />
           );
         })}
-        {vacant.map((u) => (
+        {vacant.slice(0, LIMIT).map((u) => (
           <ListRow key={'v' + u.id} icon="key-outline" iconTone="warn" title={`Leerstand: ${u.name}`} subtitle={db.properties.find((p) => p.id === u.propertyId)?.name}
-            right={eur(u.coldRent + u.advance)} rightSub="Soll / Monat" onPress={() => navigation.navigate('TenantForm', { unitId: u.id })} />
+            right={eur(unitDue(u))} rightSub="Soll / Monat" onPress={() => navigation.navigate('TenantForm', { unitId: u.id })} />
         ))}
-        {depositMissing.map((t) => (
+        {depositMissing.slice(0, LIMIT).map((t) => (
           <ListRow key={'d' + t.id} icon="shield-checkmark-outline" iconTone="warn" title={`Kaution offen: ${t.name}`} subtitle={`Vereinbart: ${eur(t.deposit)}`} onPress={() => navigation.navigate('TenantDetail', { id: t.id })} />
         ))}
+        {arrears.length > LIMIT && <ListRow icon="list" title={`Alle ${arrears.length} Rückstände anzeigen`} onPress={() => navigation.navigate('Mieter')} />}
+        {vacant.length > LIMIT && <ListRow icon="list" title={`Weitere ${vacant.length - LIMIT} Leerstände`} onPress={() => navigation.navigate('Objekte')} />}
+        {depositMissing.length > LIMIT && <ListRow icon="list" title={`Weitere ${depositMissing.length - LIMIT} offene Kautionen`} onPress={() => navigation.navigate('Mieter')} />}
       </Section>
 
       <Section title="Schnellzugriff">
@@ -115,8 +119,9 @@ export function Properties({ navigation }: any) {
               const units = db.units.filter((u) => u.propertyId === p.id);
               const vacant = units.filter((u) => !db.tenants.some((t) => t.unitId === u.id && isActive(t))).length;
               return (
-                <ListRow key={p.id} icon="business" title={p.name} subtitle={`${p.street}, ${p.zip} ${p.city}`}
-                  badge={units.length === 0 ? { text: 'Keine Wohnungen', tone: 'neutral' } : vacant > 0 ? { text: `${units.length} Einheiten · ${vacant} frei`, tone: 'warn' } : { text: `${units.length} Einheiten · voll vermietet`, tone: 'ok' }}
+                <ListRow key={p.id} icon="business" title={p.name}
+                  badge={units.length === 0 ? { text: 'Keine Einheiten', tone: 'neutral' } : vacant > 0 ? { text: `${units.length} Einheiten · ${vacant} frei`, tone: 'warn' } : { text: `${units.length} Einheiten · voll vermietet`, tone: 'ok' }}
+                  subtitle={`${p.street}, ${p.zip} ${p.city}${units.some((u) => kindOf(u) === 'gewerbe') ? ` · ${units.filter((u) => kindOf(u) === 'gewerbe').length} Gewerbe` : ''}`}
                   onPress={() => navigation.navigate('PropertyDetail', { id: p.id })} />
               );
             })}
@@ -134,14 +139,20 @@ export function Tenants({ navigation }: any) {
   const c = useColors();
   const [q, setQ] = useState('');
   const [filter, setFilter] = useState<Filter>('alle');
+  const [house, setHouse] = useState('all');
+  const [kind, setKind] = useState<'all' | 'wohnung' | 'gewerbe'>('all');
   const list = useMemo(
     () =>
       db.tenants
         .filter((t) => (filter === 'ehemalig' ? !isActive(t) : isActive(t)))
         .filter((t) => (filter === 'rueckstand' ? totalOpen(db, t) > 0 : true))
         .filter((t) => t.name.toLowerCase().includes(q.toLowerCase()))
+        .filter((t) => {
+          const u = db.units.find((x) => x.id === t.unitId);
+          return (house === 'all' || u?.propertyId === house) && (kind === 'all' || (kind === 'gewerbe' ? kindOf(u) === 'gewerbe' : kindOf(u) !== 'gewerbe'));
+        })
         .sort((a, b) => a.name.localeCompare(b.name, 'de')),
-    [db, q, filter],
+    [db, q, filter, house, kind],
   );
   return (
     <Screen tab>
@@ -151,6 +162,8 @@ export function Tenants({ navigation }: any) {
       ) : (
         <>
           <SearchBar value={q} onChangeText={setQ} placeholder="Mieter suchen" />
+          {db.properties.length > 1 && <FilterChips value={house} onChange={setHouse} options={[{ label: 'Alle Häuser', value: 'all' }, ...db.properties.map((p) => ({ label: p.name, value: p.id }))]} />}
+          {db.units.some((u) => kindOf(u) === 'gewerbe') && <FilterChips value={kind} onChange={setKind} options={[{ label: 'Alle Arten', value: 'all' }, { label: 'Wohnungen', value: 'wohnung' }, { label: 'Gewerbe', value: 'gewerbe' }]} />}
           <Segmented value={filter} onChange={setFilter} options={[{ label: 'Aktuelle', value: 'alle' }, { label: 'Mit Rückstand', value: 'rueckstand' }, { label: 'Ehemalige', value: 'ehemalig' }]} />
           {list.length === 0 ? (
             <Text style={{ color: c.muted, textAlign: 'center', marginVertical: 32, fontSize: type.body }}>Keine Treffer.</Text>
@@ -161,7 +174,7 @@ export function Tenants({ navigation }: any) {
                 const p = db.properties.find((x) => x.id === u?.propertyId);
                 const o = totalOpen(db, t);
                 return (
-                  <ListRow key={t.id} avatar={initials(t.name)} title={t.name} subtitle={`${p?.name ?? ''} · ${u?.name ?? '–'}`}
+                  <ListRow key={t.id} avatar={initials(t.name)} title={t.name} subtitle={`${p?.name ?? ''} · ${kindOf(u) === 'wohnung' ? '' : kindLabel(kindOf(u)) + ' · '}${u?.name ?? '–'}`}
                     badge={o > 0 ? { text: `${eur(o)} offen`, tone: 'danger' } : { text: 'Ausgeglichen', tone: 'ok' }}
                     onPress={() => navigation.navigate('TenantDetail', { id: t.id })} />
                 );
@@ -176,6 +189,7 @@ export function Tenants({ navigation }: any) {
 
 export function Payments({ navigation }: any) {
   const { db } = useStore();
+  const [shown, setShown] = useState(6);
   const c = useColors();
   const groups = useMemo(() => {
     const sorted = [...db.payments].sort((a, b) => b.date.localeCompare(a.date));
@@ -183,24 +197,32 @@ export function Payments({ navigation }: any) {
     sorted.forEach((p) => map.set(p.date.slice(0, 7), [...(map.get(p.date.slice(0, 7)) ?? []), p]));
     return [...map.entries()];
   }, [db.payments]);
-  const kindLabel = { miete: 'Miete', kaution: 'Kaution', nachzahlung: 'NK-Nachzahlung' } as const;
+  const kindLabel2 = { miete: 'Miete', kaution: 'Kaution', nachzahlung: 'NK-Nachzahlung' } as const;
   return (
     <Screen tab>
       <LargeHeader navTitle="Zahlungen" title="Geldeingänge" action={{ label: 'Zahlung erfassen', onPress: () => navigation.navigate('PaymentForm', {}) }} />
+      {db.tenants.length > 0 && (
+        <Section>
+          <ListRow icon="swap-vertical-outline" title="Kontoauszug importieren" subtitle="CSV hochladen, Eingänge automatisch zuordnen" onPress={() => navigation.navigate('StatementImport')} />
+        </Section>
+      )}
       {groups.length === 0 ? (
-        <EmptyState icon="card" title="Noch keine Zahlungen" text="Erfasse eingehende Mieten, Kautionen und Nachzahlungen. Offene Posten berechnet die App automatisch." actionLabel={db.tenants.length ? 'Zahlung erfassen' : undefined} onAction={() => navigation.navigate('PaymentForm', {})} />
+        <EmptyState icon="card" title="Noch keine Zahlungen" text="Erfasse eingehende Mieten, Kautionen und Nachzahlungen oder importiere deinen Kontoauszug. Offene Posten berechnet die App automatisch." actionLabel={db.tenants.length ? 'Zahlung erfassen' : undefined} onAction={() => navigation.navigate('PaymentForm', {})} />
       ) : (
-        groups.map(([month, list]) => (
-          <View key={month}>
-            <Section title={`${monthLong(month)} · ${eur(list.reduce((s, p) => s + p.amount, 0))}`}>
-              {list.map((p) => (
-                <ListRow key={p.id} icon="arrow-down" iconTone="ok" title={db.tenants.find((t) => t.id === p.tenantId)?.name ?? 'Unbekannt'}
-                  subtitle={`${kindLabel[p.kind]}${p.kind === 'miete' ? ` ${monthLabel(p.month)}` : ''} · ${dateDE(p.date)}`}
-                  right={`+ ${eur(p.amount)}`} rightColor={c.ok} onPress={() => navigation.navigate('PaymentForm', { id: p.id })} />
-              ))}
-            </Section>
-          </View>
-        ))
+        <>
+          {groups.slice(0, shown).map(([month, list]) => (
+            <View key={month}>
+              <Section title={`${monthLong(month)} · ${eur(list.reduce((s, p) => s + p.amount, 0))}`}>
+                {list.map((p) => (
+                  <ListRow key={p.id} icon="arrow-down" iconTone="ok" title={db.tenants.find((t) => t.id === p.tenantId)?.name ?? 'Unbekannt'}
+                    subtitle={`${kindLabel2[p.kind]}${p.kind === 'miete' ? ` ${monthLabel(p.month)}` : ''} · ${dateDE(p.date)}`}
+                    right={`+ ${eur(p.amount)}`} rightColor={c.ok} onPress={() => navigation.navigate('PaymentForm', { id: p.id })} />
+                ))}
+              </Section>
+            </View>
+          ))}
+          {groups.length > shown && <Button kind="secondary" title="Ältere Monate anzeigen" onPress={() => setShown(shown + 6)} />}
+        </>
       )}
       <Gap h={4} />
     </Screen>

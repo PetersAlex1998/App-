@@ -11,6 +11,7 @@ import { Dashboard, Payments, Properties, Tenants } from './src/screens/Lists';
 import { CostForm, PaymentForm, PropertyForm, TenantForm, UnitForm } from './src/screens/Forms';
 import { DataScreen } from './src/screens/Data';
 import { SearchScreen } from './src/screens/Search';
+import { BestandImport, StatementImport } from './src/screens/Imports';
 import { FloatingTabBar } from './src/FloatingTabBar';
 import { PropertyDetail, TenantDetail } from './src/screens/Details';
 
@@ -40,6 +41,8 @@ function Root() {
       <Stack.Navigator screenOptions={{ headerStyle: { backgroundColor: c.bg }, headerShadowVisible: false, headerTintColor: c.primary, headerTitleStyle: { color: c.text, fontWeight: '700' }, headerBackTitle: 'Zurück', headerTitleAlign: 'center', contentStyle: { backgroundColor: c.bg } }}>
         <Stack.Screen name="Tabs" component={Tabs} options={{ headerShown: false }} />
         <Stack.Screen name="Search" component={SearchScreen} options={{ title: 'Suche' }} />
+        <Stack.Screen name="StatementImport" component={StatementImport} options={{ title: 'Kontoauszug' }} />
+        <Stack.Screen name="BestandImport" component={BestandImport} options={{ title: 'Bestand importieren' }} />
         <Stack.Screen name="Daten" component={DataScreen} options={{ title: 'Daten' }} />
         <Stack.Screen name="PropertyForm" component={PropertyForm} options={({ route }: any) => ({ title: route.params?.id ? 'Objekt bearbeiten' : 'Neues Objekt' })} />
         <Stack.Screen name="PropertyDetail" component={PropertyDetail} options={({ route }: any) => ({ title: 'Objekt' })} />

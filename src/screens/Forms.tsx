@@ -4,6 +4,7 @@ import { useStore, uid } from '../store';
 import { Button, DateField, Field, Gap, Note, OptionRow, Screen, Section, Segmented, confirm } from '../ui';
 import { Cost, Kind, Payment, Property, Tenant, Unit } from '../types';
 import { eur, monthLabel, num, suggestPayment, today } from '../calc';
+import { UnitKind } from '../types';
 
 function useItem<T extends { id: string }>(kind: Kind, id?: string): T | undefined {
   const { db } = useStore();
@@ -65,9 +66,12 @@ export function UnitForm({ route, navigation }: any) {
   const { save } = useStore();
   const old = useItem<Unit>('units', route.params?.id);
   const [f, setF] = useState({ name: old?.name ?? '', area: old ? String(old.area) : '', rooms: old ? String(old.rooms) : '', coldRent: old ? String(old.coldRent) : '', advance: old ? String(old.advance) : '' });
+  const [kind, setKind] = useState<UnitKind>(old?.kind ?? 'wohnung');
+  const [vat, setVat] = useState<number>(old?.vat ?? 0);
   const [err, setErr] = useState<Errors>({});
   const set = (k: keyof typeof f) => (v: string) => setF({ ...f, [k]: v });
-  const total = num(f.coldRent) + num(f.advance);
+  const net = num(f.coldRent) + num(f.advance);
+  const total = net * (1 + (kind === 'gewerbe' ? vat : 0) / 100);
   const submit = () => {
     const e: Errors = {};
     if (!f.name.trim()) e.name = 'Bitte eine Bezeichnung eingeben, z. B. „WE 2, 1. OG links“.';
@@ -75,17 +79,21 @@ export function UnitForm({ route, navigation }: any) {
     if (num(f.coldRent) <= 0) e.coldRent = 'Bitte die Kaltmiete eingeben.';
     setErr(e);
     if (Object.keys(e).length) return false;
-    save('units', { id: old?.id ?? uid(), propertyId: old?.propertyId ?? route.params.propertyId, name: f.name.trim(), area: num(f.area), rooms: num(f.rooms), coldRent: num(f.coldRent), advance: num(f.advance) });
+    save('units', { id: old?.id ?? uid(), kind, vat: kind === 'gewerbe' ? vat : 0, propertyId: old?.propertyId ?? route.params.propertyId, name: f.name.trim(), area: num(f.area), rooms: num(f.rooms), coldRent: num(f.coldRent), advance: num(f.advance) });
     return true;
   };
   return (
     <Screen>
-      <Section title="Wohnung">
-        <Field label="Bezeichnung" value={f.name} onChangeText={set('name')} placeholder="z. B. WE 2, 1. OG links" error={err.name} />
+      <Segmented value={kind} onChange={setKind} options={[{ label: 'Wohnung', value: 'wohnung' }, { label: 'Gewerbe', value: 'gewerbe' }, { label: 'Eigentum', value: 'eigentum' }]} />
+      <Section title="Einheit" footer={kind === 'gewerbe' ? 'Gewerbe: andere Regeln als bei Wohnraum. Bei Umsatzsteuer-Option wird die USt auf Miete und Nebenkosten aufgeschlagen.' : kind === 'eigentum' ? 'Eigentumswohnung: Hausgeld und WEG-Abrechnung erfasst du später als Kosten.' : undefined}>
+        <Field label="Bezeichnung" value={f.name} onChangeText={set('name')} placeholder={kind === 'gewerbe' ? 'z. B. Laden EG' : 'z. B. WE 2, 1. OG links'} error={err.name} />
         <Field label="Wohnfläche" value={f.area} onChangeText={set('area')} keyboard="numeric" suffix="m²" error={err.area} />
         <Field label="Zimmer" value={f.rooms} onChangeText={set('rooms')} keyboard="numeric" />
       </Section>
-      <Section title="Miete" footer={total > 0 ? `Gesamtmiete pro Monat: ${eur(total)}` : undefined}>
+      {kind === 'gewerbe' && (
+        <Segmented value={vat} onChange={setVat} options={[{ label: 'Ohne USt', value: 0 }, { label: '7 % USt', value: 7 }, { label: '19 % USt', value: 19 }]} />
+      )}
+      <Section title="Miete (netto)" footer={total > 0 ? `Gesamt pro Monat${kind === 'gewerbe' && vat ? ` inkl. ${vat} % USt` : ''}: ${eur(total)}` : undefined}>
         <Field label="Kaltmiete pro Monat" value={f.coldRent} onChangeText={set('coldRent')} keyboard="numeric" suffix="€" error={err.coldRent} />
         <Field label="Nebenkosten-Vorauszahlung pro Monat" value={f.advance} onChangeText={set('advance')} keyboard="numeric" suffix="€" />
       </Section>
@@ -94,10 +102,13 @@ export function UnitForm({ route, navigation }: any) {
   );
 }
 
+/** Neue Mieter: Rückstände zählen ab dem aktuellen Monat, nicht ab einem Einzug vor Jahren. */
+const defaultTrackFrom = () => today().slice(0, 7);
+
 export function TenantForm({ route, navigation }: any) {
   const { db, save } = useStore();
   const old = useItem<Tenant>('tenants', route.params?.id);
-  const [f, setF] = useState({ name: old?.name ?? '', email: old?.email ?? '', phone: old?.phone ?? '', moveIn: old?.moveIn ?? today(), moveOut: old?.moveOut ?? '', deposit: old ? String(old.deposit || '') : '', unitId: old?.unitId ?? route.params?.unitId ?? '' });
+  const [f, setF] = useState({ name: old?.name ?? '', email: old?.email ?? '', phone: old?.phone ?? '', moveIn: old?.moveIn ?? today(), moveOut: old?.moveOut ?? '', iban: old?.iban ?? '', trackFrom: old ? old.trackFrom ?? '' : defaultTrackFrom(), deposit: old ? String(old.deposit || '') : '', unitId: old?.unitId ?? route.params?.unitId ?? '' });
   const [err, setErr] = useState<Errors>({});
   const set = (k: keyof typeof f) => (v: string) => setF({ ...f, [k]: v });
   const submit = () => {
@@ -106,10 +117,11 @@ export function TenantForm({ route, navigation }: any) {
     if (!f.name.trim()) e.name = 'Bitte den Namen eingeben.';
     if (!isDate(f.moveIn)) e.moveIn = 'Bitte ein gültiges Einzugsdatum wählen.';
     if (f.moveOut && (!isDate(f.moveOut) || f.moveOut < f.moveIn)) e.moveOut = 'Der Auszug muss nach dem Einzug liegen.';
+    if (f.trackFrom && !isMonth(f.trackFrom)) e.trackFrom = 'Bitte einen Monat wählen.';
     if (f.email && !/^\S+@\S+\.\S+$/.test(f.email)) e.email = 'Das sieht nicht nach einer E-Mail-Adresse aus.';
     setErr(e);
     if (Object.keys(e).length) return false;
-    save('tenants', { id: old?.id ?? uid(), unitId: f.unitId, name: f.name.trim(), email: f.email.trim(), phone: f.phone.trim(), moveIn: f.moveIn, moveOut: f.moveOut, deposit: num(f.deposit) });
+    save('tenants', { id: old?.id ?? uid(), unitId: f.unitId, name: f.name.trim(), email: f.email.trim(), phone: f.phone.trim(), iban: f.iban.replace(/\s/g, '').toUpperCase(), moveIn: f.moveIn, moveOut: f.moveOut, deposit: num(f.deposit), trackFrom: f.trackFrom || undefined });
     return true;
   };
   return (
@@ -129,12 +141,16 @@ export function TenantForm({ route, navigation }: any) {
         <Field label="Name" value={f.name} onChangeText={set('name')} error={err.name} placeholder="Vor- und Nachname" />
         <Field label="E-Mail" value={f.email} onChangeText={set('email')} keyboard="email-address" error={err.email} placeholder="optional" />
         <Field label="Telefon" value={f.phone} onChangeText={set('phone')} keyboard="phone-pad" placeholder="optional" />
+        <Field label="IBAN (für die Zuordnung von Kontoauszügen)" value={f.iban} onChangeText={set('iban')} placeholder="optional" />
       </Section>
       <Section title="Mietverhältnis">
         <DateField label="Einzug" value={f.moveIn} onChange={set('moveIn')} error={err.moveIn} />
         <DateField label="Auszug (leer lassen, wenn aktiv)" value={f.moveOut} onChange={set('moveOut')} error={err.moveOut} optional />
         <Field label="Kaution" value={f.deposit} onChangeText={set('deposit')} keyboard="numeric" suffix="€" placeholder="optional" />
+        <DateField label="Offene Posten zählen ab Monat" value={f.trackFrom} onChange={set('trackFrom')} mode="month" error={err.trackFrom} />
       </Section>
+      <Note>Frühere Monate gelten nicht als Rückstand. Das ist sinnvoll, wenn der Mieter schon länger wohnt und ältere Mieten außerhalb der App erledigt sind.</Note>
+      <Gap h={14} />
       <Footer kind="tenants" id={old?.id} nav={navigation} onSave={submit} deleteText="Alle Zahlungen und Mahnungen dieses Mieters werden ebenfalls gelöscht." />
     </Screen>
   );

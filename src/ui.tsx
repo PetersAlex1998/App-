@@ -338,3 +338,21 @@ export function notify(msg: string) {
   if (Platform.OS === 'web') window.alert(msg);
   else Alert.alert(msg);
 }
+
+/** Waagerechte Filter-Chips (z. B. nach Haus). */
+export function FilterChips<T extends string>({ value, options, onChange }: { value: T; options: { label: string; value: T }[]; onChange: (v: T) => void }) {
+  const c = useColors();
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12, marginHorizontal: -16 }} contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}>
+      {options.map((o) => {
+        const on = o.value === value;
+        return (
+          <Pressable key={o.value} accessibilityRole="radio" accessibilityState={{ selected: on }} onPress={() => onChange(o.value)}
+            style={{ minHeight: 38, paddingHorizontal: 14, borderRadius: 19, justifyContent: 'center', backgroundColor: on ? c.ink : c.card, borderWidth: 1, borderColor: on ? c.ink : c.glassBorder }}>
+            <Text style={{ fontSize: type.subhead, fontWeight: '600', color: on ? c.onInk : c.text }}>{o.label}</Text>
+          </Pressable>
+        );
+      })}
+    </ScrollView>
+  );
+}

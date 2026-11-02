@@ -10,8 +10,12 @@ export interface Property {
   notes: string;
 }
 
+export type UnitKind = 'wohnung' | 'gewerbe' | 'eigentum';
+
 export interface Unit {
   id: ID;
+  kind?: UnitKind; // fehlt = Wohnung
+  vat?: number; // USt-Satz in % (nur Gewerbe mit Umsatzsteuer-Option)
   propertyId: ID;
   name: string; // z. B. "WE 3, 2. OG links"
   area: number; // m²
@@ -29,6 +33,8 @@ export interface Tenant {
   moveIn: string; // YYYY-MM-DD
   moveOut: string; // YYYY-MM-DD oder ''
   deposit: number;
+  iban?: string; // für die automatische Zuordnung von Kontoauszügen
+  trackFrom?: string; // YYYY-MM: erst ab diesem Monat zählen Mieten als offen (ältere Monate sind außerhalb der App erledigt)
 }
 
 export type PaymentKind = 'miete' | 'kaution' | 'nachzahlung';
