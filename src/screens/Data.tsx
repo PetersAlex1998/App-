@@ -95,6 +95,11 @@ export function DataScreen({ navigation }: any) {
           subtitle={cloud.email ? (cloud.status === 'fehler' ? 'Abgleich fehlgeschlagen' : cloud.lastSyncAt ? `Zuletzt ${stamp(cloud.lastSyncAt)}` : cloud.email) : 'Auf mehreren Geräten und mit Sicherung in der Cloud'} onPress={() => navigation.navigate('Cloud')} />
       </Section>
 
+      <Section title="Rechtliches und Verträge" footer="Auftragsverarbeitung nach Art. 28 DSGVO: Supabase verarbeitet die Cloud-Daten (Region Frankfurt) in deinem Auftrag. Das DPA ist Teil der Supabase-Nutzungsbedingungen und gilt mit deinem Konto. Die Datei liegt in der App und ist auch offline abrufbar.">
+        <ListRow icon="shield-checkmark-outline" title="Auftragsverarbeitungsvertrag (AVV)" subtitle="Supabase · Data Processing Addendum, Version 1 vom 01.08.2026" right="PDF"
+          onPress={() => { if (Platform.OS === 'web') window.open(`${(window as any).__immoBase ?? ''}/dokumente/supabase-dpa-v1-2026-08-01.pdf`, '_blank'); }} />
+      </Section>
+
       <Section title="Sicherheit">
         <ListRow icon="lock-closed-outline" title="App-Sperre" subtitle="Code beim Öffnen der App verlangen" onPress={() => navigation.navigate('Sperre')} />
       </Section>

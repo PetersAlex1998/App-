@@ -8,6 +8,8 @@ const crypto = require('crypto');
 
 fs.copyFileSync(path.join(__dirname, '..', 'public-pwa/icon-192.png'), path.join(dist, 'icon-192.png'));
 fs.copyFileSync(path.join(__dirname, '..', 'public-pwa/icon-512.png'), path.join(dist, 'icon-512.png'));
+// Rechtsdokumente (z. B. Auftragsverarbeitungsvertrag), offline verfügbar
+fs.cpSync(path.join(__dirname, '..', 'public-pwa/dokumente'), path.join(dist, 'dokumente'), { recursive: true });
 fs.writeFileSync(path.join(dist, 'manifest.webmanifest'), JSON.stringify({
   name: 'Immo Verwaltung', short_name: 'Immo', lang: 'de', display: 'standalone',
   start_url: `${base}/`, scope: `${base}/`, background_color: '#E9EAEE', theme_color: '#15171A',
@@ -26,6 +28,7 @@ const head = `
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="Immo" />
 <style>html,body{background:#E9EAEE}body{overscroll-behavior-y:none}</style>
+<script>window.__immoBase='${base}';</script>
 <script>
 /* Offline-Modus: Service Worker anmelden und über Updates informieren */
 (function(){

@@ -46,3 +46,15 @@ test('Cloud: anmelden, Bestand hochladen, Daten von anderem Gerät übernehmen',
   await tap(page, btn(page, /^Löschen/));
   await expect.poll(() => pushed.some((r) => r.kind === 'tenants' && r.id === 't2' && r.deleted === true), { timeout: 15_000 }).toBe(true);
 });
+
+test('Rechtliches: AVV-PDF ist in der App hinterlegt und abrufbar', async ({ page, request }) => {
+  await seedDb(page);
+  await page.goto('/daten');
+  await expect(page.getByText('Auftragsverarbeitungsvertrag (AVV)').first()).toBeVisible();
+  expect(await body(page)).toContain('Version 1 vom 01.08.2026');
+  const res = await request.get('/dokumente/supabase-dpa-v1-2026-08-01.pdf');
+  expect(res.ok()).toBe(true);
+  expect((await res.body()).subarray(0, 4).toString()).toBe('%PDF');
+  const [popup] = await Promise.all([page.waitForEvent('popup'), tap(page, btn(page, /Auftragsverarbeitungsvertrag/))]);
+  expect(popup.url()).toContain('/dokumente/supabase-dpa-v1-2026-08-01.pdf');
+});
