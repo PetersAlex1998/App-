@@ -11,7 +11,7 @@ const ROUTES: Record<string, string> = {
   Tabs: '/', 'Übersicht': '/', Objekte: '/objekte', Mieter: '/mieter', Zahlungen: '/zahlungen',
   // Details und Formulare
   PropertyDetail: '/objekt/[id]', PropertyForm: '/objekt/formular',
-  UnitDetail: '/wohnung/[id]', UnitForm: '/wohnung/formular',
+  UnitDetail: '/wohnung/[id]', UnitForm: '/wohnung/formular', UnitSeries: '/wohnung/serie',
   TenantDetail: '/person/[id]', TenantForm: '/person/formular',
   PaymentForm: '/zahlung/formular', CostForm: '/kosten/formular',
   MeterDetail: '/zaehler/[id]', MeterForm: '/zaehler/formular', ReadingForm: '/stand/formular', Ablesung: '/ablesung',

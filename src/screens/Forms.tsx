@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 
 import { useStore, uid } from '../store';
-import { Button, ChipField, DateField, Disclosure, Field, Gap, Note, OptionRow, Screen, Section, Segmented, confirm } from '../ui';
+import { Button, ChipField, DateField, Disclosure, Field, Gap, Note, OptionRow, Row, Screen, Section, Segmented, confirm } from '../ui';
+import { defaultUnitName, houseId, nextHouseNo, nextUnitNo, unitLetter, unitPrefix, unitRef } from '../ids';
 import { Cost, Kind, Payment, Property, Tenant, Unit } from '../types';
 import { eur, monthLabel, num, suggestPayment, today } from '../calc';
 import { MeterType, UnitKind } from '../types';
@@ -35,18 +36,22 @@ const addYears = (iso: string, y: number) => (/^\d{4}-\d{2}-\d{2}$/.test(iso) ? 
 const filled = (...v: (string | undefined)[]) => v.some((x) => x && x.trim());
 
 export function PropertyForm({ route, navigation }: any) {
-  const { save } = useStore();
+  const { db, save } = useStore();
   const old = useItem<Property>('properties', route.params?.id);
   const [f, setF] = useState<Property>(old ?? { id: uid(), name: '', street: '', zip: '', city: '', yearBuilt: '', notes: '' });
+  const [houseNo, setHouseNo] = useState(String(old?.houseNo ?? nextHouseNo(db)));
   const [err, setErr] = useState<Errors>({});
   const set = (k: keyof Property) => (v: string) => setF({ ...f, [k]: v });
   const setIssued = (v: string) => setF({ ...f, eaIssued: v, eaValidUntil: !f.eaValidUntil || f.eaValidUntil === addYears(f.eaIssued ?? '', 10) ? addYears(v, 10) : f.eaValidUntil });
   const submit = () => {
     const e: Errors = {};
     if (!f.name.trim()) e.name = 'Bitte eine Bezeichnung eingeben, z. B. „Haus Lindenstraße“.';
+    const hn = Math.round(num(houseNo));
+    if (!(hn >= 1 && hn <= 999)) e.houseNo = 'Bitte eine Nummer von 1 bis 999 eingeben.';
+    else if (db.properties.some((p) => p.id !== f.id && p.houseNo === hn)) e.houseNo = `Die Haus-ID ${houseId({ houseNo: hn })} gibt es schon bei „${db.properties.find((p) => p.id !== f.id && p.houseNo === hn)?.name}“.`;
     setErr(e);
     if (Object.keys(e).length) return false;
-    save('properties', f);
+    save('properties', { ...f, houseNo: hn });
     return true;
   };
   return (
@@ -54,6 +59,9 @@ export function PropertyForm({ route, navigation }: any) {
       <Section title="Objekt">
         <Field label="Bezeichnung" value={f.name} onChangeText={set('name')} placeholder="z. B. Haus Lindenstraße" error={err.name} />
         <Field label="Baujahr" value={f.yearBuilt} onChangeText={set('yearBuilt')} keyboard="numeric" placeholder="optional" />
+      </Section>
+      <Section title="Haus-ID" footer="Eindeutige Kennung des Hauses. Sie ist der Anfang der Wohnungs-IDs, die Mieter bei jeder Zahlung als Verwendungszweck angeben.">
+        <Field label="Haus-Nr." value={houseNo} onChangeText={setHouseNo} keyboard="numeric" error={err.houseNo} hint={`Haus-ID: ${houseId({ houseNo: Math.round(num(houseNo)) || undefined }) || '–'}`} />
       </Section>
       <Section title="Adresse">
         <Field label="Straße und Hausnummer" value={f.street} onChangeText={set('street')} />
@@ -98,15 +106,33 @@ export function PropertyForm({ route, navigation }: any) {
 }
 
 export function UnitForm({ route, navigation }: any) {
-  const { save } = useStore();
+  const { db, save } = useStore();
   const old = useItem<Unit>('units', route.params?.id);
-  const [f, setF] = useState({ name: old?.name ?? '', area: old ? String(old.area) : '', rooms: old ? String(old.rooms) : '', coldRent: old ? String(old.coldRent) : '', advance: old ? String(old.advance) : '' });
+  const propertyId: string = old?.propertyId ?? route.params.propertyId;
+  const prop = db.properties.find((p) => p.id === propertyId);
+  const startNo = old?.no ?? nextUnitNo(db, propertyId, old?.kind ?? 'wohnung');
+  const [no, setNo] = useState(String(startNo));
+  const [nameTouched, setNameTouched] = useState(!!old);
+  const [f, setF] = useState({ name: old?.name ?? defaultUnitName('wohnung', startNo), area: old ? String(old.area) : '', rooms: old ? String(old.rooms) : '', coldRent: old ? String(old.coldRent) : '', advance: old ? String(old.advance) : '' });
   const [kind, setKind] = useState<UnitKind>(old?.kind ?? 'wohnung');
   const [vat, setVat] = useState<number>(old?.vat ?? 0);
   const [x, setX] = useState({ floor: old?.floor ?? '', position: old?.position ?? '', balcony: old?.balcony ?? '', cellar: old?.cellar ?? '', parking: old?.parking ?? '', kitchen: old?.kitchen ?? '', equipment: old?.equipment ?? '', notes: old?.notes ?? '' });
   const setx = (k: keyof typeof x) => (v: string) => setX({ ...x, [k]: v });
   const [err, setErr] = useState<Errors>({});
-  const set = (k: keyof typeof f) => (v: string) => setF({ ...f, [k]: v });
+  const set = (k: keyof typeof f) => (v: string) => { if (k === 'name') setNameTouched(true); setF({ ...f, [k]: v }); };
+  // Neue Einheit: Nummer und Name folgen der Art (Wohnung 4 / Gewerbe 2), solange der Name nicht von Hand geändert wurde
+  const changeKind = (k: UnitKind) => {
+    setKind(k);
+    if (old) return;
+    const n = nextUnitNo(db, propertyId, k);
+    setNo(String(n));
+    if (!nameTouched) setF((cur) => ({ ...cur, name: defaultUnitName(k, n) }));
+  };
+  const changeNo = (v: string) => {
+    setNo(v);
+    const n = Math.round(num(v));
+    if (!old && !nameTouched && n >= 1) setF((cur) => ({ ...cur, name: defaultUnitName(kind, n) }));
+  };
   const net = num(f.coldRent) + num(f.advance);
   const total = net * (1 + (kind === 'gewerbe' ? vat : 0) / 100);
   const submit = () => {
@@ -114,18 +140,28 @@ export function UnitForm({ route, navigation }: any) {
     if (!f.name.trim()) e.name = 'Bitte eine Bezeichnung eingeben, z. B. „WE 2, 1. OG links“.';
     if (num(f.area) <= 0) e.area = 'Die Wohnfläche wird für die Nebenkostenabrechnung gebraucht.';
     if (num(f.coldRent) <= 0) e.coldRent = 'Bitte die Kaltmiete eingeben.';
+    const n = Math.round(num(no));
+    if (!(n >= 1 && n <= 999)) e.no = 'Bitte eine Nummer von 1 bis 999 eingeben.';
+    else {
+      const clash = db.units.find((u) => u.id !== old?.id && u.propertyId === propertyId && unitLetter(u.kind) === unitLetter(kind) && u.no === n);
+      if (clash) e.no = `Die ID ${unitRef(prop, { kind, no: n })} ist schon vergeben (${clash.name}).`;
+    }
     setErr(e);
     if (Object.keys(e).length) return false;
-    save('units', { ...x, id: old?.id ?? uid(), kind, vat: kind === 'gewerbe' ? vat : 0, propertyId: old?.propertyId ?? route.params.propertyId, name: f.name.trim(), area: num(f.area), rooms: num(f.rooms), coldRent: num(f.coldRent), advance: num(f.advance) });
+    save('units', { ...x, id: old?.id ?? uid(), no: n, kind, vat: kind === 'gewerbe' ? vat : 0, propertyId, name: f.name.trim(), area: num(f.area), rooms: num(f.rooms), coldRent: num(f.coldRent), advance: num(f.advance) });
     return true;
   };
   return (
     <Screen>
-      <Segmented value={kind} onChange={setKind} options={[{ label: 'Wohnung', value: 'wohnung' }, { label: 'Gewerbe', value: 'gewerbe' }, { label: 'Eigentum', value: 'eigentum' }]} />
+      <Segmented value={kind} onChange={changeKind} options={[{ label: 'Wohnung', value: 'wohnung' }, { label: 'Gewerbe', value: 'gewerbe' }, { label: 'Eigentum', value: 'eigentum' }]} />
       <Section title="Einheit" footer={kind === 'gewerbe' ? 'Gewerbe: andere Regeln als bei Wohnraum. Bei Umsatzsteuer-Option wird die USt auf Miete und Nebenkosten aufgeschlagen.' : kind === 'eigentum' ? 'Eigentumswohnung: Hausgeld und WEG-Abrechnung erfasst du später als Kosten.' : undefined}>
-        <Field label="Bezeichnung" value={f.name} onChangeText={set('name')} placeholder={kind === 'gewerbe' ? 'z. B. Laden EG' : 'z. B. WE 2, 1. OG links'} error={err.name} />
+        <Field label="Bezeichnung" value={f.name} onChangeText={set('name')} placeholder={kind === 'gewerbe' ? 'z. B. Gewerbe 1' : 'z. B. Wohnung 1'} error={err.name} />
+        <Field label="Nummer im Haus" value={no} onChangeText={changeNo} keyboard="numeric" error={err.no} />
         <Field label="Wohnfläche" value={f.area} onChangeText={set('area')} keyboard="numeric" suffix="m²" error={err.area} />
         <Field label="Zimmer" value={f.rooms} onChangeText={set('rooms')} keyboard="numeric" />
+      </Section>
+      <Section title="Kennung" footer="Eindeutig in allen deinen Häusern. Mieter geben sie bei jeder Zahlung als Verwendungszweck an, so kann die App den Eingang sicher zuordnen.">
+        <Row left="Wohnungs-ID" right={unitRef(prop, { kind, no: Math.round(num(no)) || undefined }) || '–'} bold />
       </Section>
       {kind === 'gewerbe' && (
         <Segmented value={vat} onChange={setVat} options={[{ label: 'Ohne USt', value: 0 }, { label: '7 % USt', value: 7 }, { label: '19 % USt', value: 19 }]} />
@@ -312,6 +348,55 @@ export function CostForm({ route, navigation }: any) {
         </Section>
       )}
       <Footer kind="costs" id={old?.id} nav={navigation} onSave={submit} />
+    </Screen>
+  );
+}
+
+/** Mehrere Einheiten auf einmal anlegen: Wohnung 1 bis Wohnung 20 usw. */
+export function UnitSeries({ route, navigation }: any) {
+  const { db, save } = useStore();
+  const propertyId: string = route.params.propertyId;
+  const prop = db.properties.find((p) => p.id === propertyId);
+  const [kind, setKind] = useState<UnitKind>('wohnung');
+  const [count, setCount] = useState('10');
+  const [start, setStart] = useState(String(nextUnitNo(db, propertyId, 'wohnung')));
+  const [d, setD] = useState({ area: '', rooms: '', coldRent: '', advance: '' });
+  const [err, setErr] = useState<Errors>({});
+  const n = Math.round(num(count));
+  const from = Math.round(num(start));
+  const last = from + n - 1;
+  const changeKind = (k: UnitKind) => { setKind(k); setStart(String(nextUnitNo(db, propertyId, k))); };
+  const clash = (() => {
+    for (let i = from; i <= last && n > 0; i++) if (db.units.some((u) => u.propertyId === propertyId && unitLetter(u.kind) === unitLetter(kind) && u.no === i)) return i;
+    return 0;
+  })();
+  const submit = () => {
+    const e: Errors = {};
+    if (!(n >= 1 && n <= 200)) e.count = 'Bitte eine Anzahl von 1 bis 200 eingeben.';
+    if (!(from >= 1 && last <= 999)) e.start = 'Die Nummern müssen zwischen 1 und 999 liegen.';
+    else if (clash) e.start = `Die Nummer ${clash} ist in diesem Haus schon vergeben (${unitRef(prop, { kind, no: clash })}).`;
+    setErr(e);
+    if (Object.keys(e).length) return false;
+    for (let i = from; i <= last; i++) {
+      save('units', { id: uid(), propertyId, kind, vat: 0, no: i, name: defaultUnitName(kind, i), area: num(d.area), rooms: num(d.rooms), coldRent: num(d.coldRent), advance: num(d.advance) });
+    }
+    return true;
+  };
+  const preview = n >= 1 && from >= 1 ? `${defaultUnitName(kind, from)}${n > 1 ? ` bis ${defaultUnitName(kind, last)}` : ''} · IDs ${unitRef(prop, { kind, no: from })}${n > 1 ? ` … ${unitRef(prop, { kind, no: last })}` : ''}` : undefined;
+  return (
+    <Screen>
+      <Segmented value={kind} onChange={changeKind} options={[{ label: 'Wohnungen', value: 'wohnung' }, { label: 'Gewerbe', value: 'gewerbe' }]} />
+      <Section title={`Anlegen in ${prop?.name ?? ''}`} footer={preview}>
+        <Field label="Anzahl" value={count} onChangeText={setCount} keyboard="numeric" error={err.count} />
+        <Field label="Beginnt bei Nummer" value={start} onChangeText={setStart} keyboard="numeric" error={err.start} />
+      </Section>
+      <Section title="Gleiche Werte für alle (optional)" footer="Fläche, Miete und Nebenkosten kannst du später pro Einheit ändern. Ohne Fläche ist keine Abrechnung nach Wohnfläche möglich.">
+        <Field label={`${unitPrefix(kind)}sfläche`.replace('Wohnungsfläche', 'Wohnfläche').replace('Gewerbesfläche', 'Nutzfläche')} value={d.area} onChangeText={(v) => setD({ ...d, area: v })} keyboard="numeric" suffix="m²" />
+        <Field label="Zimmer" value={d.rooms} onChangeText={(v) => setD({ ...d, rooms: v })} keyboard="numeric" />
+        <Field label="Kaltmiete pro Monat" value={d.coldRent} onChangeText={(v) => setD({ ...d, coldRent: v })} keyboard="numeric" suffix="€" />
+        <Field label="Nebenkosten-Vorauszahlung pro Monat" value={d.advance} onChangeText={(v) => setD({ ...d, advance: v })} keyboard="numeric" suffix="€" />
+      </Section>
+      <Button icon="checkmark" title={n >= 1 ? `${n} ${n === 1 ? 'Einheit' : 'Einheiten'} anlegen` : 'Anlegen'} onPress={() => submit() && navigation.goBack()} />
     </Screen>
   );
 }

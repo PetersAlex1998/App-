@@ -5,6 +5,8 @@ import { Badge, EmptyState, LargeHeader, ListRow, Screen, SearchBar, Section, Se
 import { dateDE, eur, initials, monthLabel, monthLong, openItems, totalOpen, today, unitDue, kindOf, kindLabel } from '../calc';
 import { type } from '../theme';
 import { useSettings } from '../settings';
+import { houseId, unitRef } from '../ids';
+import { CoverThumb } from './Documents';
 import { dunningPlans } from '../dunning';
 import { daysUntil, expiryState } from '../docs';
 import { dueStatements } from '../nk';
@@ -163,9 +165,9 @@ export function Properties({ navigation }: any) {
               const units = db.units.filter((u) => u.propertyId === p.id);
               const vacant = units.filter((u) => !db.tenants.some((t) => t.unitId === u.id && isActive(t))).length;
               return (
-                <ListRow key={p.id} icon="business" title={p.name}
-                  badge={units.length === 0 ? { text: 'Keine Einheiten', tone: 'neutral' } : vacant > 0 ? { text: `${units.length} Einheiten · ${vacant} frei`, tone: 'warn' } : { text: `${units.length} Einheiten · voll vermietet`, tone: 'ok' }}
-                  subtitle={`${p.street}, ${p.zip} ${p.city}${units.some((u) => kindOf(u) === 'gewerbe') ? ` · ${units.filter((u) => kindOf(u) === 'gewerbe').length} Gewerbe` : ''}`}
+                <ListRow key={p.id} leading={<CoverThumb docId={p.coverId} />} title={p.name}
+                  badge={units.length === 0 ? { text: 'Keine Einheiten', tone: 'neutral' } : vacant > 0 ? { text: `${units.length} ${units.length === 1 ? 'Einheit' : 'Einheiten'} · ${vacant} frei`, tone: 'warn' } : { text: `${units.length} ${units.length === 1 ? 'Einheit' : 'Einheiten'} · voll vermietet`, tone: 'ok' }}
+                  subtitle={`${houseId(p) ? houseId(p) + ' · ' : ''}${p.street}, ${p.zip} ${p.city}${units.some((u) => kindOf(u) === 'gewerbe') ? ` · ${units.filter((u) => kindOf(u) === 'gewerbe').length} Gewerbe` : ''}`}
                   onPress={() => navigation.navigate('PropertyDetail', { id: p.id })} />
               );
             })}
@@ -218,7 +220,7 @@ export function Tenants({ navigation }: any) {
                 const p = db.properties.find((x) => x.id === u?.propertyId);
                 const o = totalOpen(db, t);
                 return (
-                  <ListRow key={t.id} avatar={initials(t.name)} title={t.name} subtitle={`${p?.name ?? ''} · ${kindOf(u) === 'wohnung' ? '' : kindLabel(kindOf(u)) + ' · '}${u?.name ?? '–'}`}
+                  <ListRow key={t.id} avatar={initials(t.name)} title={t.name} subtitle={`${unitRef(p, u) ? unitRef(p, u) + ' · ' : ''}${p?.name ?? ''} · ${u?.name ?? '–'}`}
                     badge={o > 0 ? { text: `${eur(o)} offen`, tone: 'danger' } : { text: 'Ausgeglichen', tone: 'ok' }}
                     onPress={() => navigation.navigate('TenantDetail', { id: t.id })} />
                 );

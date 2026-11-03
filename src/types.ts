@@ -8,6 +8,8 @@ export interface Property {
   city: string;
   yearBuilt: string;
   notes: string;
+  houseNo?: number; // Haus-Nr. -> Haus-ID „H03“
+  coverId?: string; // Dokument-ID des Titelbilds
   // Gebäude und Technik
   plotArea?: string; floors?: string; heatingType?: string; heatingYear?: string; energySource?: string;
   // Energieausweis
@@ -25,6 +27,7 @@ export type UnitKind = 'wohnung' | 'gewerbe' | 'eigentum';
 export interface Unit {
   id: ID;
   kind?: UnitKind; // fehlt = Wohnung
+  no?: number; // laufende Nummer im Haus („Wohnung 12“) -> Wohnungs-ID „H03-W12“
   vat?: number; // USt-Satz in % (nur Gewerbe mit Umsatzsteuer-Option)
   propertyId: ID;
   name: string; // z. B. "WE 3, 2. OG links"

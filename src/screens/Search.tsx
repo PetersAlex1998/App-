@@ -3,6 +3,7 @@ import { Text } from 'react-native';
 import { useStore } from '../store';
 import { ListRow, Screen, SearchBar, Section, useColors } from '../ui';
 import { eur, initials, unitDue } from '../calc';
+import { houseId, unitRef } from '../ids';
 import { type } from '../theme';
 
 export function SearchScreen({ navigation }: any) {
@@ -11,9 +12,10 @@ export function SearchScreen({ navigation }: any) {
   const [q, setQ] = useState('');
   const n = q.trim().toLowerCase();
   const has = (...v: string[]) => v.join(' ').toLowerCase().includes(n);
-  const props = n ? db.properties.filter((p) => has(p.name, p.street, p.city, p.zip)) : [];
-  const units = n ? db.units.filter((u) => has(u.name)) : [];
-  const tenants = n ? db.tenants.filter((t) => has(t.name, t.email, t.phone)) : [];
+  const props = n ? db.properties.filter((p) => has(p.name, p.street, p.city, p.zip, houseId(p))) : [];
+  const refOf = (u: (typeof db.units)[number]) => unitRef(db.properties.find((p) => p.id === u.propertyId), u);
+  const units = n ? db.units.filter((u) => has(u.name, refOf(u), refOf(u).replace('-', ''))) : [];
+  const tenants = n ? db.tenants.filter((t) => has(t.name, t.email, t.phone, refOf(db.units.find((u) => u.id === t.unitId) ?? ({} as never)))) : [];
   const none = n && !props.length && !units.length && !tenants.length;
   return (
     <Screen>
@@ -27,7 +29,7 @@ export function SearchScreen({ navigation }: any) {
       )}
       {units.length > 0 && (
         <Section title="Wohnungen">
-          {units.map((u) => <ListRow key={u.id} icon="home" title={u.name} subtitle={db.properties.find((p) => p.id === u.propertyId)?.name} right={eur(unitDue(u))} onPress={() => navigation.navigate('UnitDetail', { id: u.id })} />)}
+          {units.map((u) => <ListRow key={u.id} icon="home" title={u.name} subtitle={`${refOf(u)} · ${db.properties.find((p) => p.id === u.propertyId)?.name ?? ''}`} right={eur(unitDue(u))} onPress={() => navigation.navigate('UnitDetail', { id: u.id })} />)}
         </Section>
       )}
       {tenants.length > 0 && (

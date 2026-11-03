@@ -1,6 +1,7 @@
 import { DB, Payment, Tenant, UnitKind } from './types';
 import { addDays, openItems, today, unitDue } from './calc';
 import { uid } from './store';
+import { unitLetter } from './ids';
 
 /* ───────── CSV lesen ───────── */
 
@@ -139,6 +140,12 @@ function scoreTenant(db: DB, t: Tenant, r: BankRow): number {
   if (tokens.length >= 2 && tokens.every((w) => hay.includes(` ${w} `))) s += 70;
   else if (last && last.length >= 3 && hay.includes(` ${last} `)) s += 50;
   const unit = db.units.find((u) => u.id === t.unitId);
+  // Eindeutige Wohnungs-ID (H03-W12) im Verwendungszweck: sicherster Treffer
+  const prop = db.properties.find((p) => p.id === unit?.propertyId);
+  if (prop?.houseNo && unit?.no) {
+    const re = new RegExp(`(?:^|[^A-Za-z0-9])H\\s*0*${prop.houseNo}\\s*[-–_./ ]?\\s*${unitLetter(unit.kind)}\\s*0*${unit.no}(?![0-9])`, 'i');
+    if (re.test(`${r.purpose} ${r.name}`)) s += 100;
+  }
   const un = unit ? norm(unit.name) : '';
   if (un.length >= 3 && hay.includes(` ${un} `)) s += 25;
   if (unit && Math.abs(r.amount - unitDue(unit)) < 0.01) s += 25;
@@ -199,11 +206,11 @@ const BESTAND_HEADER = [
 const row = (o: Record<string, string>) => BESTAND_HEADER.map((h) => o[h] ?? '').join(';');
 export const BESTAND_TEMPLATE =
   BESTAND_HEADER.join(';') + '\n' +
-  row({ Haus: 'Haus Lindenstraße', Straße: 'Lindenstr. 12', PLZ: '50667', Ort: 'Köln', Einheit: 'WE 1 EG links', Typ: 'Wohnung', Fläche: '62', Zimmer: '2', Kaltmiete: '640,00', Nebenkosten: '160,00', Mieter: 'Anna Schmidt', 'E-Mail': 'anna@example.de', Telefon: '0221 123456', Einzug: '01.06.2024', Kaution: '1920,00',
+  row({ Haus: 'Haus Lindenstraße', Straße: 'Lindenstr. 12', PLZ: '50667', Ort: 'Köln', Einheit: 'Wohnung 1', Typ: 'Wohnung', Fläche: '62', Zimmer: '2', Kaltmiete: '640,00', Nebenkosten: '160,00', Mieter: 'Anna Schmidt', 'E-Mail': 'anna@example.de', Telefon: '0221 123456', Einzug: '01.06.2024', Kaution: '1920,00',
     Baujahr: '1998', Grundstück: '450', Etagen: '4', Heizung: 'Gas', 'Baujahr Heizung': '2015', Energieträger: 'Erdgas H', 'EA Art': 'Bedarf', 'EA Kennwert': '112', 'EA Klasse': 'C', 'EA ausgestellt': '15.03.2020', Versicherer: 'Muster Versicherung', Policennummer: 'GV-123456', Jahresprämie: '1850,00', Ansprechpartner: 'Hausmeister Meier', 'Ansprechpartner Telefon': '0171 555555',
     Etage: 'EG', Lage: 'links', Balkon: 'Terrasse', Keller: 'Ja', Küche: 'Einbauküche', Anrede: 'Frau', Mobil: '0171 1234567', Kündigungsfrist: '3', Mietanpassung: 'Indexmiete', 'Nächste Anpassung': '01.06.2027', Kautionsart: 'Kautionskonto' }) + '\n' +
-  row({ Haus: 'Haus Lindenstraße', Einheit: 'Laden EG', Typ: 'Gewerbe', Fläche: '85', Zimmer: '3', Kaltmiete: '1200,00', Nebenkosten: '250,00', USt: '19', Mieter: 'Muster Bäckerei GmbH', Einzug: '01.01.2023', Kaution: '3600,00', 'Befristet bis': '31.12.2027', Stellplatz: 'Hof 2' }) + '\n' +
-  row({ Haus: 'Haus Lindenstraße', Einheit: 'WE 3 1. OG', Typ: 'Wohnung', Fläche: '70', Zimmer: '3', Etage: '1. OG' }) + '\n';
+  row({ Haus: 'Haus Lindenstraße', Einheit: 'Gewerbe 1', Typ: 'Gewerbe', Fläche: '85', Zimmer: '3', Kaltmiete: '1200,00', Nebenkosten: '250,00', USt: '19', Mieter: 'Muster Bäckerei GmbH', Einzug: '01.01.2023', Kaution: '3600,00', 'Befristet bis': '31.12.2027', Stellplatz: 'Hof 2' }) + '\n' +
+  row({ Haus: 'Haus Lindenstraße', Einheit: 'Wohnung 2', Typ: 'Wohnung', Fläche: '70', Zimmer: '3', Etage: '1. OG' }) + '\n';
 
 export interface BestandPlan { db: DB; summary: { properties: number; units: number; tenants: number; updated: number }; warnings: string[]; error?: string }
 

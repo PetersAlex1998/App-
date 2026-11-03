@@ -37,6 +37,46 @@ function Thumb({ doc, onPress }: { doc: Doc; onPress: () => void }) {
   );
 }
 
+/** Kleines quadratisches Titelbild (Listen). Ohne Bild: Haus-Symbol. */
+export function CoverThumb({ docId, size = 40 }: { docId?: string; size?: number }) {
+  const c = useColors();
+  const { url } = useBlobUrl(docId ?? '');
+  return (
+    <View accessible={false} style={{ width: size, height: size, borderRadius: size * 0.3, overflow: 'hidden', backgroundColor: c.fill, alignItems: 'center', justifyContent: 'center' }}>
+      {url ? <Image source={{ uri: url }} style={{ width: '100%', height: '100%' }} resizeMode="cover" /> : <Ionicons name="business" size={size * 0.55} color={c.text} />}
+    </View>
+  );
+}
+
+/** Großes Titelbild unter dem Namen des Objekts. */
+export function CoverHero({ doc, onPress, onChange }: { doc: Doc; onPress: () => void; onChange: () => void }) {
+  const c = useColors();
+  const { url, missing } = useBlobUrl(doc.id);
+  if (missing) return null;
+  return (
+    <View style={{ marginBottom: 16 }}>
+      <Pressable accessibilityRole="imagebutton" accessibilityLabel="Titelbild des Objekts" onPress={onPress} style={{ width: '100%', aspectRatio: 16 / 9, borderRadius: 18, overflow: 'hidden', backgroundColor: c.fill }}>
+        {url ? <Image source={{ uri: url }} style={{ width: '100%', height: '100%' }} resizeMode="cover" /> : null}
+      </Pressable>
+      <Pressable accessibilityRole="button" onPress={onChange} hitSlop={8} style={{ alignSelf: 'flex-start', marginTop: 6, minHeight: 32, justifyContent: 'center' }}>
+        <Text style={{ color: c.primary, fontSize: type.subhead, fontWeight: '600' }}>Bild ändern</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+/** Platzhalter, solange noch kein Titelbild gesetzt ist. */
+export function CoverEmpty({ onPress }: { onPress: () => void }) {
+  const c = useColors();
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel="Bild des Objekts hinzufügen" onPress={onPress}
+      style={{ width: '100%', minHeight: 88, borderRadius: 18, borderWidth: 1.5, borderStyle: 'dashed', borderColor: c.line, backgroundColor: c.card, marginBottom: 16, flexDirection: 'row', gap: 12, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16 }}>
+      <Ionicons name="camera-outline" size={26} color={c.primary} />
+      <Text style={{ color: c.primary, fontSize: type.body, fontWeight: '600' }}>Bild des Objekts hinzufügen</Text>
+    </Pressable>
+  );
+}
+
 /** Bereich „Dokumente und Fotos“ für Objekt, Wohnung oder Mieter. */
 export function DocumentsSection({ ownerKind, ownerId, navigation }: { ownerKind: DocOwner; ownerId: string; navigation: any }) {
   const { db } = useStore();
@@ -73,8 +113,9 @@ export function DocumentForm({ route, navigation }: any) {
   const old = db.documents.find((d) => d.id === route.params?.id);
   const ownerKind: DocOwner = old?.ownerKind ?? route.params.ownerKind;
   const ownerId: string = old?.ownerId ?? route.params.ownerId;
+  const cover = !old && route.params?.cover === '1' && ownerKind === 'property';
   const cats = CATEGORIES_FOR[ownerKind];
-  const [category, setCategory] = useState<DocCategory>(old?.category ?? (ownerKind === 'property' ? 'energieausweis' : ownerKind === 'tenant' ? 'mietvertrag' : 'foto'));
+  const [category, setCategory] = useState<DocCategory>(old?.category ?? (route.params?.cover === '1' ? 'foto' : ownerKind === 'property' ? 'energieausweis' : ownerKind === 'tenant' ? 'mietvertrag' : 'foto'));
   const [name, setName] = useState(old?.name ?? '');
   const [validUntil, setValidUntil] = useState(old?.validUntil ?? '');
   const [note, setNote] = useState(old?.note ?? '');
@@ -84,7 +125,9 @@ export function DocumentForm({ route, navigation }: any) {
 
   const choose = async (camera: boolean) => {
     const f = await pickFiles({ camera, multiple: !camera });
-    if (f.length) { setPicked(f); setErr(''); if (f.length === 1 && !name) setName(f[0].name.replace(/\.[^.]+$/, '')); }
+    const list = cover ? f.filter((x) => x.type.startsWith('image/')).slice(0, 1) : f;
+    if (cover && f.length && list.length === 0) return setErr('Bitte ein Bild auswählen (JPG oder PNG).');
+    if (list.length) { setPicked(list); setErr(''); if (list.length === 1 && !name) setName(cover ? 'Titelbild' : list[0].name.replace(/\.[^.]+$/, '')); }
   };
   const submit = async () => {
     if (old) {
@@ -99,6 +142,7 @@ export function DocumentForm({ route, navigation }: any) {
         const id = uid();
         await putBlob(id, blob);
         const single = picked.length === 1;
+        if (cover && picked.indexOf(f) === 0) { const pr = db.properties.find((x) => x.id === ownerId); if (pr) save('properties', { ...pr, coverId: id }); }
         save('documents', { id, ownerKind, ownerId, category, name: (single && name.trim()) || f.name.replace(/\.[^.]+$/, ''), mime: blob.type || f.type || 'application/octet-stream', size: blob.size, added: today(), validUntil: HAS_EXPIRY.includes(category) && validUntil ? validUntil : undefined, note: note.trim() || undefined });
       }
       navigation.goBack();
@@ -116,16 +160,16 @@ export function DocumentForm({ route, navigation }: any) {
           <ListRow icon="folder-open" title="Foto oder Datei auswählen" subtitle="Bild oder PDF, auch mehrere" onPress={() => choose(false)} />
         </Section>
       )}
-      <Section title="Art">
+      {!cover && <Section title="Art">
         <ChipField label="Kategorie" value={CATEGORY_LABEL[category]} options={cats.map((k) => CATEGORY_LABEL[k])} onChange={(v) => v && setCategory(cats.find((k) => CATEGORY_LABEL[k] === v)!)} />
-      </Section>
+      </Section>}
       <Section title="Angaben">
         {(old || picked.length <= 1) && <Field label="Bezeichnung" value={name} onChangeText={setName} placeholder="z. B. Energieausweis 2024" />}
         {HAS_EXPIRY.includes(category) && <DateField label={category === 'energieausweis' ? 'Gültig bis (10 Jahre ab Ausstellung)' : 'Gültig bis'} value={validUntil} onChange={setValidUntil} optional />}
         <Field label="Notiz" value={note} onChangeText={setNote} placeholder="optional" />
       </Section>
       {err ? <View style={{ marginBottom: 12 }}><Badge text={err} tone="danger" /></View> : null}
-      <Button icon="checkmark" title={busy ? 'Wird gespeichert …' : old ? 'Speichern' : picked.length > 1 ? `${picked.length} Dateien speichern` : 'Speichern'} onPress={submit} disabled={busy} />
+      <Button icon="checkmark" title={busy ? 'Wird gespeichert …' : old ? 'Speichern' : cover ? 'Als Titelbild speichern' : picked.length > 1 ? `${picked.length} Dateien speichern` : 'Speichern'} onPress={submit} disabled={busy} />
       {old && (<><Gap h={22} /><Button kind="destructive" icon="trash-outline" title="Löschen" onPress={() => confirm('Dokument löschen?', () => { remove('documents', old.id); deleteBlob(old.id).catch(() => {}); navigation.goBack(); if (navigation.canGoBack()) navigation.goBack(); }, 'Löschen', 'Die Datei wird dauerhaft entfernt.')} /></>)}
     </Screen>
   );
@@ -133,7 +177,7 @@ export function DocumentForm({ route, navigation }: any) {
 
 /** Betrachter für Bilder und PDFs. */
 export function DocumentViewer({ route, navigation }: any) {
-  const { db } = useStore();
+  const { db, save } = useStore();
   const c = useColors();
   const doc = db.documents.find((d) => d.id === route.params.id);
   const { url, missing } = useBlobUrl(route.params.id);
@@ -163,6 +207,14 @@ export function DocumentViewer({ route, navigation }: any) {
       {url && isImage && <Image source={{ uri: url }} accessibilityLabel={doc.name} style={{ width: '100%', aspectRatio: 1, borderRadius: 16, backgroundColor: c.fill }} resizeMode="contain" />}
       {url && isPdf && Platform.OS === 'web' && React.createElement('iframe', { src: url, title: doc.name, style: { width: '100%', height: '65vh', border: 'none', borderRadius: 16, background: '#fff' } })}
       <Gap h={16} />
+      {isImage && doc.ownerKind === 'property' && (() => {
+        const pr = db.properties.find((x) => x.id === doc.ownerId);
+        if (!pr) return null;
+        return pr.coverId === doc.id
+          ? <Badge text="Ist das Titelbild des Objekts" tone="ok" />
+          : <Button icon="image-outline" title="Als Titelbild verwenden" onPress={() => { save('properties', { ...pr, coverId: doc.id }); notify('Als Titelbild gesetzt.'); }} />;
+      })()}
+      <Gap h={8} />
       {url && <Button icon="open-outline" title="In neuem Tab öffnen" kind="secondary" onPress={() => window.open(url, '_blank')} />}
       {url && <><Gap h={8} /><Button icon="download-outline" title="Herunterladen" kind="secondary" onPress={download} /></>}
     </Screen>

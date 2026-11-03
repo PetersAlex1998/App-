@@ -33,6 +33,7 @@ function Shell() {
         <Stack.Screen name="objekt/[id]" options={{ title: 'Objekt' }} />
         <Stack.Screen name="objekt/formular" options={edit('Neues Objekt', 'Objekt bearbeiten')} />
         <Stack.Screen name="wohnung/[id]" options={{ title: 'Wohnung' }} />
+        <Stack.Screen name="wohnung/serie" options={{ title: 'Mehrere Einheiten anlegen' }} />
         <Stack.Screen name="wohnung/formular" options={edit('Neue Wohnung', 'Wohnung bearbeiten')} />
         <Stack.Screen name="person/[id]" options={{ title: 'Mieter' }} />
         <Stack.Screen name="person/formular" options={edit('Neuer Mieter', 'Mieter bearbeiten')} />

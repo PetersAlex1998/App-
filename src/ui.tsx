@@ -136,14 +136,14 @@ export function Badge({ text, tone = 'neutral' }: { text: string; tone?: Tone })
   );
 }
 
-export function ListRow({ title, subtitle, right, rightColor, rightSub, badge, avatar, icon, iconTone, onPress, chevron }: {
+export function ListRow({ title, subtitle, right, rightColor, rightSub, badge, avatar, icon, iconTone, onPress, chevron, leading }: {
   title: string; subtitle?: string; right?: string; rightColor?: string; rightSub?: string;
-  badge?: { text: string; tone?: Tone }; avatar?: string; icon?: IconName; iconTone?: Tone; onPress?: () => void; chevron?: boolean;
+  badge?: { text: string; tone?: Tone }; avatar?: string; icon?: IconName; iconTone?: Tone; onPress?: () => void; chevron?: boolean; leading?: React.ReactNode;
 }) {
   const c = useColors();
   const content = (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 12, minHeight: 56 }}>
-      {avatar ? <Avatar text={avatar} /> : icon ? <IconBubble name={icon} tone={iconTone} /> : null}
+      {leading ?? (avatar ? <Avatar text={avatar} /> : icon ? <IconBubble name={icon} tone={iconTone} /> : null)}
       <View style={{ flex: 1, gap: 2 }}>
         <Text style={{ fontSize: type.body, fontWeight: '600', color: c.text }}>{title}</Text>
         {subtitle ? <Text style={{ fontSize: type.subhead, color: c.muted }}>{subtitle}</Text> : null}

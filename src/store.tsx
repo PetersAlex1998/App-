@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useRef, useSt
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DB, Kind, emptyDB } from './types';
 import { deleteBlob, filesSupported } from './files';
+import { normalizeIds } from './ids';
 
 const KEY = 'immo-db-v1';
 
@@ -24,7 +25,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     AsyncStorage.getItem(KEY)
-      .then((raw) => raw && setDb({ ...emptyDB, ...JSON.parse(raw) }))
+      .then((raw) => raw && setDb(normalizeIds({ ...emptyDB, ...JSON.parse(raw) })))
       .catch(() => {})
       .finally(() => {
         loaded.current = true;
@@ -41,7 +42,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       const list = d[kind] as { id: string }[];
       const exists = list.some((x) => x.id === item.id);
       const next = exists ? list.map((x) => (x.id === item.id ? item : x)) : [...list, item];
-      return { ...d, [kind]: next };
+      return normalizeIds({ ...d, [kind]: next });
     });
   }, []);
 
@@ -88,7 +89,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  const replaceAll = useCallback((next: DB) => setDb(next), []);
+  const replaceAll = useCallback((next: DB) => setDb(normalizeIds(next)), []);
 
   return <StoreCtx.Provider value={{ db, ready, save, remove, replaceAll }}>{children}</StoreCtx.Provider>;
 }

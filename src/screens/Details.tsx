@@ -2,8 +2,10 @@ import React, { useLayoutEffect, useState } from 'react';
 import { Linking, Pressable, Text, View } from 'react-native';
 import { useStore, uid } from '../store';
 import { Avatar, Badge, Button, EmptyState, Gap, ListRow, Note, Row, Screen, Section, Segmented, Stat, StatGrid, confirm, infoRows, notify, useColors } from '../ui';
-import { DocumentsSection } from './Documents';
+import { CoverEmpty, CoverHero, DocumentsSection } from './Documents';
 import { expiryState } from '../docs';
+import { defaultUnitName, houseId, unitLetter, unitRef } from '../ids';
+import { Platform } from 'react-native';
 import { addDays, dateDE, eur, initials, kindLabel, kindOf, monthLabel, unitDue, nkStatement, openItems, reminderLabel, today, totalOpen } from '../calc';
 import { exportPdf, nkHtml, reminderHtml } from '../pdf';
 import { nkModel, reminderModel } from '../letters';
@@ -29,12 +31,12 @@ function useHeaderAction(navigation: any, label: string, onPress: () => void) {
 }
 
 export function PropertyDetail({ route, navigation }: any) {
-  const { db } = useStore();
+  const { db, save } = useStore();
   const c = useColors();
   const p = db.properties.find((x) => x.id === route.params.id);
   useHeaderAction(navigation, 'Bearbeiten', () => p && navigation.navigate('PropertyForm', { id: p.id }));
   if (!p) return <Screen><EmptyState icon="help-circle" title="Objekt nicht gefunden" text="Es wurde vermutlich gelöscht." /></Screen>;
-  const units = db.units.filter((u) => u.propertyId === p.id);
+  const units = db.units.filter((u) => u.propertyId === p.id).sort((a, b) => (unitLetter(a.kind) === unitLetter(b.kind) ? (a.no ?? 0) - (b.no ?? 0) : unitLetter(a.kind) === 'W' ? -1 : 1));
   const active = (u: string) => db.tenants.find((t) => t.unitId === u && (!t.moveOut || t.moveOut >= today()));
   const area = units.reduce((s, u) => s + u.area, 0);
   const rent = units.filter((u) => active(u.id)).reduce((s, u) => s + unitDue(u), 0);
@@ -47,8 +49,14 @@ export function PropertyDetail({ route, navigation }: any) {
       <View style={{ marginBottom: 16, marginTop: 4 }}>
         <Text accessibilityRole="header" style={{ fontSize: 28, fontWeight: '800', color: c.text, letterSpacing: -0.4 }}>{p.name}</Text>
         <Text style={{ fontSize: type.subhead, color: c.muted, marginTop: 2 }}>{p.street}, {p.zip} {p.city}{p.yearBuilt ? ` · Baujahr ${p.yearBuilt}` : ''}</Text>
+        {houseId(p) ? <Text style={{ fontSize: type.subhead, color: c.primary, fontWeight: '700', marginTop: 4 }}>Haus-ID {houseId(p)}</Text> : null}
         {p.notes ? <Text style={{ fontSize: type.subhead, color: c.muted, marginTop: 6 }}>{p.notes}</Text> : null}
       </View>
+      {filesSupported() && (() => {
+        const cover = p.coverId ? db.documents.find((d) => d.id === p.coverId) : undefined;
+        const pick = () => navigation.navigate('DocumentForm', { ownerKind: 'property', ownerId: p.id, cover: '1' });
+        return cover ? <CoverHero doc={cover} onPress={() => navigation.navigate('DocumentViewer', { id: cover.id })} onChange={pick} /> : <CoverEmpty onPress={pick} />;
+      })()}
       <StatGrid>
         <Stat label="Einheiten" value={String(units.length)} icon="home-outline" />
         <Stat label="Fläche" value={`${area.toLocaleString('de-DE')} m²`} icon="resize-outline" />
@@ -73,11 +81,19 @@ export function PropertyDetail({ route, navigation }: any) {
         {units.map((u) => {
           const t = active(u.id);
           return (
-            <ListRow key={u.id} icon={kindOf(u) === 'gewerbe' ? 'storefront' : 'home'} title={u.name} subtitle={`${kindOf(u) === 'wohnung' ? '' : kindLabel(kindOf(u)) + ' · '}${u.area} m² · ${eur(u.coldRent)} + ${eur(u.advance)} NK${kindOf(u) === 'gewerbe' && u.vat ? ` + ${u.vat} % USt` : ''}`}
+            <ListRow key={u.id} icon={kindOf(u) === 'gewerbe' ? 'storefront' : 'home'} title={u.name} subtitle={`${unitRef(p, u) ? unitRef(p, u) + ' · ' : ''}${kindOf(u) === 'wohnung' ? '' : kindLabel(kindOf(u)) + ' · '}${u.area} m² · ${eur(u.coldRent)} + ${eur(u.advance)} NK${kindOf(u) === 'gewerbe' && u.vat ? ` + ${u.vat} % USt` : ''}`}
               badge={t ? { text: t.name, tone: 'ok' } : { text: 'Leerstand', tone: 'warn' }}
               onPress={() => navigation.navigate('UnitDetail', { id: u.id })} />
           );
         })}
+        {units.some((u) => u.no && u.name !== defaultUnitName(u.kind, u.no)) && (
+          <ListRow icon="swap-horizontal-outline" title="Namen vereinheitlichen" subtitle="Alle Einheiten heißen dann Wohnung 1, Wohnung 2 …"
+            onPress={() => confirm('Namen vereinheitlichen?', () => units.forEach((u) => {
+              if (!u.no || u.name === defaultUnitName(u.kind, u.no)) return;
+              save('units', { ...u, name: defaultUnitName(u.kind, u.no), notes: [u.notes, `Früher: ${u.name}`].filter(Boolean).join('\n') });
+            }), 'Umbenennen', 'Die Namen folgen der Nummer, die Wohnungs-IDs bleiben gleich. Die bisherige Bezeichnung wird in den Notizen der Einheit aufbewahrt.')} />
+        )}
+        <ListRow icon="copy-outline" title="Mehrere Einheiten auf einmal anlegen" subtitle="z. B. Wohnung 1 bis Wohnung 20" onPress={() => navigation.navigate('UnitSeries', { propertyId: p.id })} />
       </Section>
 
       <Section title="Zähler" action={{ label: '+ Hinzufügen', onPress: () => navigation.navigate('MeterForm', { propertyId: p.id }) }}
@@ -213,6 +229,7 @@ export function TenantDetail({ route, navigation }: any) {
 
       <Section title="Mietvertrag">
         <Row left="Wohnung" right={unit ? `${unit.area} m² · ${unit.rooms} Zi.` : '–'} />
+        {unitRef(prop, unit) ? <Row left="Zahlungsreferenz" right={unitRef(prop, unit)} bold /> : null}
         <Row left="Kaltmiete" right={unit ? eur(unit.coldRent) : '–'} />
         <Row left="NK-Vorauszahlung" right={unit ? eur(unit.advance) : '–'} />
         <Row left="Einzug" right={dateDE(t.moveIn)} />
@@ -266,7 +283,7 @@ export function UnitDetail({ route, navigation }: any) {
     <Screen>
       <View style={{ marginBottom: 16, marginTop: 4 }}>
         <Text accessibilityRole="header" style={{ fontSize: 28, fontWeight: '800', color: c.text, letterSpacing: -0.4 }}>{u.name}</Text>
-        <Text style={{ fontSize: type.subhead, color: c.muted, marginTop: 2 }}>{prop?.name} · {kindLabel(kindOf(u))}</Text>
+        <Text style={{ fontSize: type.subhead, color: c.muted, marginTop: 2 }}>{prop?.name} · {kindLabel(kindOf(u))}{unitRef(prop, u) ? ` · ${unitRef(prop, u)}` : ''}</Text>
       </View>
       <StatGrid>
         <Stat label="Fläche" value={`${u.area} m²`} icon="resize-outline" />
@@ -274,6 +291,18 @@ export function UnitDetail({ route, navigation }: any) {
         <Stat label="Miete / Monat" value={eur(unitDue(u))} icon="cash-outline" />
         <Stat label="Kaltmiete" value={eur(u.coldRent)} icon="pricetag-outline" />
       </StatGrid>
+      {(() => {
+        const ref = unitRef(prop, u);
+        const copy = () => {
+          if (Platform.OS === 'web' && navigator.clipboard) navigator.clipboard.writeText(ref).then(() => notify(`Kopiert: ${ref}`)).catch(() => notify(ref));
+          else notify(ref);
+        };
+        return ref ? (
+          <Section title="Kennung" footer="Diese ID geben Mieter bei jeder Zahlung als Verwendungszweck an.">
+            <ListRow icon="finger-print" title="Wohnungs-ID" subtitle="Verwendungszweck für Zahlungen" right={ref} onPress={copy} chevron={false} />
+          </Section>
+        ) : null;
+      })()}
       <Section title="Mieter">
         {tenant ? <ListRow avatar={initials(tenant.name)} title={tenant.name} subtitle={`seit ${dateDE(tenant.moveIn)}`} onPress={() => navigation.navigate('TenantDetail', { id: tenant.id })} />
           : <ListRow icon="key-outline" iconTone="warn" title="Leerstand" subtitle="Mieter hinzufügen" onPress={() => navigation.navigate('TenantForm', { unitId: u.id })} />}

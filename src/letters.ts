@@ -1,6 +1,7 @@
 import { DB, Property, Reminder, Tenant, Unit } from './types';
 import { NkResult, dateDE, eur, monthLabel, openItems } from './calc';
 import type { Settings } from './settings';
+import { unitRef } from './ids';
 
 /* ───────── Brief-Modell: daraus entstehen HTML (Druck) und PDF (Versand) ───────── */
 
@@ -67,6 +68,8 @@ const levelTitle = ['', 'Zahlungserinnerung', '1. Mahnung', '2. Mahnung – letz
 
 function frame(s: Settings, t: Tenant, prop: Property, unit: Unit, date: string, info: [string, string][], title: string, blocks: Block[]): LetterModel {
   const a = addressLines(t, prop, unit);
+  const ref = unitRef(prop, unit);
+  if (ref) info = [...info, ['Kennung', ref]];
   return {
     title,
     senderLines: [s.name || 'Hausverwaltung', s.street, `${s.zip} ${s.city}`.trim(), s.phone, s.email].filter((x) => x && x.trim()),
@@ -77,13 +80,16 @@ function frame(s: Settings, t: Tenant, prop: Property, unit: Unit, date: string,
   };
 }
 
-function bankBlocks(s: Settings, unit: Unit, t: Tenant, purpose = 'Miete'): Block[] {
+function bankBlocks(s: Settings, unit: Unit, t: Tenant, purpose = 'Miete', prop?: Property): Block[] {
   if (!s.iban) return [{ t: 'p', small: true, text: 'Bitte überweisen Sie auf das Ihnen bekannte Mietkonto.' }];
+  const ref = unitRef(prop, unit);
   const rows: [string, string][] = [['Empfänger', s.name || ''], ['IBAN', s.iban]];
   if (s.bic) rows.push(['BIC', s.bic]);
   if (s.bank) rows.push(['Bank', s.bank]);
-  rows.push(['Verwendungszweck', `${purpose} ${unit.name} – ${t.name}`]);
-  return [{ t: 'kv', rows }];
+  rows.push(['Verwendungszweck', ref ? `${purpose} ${ref}` : `${purpose} ${unit.name} – ${t.name}`]);
+  const blocks: Block[] = [{ t: 'kv', rows }];
+  if (ref) blocks.push({ t: 'p', small: true, text: `Bitte geben Sie bei jeder Zahlung die Kennung ${ref} als Verwendungszweck an, damit wir Ihre Zahlung zuordnen können.` });
+  return blocks;
 }
 
 /* ───────── Modelle ───────── */
@@ -105,7 +111,7 @@ export function reminderModel(db: DB, r: Reminder, t: Tenant, unit: Unit, prop: 
     { t: 'p', text: intro },
     { t: 'table', head: ['Monat', 'Soll', 'Gezahlt', 'Offen'], align: ['l', 'r', 'r', 'r'], widths: [0.4, 0.2, 0.2, 0.2], rows },
     { t: 'p', text: `Bitte überweisen Sie den Betrag bis spätestens **${dateDE(r.deadline)}**.` },
-    ...bankBlocks(s, unit, t),
+    ...bankBlocks(s, unit, t, 'Miete', prop),
     { t: 'sign', lines: ['Mit freundlichen Grüßen', s.name || 'Ihre Hausverwaltung'] },
   ]);
 }
@@ -125,7 +131,7 @@ export function nkModel(res: NkResult, t: Tenant, unit: Unit, prop: Property, ye
     { t: 'p', text: `nachfolgend erhalten Sie die Abrechnung der Betriebskosten für das Jahr ${year}. Abrechnungszeitraum: ${res.months} Monat(e).` },
     { t: 'table', head: ['Kostenart', 'Verteilung', 'Gesamt', 'Ihr Anteil'], align: ['l', 'l', 'r', 'r'], widths: [0.26, 0.42, 0.16, 0.16], rows },
     { t: 'p', text: outro },
-    ...(res.balance > 0 ? bankBlocks(s, unit, t, `Nebenkosten ${year}`) : []),
+    ...(res.balance > 0 ? bankBlocks(s, unit, t, `Nebenkosten ${year}`, prop) : []),
     { t: 'p', small: true, text: 'Die Abrechnung wurde anteilig nach Mietmonaten erstellt.' },
     { t: 'sign', lines: ['Mit freundlichen Grüßen', s.name || 'Ihre Hausverwaltung'] },
   ]);
@@ -171,8 +177,8 @@ export function testLetterModel(s: Settings, date = new Date().toISOString().sli
 }
 
 export function sampleModel(s: Settings): LetterModel {
-  const prop: Property = { id: 'p', name: 'Haus Lindenstraße', street: 'Lindenstr. 12', zip: '50667', city: 'Köln', yearBuilt: '', notes: '' };
-  const unit: Unit = { id: 'u', propertyId: 'p', name: 'WE 2, 1. OG', area: 70, rooms: 3, coldRent: 700, advance: 160 };
+  const prop: Property = { id: 'p', name: 'Haus Lindenstraße', street: 'Lindenstr. 12', zip: '50667', city: 'Köln', yearBuilt: '', notes: '', houseNo: 1 };
+  const unit: Unit = { id: 'u', propertyId: 'p', name: 'Wohnung 2', no: 2, area: 70, rooms: 3, coldRent: 700, advance: 160 };
   const t: Tenant = { id: 't', unitId: 'u', name: 'Erika Mustermann', salutation: 'Frau', email: '', phone: '', moveIn: '2024-01-01', moveOut: '', deposit: 0 };
   const items = [{ month: '2026-09', due: 860, paid: 0, open: 860 }, { month: '2026-10', due: 860, paid: 0, open: 860 }];
   const r: Reminder = { id: 'x', tenantId: 't', date: new Date().toISOString().slice(0, 10), level: 2, amount: 1720, fee: s.fee2, deadline: new Date(Date.now() + s.deadlineDays * 86400000).toISOString().slice(0, 10), items };
