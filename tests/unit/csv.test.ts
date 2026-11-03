@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { BESTAND_TEMPLATE, applyMatches, matchRows, parseAmount, parseBankCsv, parseCsv, parseDate, paymentsFromMatches, planBestandImport, planZaehlerImport, scoreRows } from '../../src/csv';
+import { BESTAND_TEMPLATE, applyMatches, matchRows, parseAmount, parseBankCsv, parseCsv, parseDate, paymentsFromMatches, planBestandImport, planZaehlerImport, previewBestand, scoreRows } from '../../src/csv';
 import { emptyDB } from '../../src/types';
 import { dueMonths } from '../../src/calc';
 import { normalizeIds } from '../../src/ids';
@@ -336,5 +336,22 @@ describe('Zähler-Import', () => {
   });
   it('Fehler ohne Pflichtspalten', () => {
     expect(planZaehlerImport(base(), 'A;B\n1;2').error).toMatch(/Spalten/);
+  });
+});
+
+describe('Vorschau des Bestand-Imports', () => {
+  const head = 'Haus;Einheit;Typ;Fläche;Kaltmiete;Nebenkosten;Mieter;Einzug;Auszug';
+  it('zeigt je Wohnung aktuellen Mieter und Historie; unveränderte Einheiten fehlen', () => {
+    const base = planBestandImport(emptyDB, `${head}\nHaus Test;Wohnung 1;Wohnung;50;300;100;Anna;01.01.2020;`).db;
+    const plan = planBestandImport(base, `${head}\nHaus Test;Wohnung 1;Wohnung;50;300;100;Anna;01.01.2020;\nHaus Test;Wohnung 4;Wohnung;;;;Alt;01.12.2009;31.03.2019\nHaus Test;Wohnung 4;Wohnung;77;480;140;Neu;01.04.2019;`);
+    const pv = previewBestand(base, plan.db);
+    expect(pv).toHaveLength(1);
+    expect(pv[0]).toMatchObject({ unit: 'Wohnung 4', change: 'neu', current: ['Neu'], since: '2019-04-01', history: 1 });
+    expect(pv[0].problem).toBeUndefined();
+  });
+  it('warnt, wenn danach zwei Mieter aktiv wären (Auszug fehlt)', () => {
+    const plan = planBestandImport(emptyDB, `${head}\nHaus Test;Wohnung 1;Wohnung;;;;Alt;01.01.2010;\nHaus Test;Wohnung 1;Wohnung;50;300;100;Neu;01.01.2020;`);
+    const pv = previewBestand(emptyDB, plan.db);
+    expect(pv[0].problem).toContain('2 aktive Mieter');
   });
 });

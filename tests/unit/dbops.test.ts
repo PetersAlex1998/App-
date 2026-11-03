@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { removeItem, upsertItem } from '../../src/dbops';
-import { dbWith, payment, property, resetIds, tenant, unit } from '../helpers/builders';
+import { removeItem, removedCount, restoreRemoved, upsertItem } from '../../src/dbops';
+import { dbWith, payment, property, resetIds, simple, tenant, unit } from '../helpers/builders';
 import { beforeEach } from 'vitest';
 import { Doc } from '../../src/types';
 
@@ -94,5 +94,46 @@ describe('Anlegen und Ändern', () => {
     d = upsertItem(d, 'units', unit('h', { id: 'a', name: 'Wohnung 1' }));
     d = upsertItem(d, 'units', unit('h', { id: 'b', name: 'Wohnung 1' }));
     expect(d.units.map((u) => u.no).sort()).toEqual([1, 2]);
+  });
+});
+
+describe('Löschen rückgängig machen', () => {
+  const doc = { id: 'd1', ownerKind: 'property' as const, ownerId: 'p1', category: 'rechnung' as const, name: 'B', mime: 'a/b', size: 1, added: '2025-01-01' };
+  it('Haus samt allem wird vollständig zurückgebracht', () => {
+    const { p, u, t, db } = simple();
+    const full = { ...db, payments: [payment(t.id, '2025-01', 800)], documents: [{ ...doc, ownerId: p.id }] };
+    const { db: after } = removeItem(full, 'properties', p.id);
+    expect(removedCount(full, after)).toBe(5);
+    const back = restoreRemoved(after, full, after, 'NOW');
+    expect(back.properties.map((x) => x.id)).toEqual([p.id]);
+    expect(back.units.map((x) => x.id)).toEqual([u.id]);
+    expect(back.tenants.map((x) => x.id)).toEqual([t.id]);
+    expect(back.payments).toHaveLength(1);
+    expect(back.documents).toHaveLength(1);
+    expect(back.properties[0].updatedAt).toBe('NOW');
+  });
+  it('Beleg löschen und zurück: Verweis der Ausgabe wird wiederhergestellt', () => {
+    const { p, db } = simple();
+    const exp = { id: 'e1', propertyId: p.id, date: '2025-01-01', amount: 5, category: 'sonstiges' as const, vendor: '', description: '', receiptId: 'd1' };
+    const full = { ...db, documents: [{ ...doc, ownerId: p.id }], expenses: [exp] };
+    const { db: after } = removeItem(full, 'documents', 'd1');
+    expect(after.expenses[0].receiptId).toBeUndefined();
+    const back = restoreRemoved(after, full, after);
+    expect(back.expenses[0].receiptId).toBe('d1');
+    expect(back.documents).toHaveLength(1);
+  });
+  it('Änderungen, die inzwischen gemacht wurden, bleiben erhalten', () => {
+    const p1 = property({ houseNo: 1 }), p2 = property({ houseNo: 2, name: 'B' });
+    const full = dbWith({ properties: [p1, p2] });
+    const { db: after } = removeItem(full, 'properties', p1.id);
+    const edited = { ...after, properties: after.properties.map((x) => ({ ...x, name: 'Neu' })) };
+    const back = restoreRemoved(edited, full, after);
+    expect(back.properties.map((x) => x.name).sort()).toEqual(['Haus A', 'Neu']);
+  });
+  it('bereits wieder vorhandene Sätze werden nicht verdoppelt', () => {
+    const { p, db } = simple();
+    const { db: after } = removeItem(db, 'properties', p.id);
+    const again = restoreRemoved(restoreRemoved(after, db, after), db, after);
+    expect(again.properties).toHaveLength(1);
   });
 });

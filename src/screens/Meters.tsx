@@ -1,6 +1,7 @@
 import React, { useLayoutEffect, useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { useStore, uid } from '../store';
+import { useDelete } from '../undo';
 import { Badge, Button, DateField, EmptyState, Field, Gap, ListRow, Note, OptionRow, Screen, Section, confirm, useColors } from '../ui';
 import { METER_TYPES, fmtVal, latestReading, meterIcon, meterLabel, meterTypeLabel, meterUnitLabel, readingsOf } from '../meters';
 import { dateDE, num, today } from '../calc';
@@ -24,6 +25,7 @@ function HeaderAction({ navigation, label, onPress }: { navigation: any; label: 
 /* ───────── Zähler anlegen / bearbeiten ───────── */
 export function MeterForm({ route, navigation }: any) {
   const { db, save, remove } = useStore();
+  const del = useDelete();
   const old = db.meters.find((m) => m.id === route.params?.id);
   const propertyId: string = old?.propertyId ?? route.params.propertyId;
   const units = db.units.filter((u) => u.propertyId === propertyId);
@@ -63,7 +65,7 @@ export function MeterForm({ route, navigation }: any) {
         </Section>
       )}
       <Button icon="checkmark" title="Speichern" onPress={submit} />
-      {old && (<><Gap h={22} /><Button kind="destructive" icon="trash-outline" title="Zähler löschen" onPress={() => confirm('Zähler löschen?', () => { remove('meters', old.id); navigation.goBack(); }, 'Löschen', 'Alle Zählerstände dieses Zählers werden ebenfalls gelöscht.')} /></>)}
+      {old && (<><Gap h={22} /><Button kind="destructive" icon="trash-outline" title="Zähler löschen" onPress={() => { del('meters', old.id); navigation.goBack(); }} /></>)}
     </Screen>
   );
 }
@@ -105,6 +107,7 @@ export function MeterDetail({ route, navigation }: any) {
 /* ───────── Einzelnen Stand erfassen ───────── */
 export function ReadingForm({ route, navigation }: any) {
   const { db, save, remove } = useStore();
+  const del = useDelete();
   const old = db.readings.find((r) => r.id === route.params?.id);
   const meter = db.meters.find((m) => m.id === (old?.meterId ?? route.params.meterId));
   const [value, setValue] = useState(old ? String(old.value) : '');
@@ -130,7 +133,7 @@ export function ReadingForm({ route, navigation }: any) {
         <DateField label="Abgelesen am" value={date} onChange={setDate} error={err.date} />
       </Section>
       <Button icon="checkmark" title="Speichern" onPress={submit} />
-      {old && (<><Gap h={22} /><Button kind="destructive" icon="trash-outline" title="Stand löschen" onPress={() => confirm('Stand löschen?', () => { remove('readings', old.id); navigation.goBack(); })} /></>)}
+      {old && (<><Gap h={22} /><Button kind="destructive" icon="trash-outline" title="Stand löschen" onPress={() => { del('readings', old.id); navigation.goBack(); }} /></>)}
     </Screen>
   );
 }

@@ -60,3 +60,25 @@ export function removeItem(d: DB, kind: Kind, id: string): { db: DB; goneDocs: D
   n.documents = d.documents.filter((x) => !goneDocs.includes(x));
   return { db: n, goneDocs };
 }
+
+/**
+ * Macht ein Löschen rückgängig: bringt entfernte Datensätze zurück und stellt Einträge wieder her, die das Löschen verändert hat
+ * (z. B. entfernter Beleg-Verweis), sofern sie seither nicht erneut geändert wurden. Wiederhergestellte Sätze erhalten eine neue
+ * Änderungszeit, damit der Cloud-Abgleich sie als neuer als den Grabstein erkennt.
+ */
+export function restoreRemoved(cur: DB, before: DB, after: DB, now = new Date().toISOString()): DB {
+  const out = { ...cur } as Record<string, any[]>;
+  for (const k of Object.keys(before) as Kind[]) {
+    const curList = cur[k] as unknown as { id: string }[];
+    const ids = new Set(curList.map((x) => x.id));
+    const afterById = new Map((after[k] as unknown as { id: string }[]).map((x) => [x.id, x]));
+    const beforeList = before[k] as unknown as { id: string }[];
+    const removed = beforeList.filter((x) => !afterById.has(x.id) && !ids.has(x.id)).map((x) => ({ ...x, updatedAt: now }));
+    const revert = new Map(beforeList.filter((x) => afterById.has(x.id) && JSON.stringify(afterById.get(x.id)) !== JSON.stringify(x)).map((x) => [x.id, x]));
+    out[k] = [...curList.map((x) => (revert.has(x.id) && JSON.stringify(x) === JSON.stringify(afterById.get(x.id)) ? { ...revert.get(x.id)!, updatedAt: now } : x)), ...removed];
+  }
+  return out as unknown as DB;
+}
+
+/** Anzahl der Datensätze, die ein Löschen entfernt (für die Meldung „Gelöscht (n Einträge)“). */
+export const removedCount = (before: DB, after: DB) => (Object.keys(before) as Kind[]).reduce((s, k) => s + (before[k] as unknown[]).length - (after[k] as unknown[]).length, 0);

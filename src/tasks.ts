@@ -1,0 +1,69 @@
+import { DB } from './types';
+import { addDays, today } from './calc';
+import { houseId } from './ids';
+
+/**
+ * Aufgaben aus der Datenprüfung: Dinge, die die App selbst bemerkt und die du nur noch antippen musst.
+ * (Rückstände, Mahnungen, Fristen zeigt weiterhin die Übersicht.)
+ */
+export type TaskLevel = 'hoch' | 'normal' | 'hinweis';
+export interface Task {
+  id: string; // stabil, damit „Erledigt“ gemerkt werden kann
+  level: TaskLevel;
+  icon: string;
+  title: string;
+  detail: string;
+  screen: string;
+  params?: Record<string, string>;
+}
+
+const isActive = (t: { moveOut: string }, now: string) => !t.moveOut || t.moveOut >= now;
+
+export function computeTasks(db: DB, opts: { dismissed?: string[]; now?: string } = {}): Task[] {
+  const now = opts.now ?? today();
+  const out: Task[] = [];
+  const unitName = (id: string) => db.units.find((u) => u.id === id)?.name ?? '';
+  const propOfUnit = (id: string) => db.properties.find((p) => p.id === db.units.find((u) => u.id === id)?.propertyId);
+  const where = (unitId: string) => { const p = propOfUnit(unitId); return `${p?.name ?? ''} · ${unitName(unitId)}`.replace(/^ · /, ''); };
+
+  // 1) Mehrere aktive Mieter in einer Einheit
+  for (const u of db.units) {
+    const act = db.tenants.filter((t) => t.unitId === u.id && isActive(t, now));
+    if (act.length > 1) out.push({ id: `zwei:${u.id}`, level: 'hoch', icon: 'people', title: `${act.length} aktive Mieter in ${u.name}`, detail: `${where(u.id)}: ${act.map((t) => t.name).join(', ')}. Wer ist der aktuelle Mieter? Trage beim Vorgänger einen Auszug ein.`, screen: 'UnitDetail', params: { id: u.id } });
+  }
+
+  // 2) Fehlende Angaben bei aktiven Mietern und belegten Einheiten
+  for (const t of db.tenants) {
+    if (!isActive(t, now)) continue;
+    if (!t.moveIn) out.push({ id: `einzug:${t.id}`, level: 'normal', icon: 'calendar-outline', title: `Einzugsdatum fehlt: ${t.name}`, detail: where(t.unitId), screen: 'TenantForm', params: { id: t.id } });
+    const u = db.units.find((x) => x.id === t.unitId);
+    if (u && (!(u.area > 0) || !(u.coldRent > 0))) out.push({ id: `einheit:${u.id}`, level: 'normal', icon: 'resize-outline', title: `${u.name}: ${!(u.area > 0) ? 'Fläche' : 'Kaltmiete'} fehlt`, detail: `${where(u.id)} ist vermietet, aber nicht vollständig erfasst.`, screen: 'UnitForm', params: { id: u.id } });
+  }
+
+  // 3) Eigene Vermerke „bitte prüfen / ergänzen“ (z. B. aus dem Import)
+  for (const t of db.tenants) {
+    const m = t.notes?.match(/[^.]*\bbitte (prüfen|ergänzen)[^.]*\.?/i);
+    if (m) out.push({ id: `notiz:${t.id}`, level: 'normal', icon: 'create-outline', title: `Prüfen: ${t.name}`, detail: `${where(t.unitId)} · ${m[0].trim()}`, screen: 'TenantForm', params: { id: t.id } });
+  }
+
+  // 4) Zählerstände fehlen zum letzten Jahresende (Voraussetzung für Abrechnung nach Verbrauch)
+  const year = Number(now.slice(0, 4)) - 1;
+  const cutoff = `${year}-12-01`;
+  for (const p of db.properties) {
+    const meters = db.meters.filter((m) => m.propertyId === p.id);
+    const stale = meters.filter((m) => !db.readings.some((r) => r.meterId === m.id && r.date >= cutoff));
+    if (stale.length) out.push({ id: `zaehler:${p.id}:${year}`, level: 'normal', icon: 'speedometer-outline', title: `Zählerstände ${year}: ${stale.length} von ${meters.length} fehlen`, detail: `${p.name}${houseId(p) ? ` (${houseId(p)})` : ''} · für die Nebenkostenabrechnung zum 31.12.${year}`, screen: 'Ablesung', params: { propertyId: p.id } });
+  }
+
+  // 5) Ausgaben ohne Beleg (älter als eine Woche)
+  const old = db.expenses.filter((e) => !e.receiptId && e.date <= addDays(now, -7));
+  if (old.length) out.push({ id: 'belege', level: 'hinweis', icon: 'receipt-outline', title: `${old.length} Ausgabe${old.length === 1 ? '' : 'n'} ohne Beleg`, detail: 'Für die Steuer sollte zu jeder Ausgabe ein Beleg vorliegen.', screen: 'Ausgaben' });
+
+  // 6) Frühere Mieter ohne bekanntes Einzugsdatum (Historie unvollständig)
+  const formerNoIn = db.tenants.filter((t) => !isActive(t, now) && !t.moveIn);
+  if (formerNoIn.length) out.push({ id: 'historie-einzug', level: 'hinweis', icon: 'time-outline', title: `Historie: ${formerNoIn.length} früherer Mieter ohne Einzugsdatum`, detail: formerNoIn.slice(0, 3).map((t) => `${t.name} (${unitName(t.unitId)})`).join(', ') + (formerNoIn.length > 3 ? ' …' : ''), screen: 'TenantForm', params: { id: formerNoIn[0].id } });
+
+  const hidden = new Set(opts.dismissed ?? []);
+  const rank = { hoch: 0, normal: 1, hinweis: 2 } as const;
+  return out.filter((t) => !hidden.has(t.id)).sort((a, b) => rank[a.level] - rank[b.level]);
+}

@@ -2,6 +2,7 @@ import React, { useEffect, useLayoutEffect, useState } from 'react';
 import { Image, Platform, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore, uid } from '../store';
+import { useDelete } from '../undo';
 import { Badge, Button, ChipField, DateField, EmptyState, Field, Gap, ListRow, Note, Screen, Section, confirm, notify, useColors } from '../ui';
 import { CATEGORIES_FOR, CATEGORY_ICON, CATEGORY_LABEL, HAS_EXPIRY, expiryState } from '../docs';
 import { deleteBlob, filesSupported, fmtSize, getBlob, pickFiles, putBlob, shrinkImage } from '../files';
@@ -110,6 +111,7 @@ export function DocumentsSection({ ownerKind, ownerId, navigation }: { ownerKind
 /** Neue Dateien hinzufügen oder Metadaten eines Dokuments bearbeiten. */
 export function DocumentForm({ route, navigation }: any) {
   const { db, save, remove } = useStore();
+  const del = useDelete();
   const old = db.documents.find((d) => d.id === route.params?.id);
   const ownerKind: DocOwner = old?.ownerKind ?? route.params.ownerKind;
   const ownerId: string = old?.ownerId ?? route.params.ownerId;
@@ -170,7 +172,7 @@ export function DocumentForm({ route, navigation }: any) {
       </Section>
       {err ? <View style={{ marginBottom: 12 }}><Badge text={err} tone="danger" /></View> : null}
       <Button icon="checkmark" title={busy ? 'Wird gespeichert …' : old ? 'Speichern' : cover ? 'Als Titelbild speichern' : picked.length > 1 ? `${picked.length} Dateien speichern` : 'Speichern'} onPress={submit} disabled={busy} />
-      {old && (<><Gap h={22} /><Button kind="destructive" icon="trash-outline" title="Löschen" onPress={() => confirm('Dokument löschen?', () => { remove('documents', old.id); deleteBlob(old.id).catch(() => {}); navigation.goBack(); if (navigation.canGoBack()) navigation.goBack(); }, 'Löschen', 'Die Datei wird dauerhaft entfernt.')} /></>)}
+      {old && (<><Gap h={22} /><Button kind="destructive" icon="trash-outline" title="Löschen" onPress={() => { del('documents', old.id); navigation.goBack(); if (navigation.canGoBack()) navigation.goBack(); }} /></>)}
     </Screen>
   );
 }

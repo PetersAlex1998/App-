@@ -12,6 +12,7 @@ import { dunningPlans } from '../dunning';
 import { daysUntil, expiryState } from '../docs';
 import { dueStatements } from '../nk';
 import { useOnline } from '../pwa';
+import { computeTasks } from '../tasks';
 
 const LIMIT = 5;
 const isActive = (t: { moveOut: string }) => !t.moveOut || t.moveOut >= today();
@@ -65,6 +66,7 @@ export function Dashboard({ navigation }: any) {
   if (cfg.backupRemindDays > 0 && db.properties.length > 0 && (bkDays === null || bkDays >= cfg.backupRemindDays)) {
     dues.unshift({ key: 'backup', icon: 'cloud-upload', tone: bkDays === null || bkDays >= cfg.backupRemindDays * 2 ? 'danger' : 'warn', title: 'Sicherung fällig', subtitle: bkDays === null ? 'Noch nie gesichert. Deine Daten liegen nur auf diesem Gerät.' : `Die letzte Sicherung ist ${bkDays} Tage alt.`, go: () => navigation.navigate('Daten') });
   }
+  const checks = computeTasks(db, { dismissed: cfg.dismissedTasks });
   const todoCount = dues.length + arrears.length + vacant.length + depositMissing.length;
 
   // Erste Schritte
@@ -157,6 +159,15 @@ export function Dashboard({ navigation }: any) {
         {vacant.length > LIMIT && <ListRow icon="list" title={`Weitere ${vacant.length - LIMIT} Leerstände`} onPress={() => navigation.navigate('Objekte')} />}
         {depositMissing.length > LIMIT && <ListRow icon="list" title={`Weitere ${depositMissing.length - LIMIT} offene Kautionen`} onPress={() => navigation.navigate('Mieter')} />}
       </Section>
+
+      {checks.length > 0 && (
+        <Section title={`Datenprüfung (${checks.length})`}>
+          {checks.slice(0, 3).map((t) => (
+            <ListRow key={t.id} icon={t.icon as 'leaf'} iconTone={t.level === 'hoch' ? 'danger' : t.level === 'normal' ? 'warn' : undefined} title={t.title} subtitle={t.detail} onPress={() => navigation.navigate(t.screen, t.params)} />
+          ))}
+          <ListRow icon="list" title="Alle Aufgaben ansehen" subtitle="Prüfen, klären oder als erledigt markieren" onPress={() => navigation.navigate('Aufgaben')} />
+        </Section>
+      )}
 
       <Section title="Schnellzugriff">
         <ListRow icon="add-circle-outline" title="Zahlung erfassen" onPress={() => navigation.navigate('PaymentForm', {})} />

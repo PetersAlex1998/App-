@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
 import { useStore, uid } from '../store';
+import { useDelete } from '../undo';
 import { Badge, Button, ChipField, DateField, EmptyState, Field, FilterChips, Gap, ListRow, Note, Row, Screen, Section, Stat, StatGrid, confirm, notify, useColors } from '../ui';
 import { dateDE, eur, num, today } from '../calc';
 import { houseId } from '../ids';
@@ -71,6 +72,7 @@ export function ExpensesScreen({ route, navigation }: any) {
 
 export function ExpenseForm({ route, navigation }: any) {
   const { db, save, remove } = useStore();
+  const del = useDelete();
   const old = db.expenses.find((e) => e.id === route.params?.id);
   const [propertyId, setPropertyId] = useState(old?.propertyId ?? route.params?.propertyId ?? db.properties[0]?.id ?? '');
   const [date, setDate] = useState(old?.date ?? today());
@@ -138,7 +140,7 @@ export function ExpenseForm({ route, navigation }: any) {
       )}
       {err.property ? <View style={{ marginBottom: 12 }}><Badge text={err.property} tone="danger" /></View> : null}
       <Button icon="checkmark" title={busy ? 'Wird gespeichert …' : 'Speichern'} onPress={submit} disabled={busy} />
-      {old && (<><Gap h={22} /><Button kind="destructive" icon="trash-outline" title="Löschen" onPress={() => confirm('Ausgabe löschen?', () => { remove('expenses', old.id); navigation.goBack(); }, 'Löschen', 'Der Beleg wird ebenfalls gelöscht.')} /></>)}
+      {old && (<><Gap h={22} /><Button kind="destructive" icon="trash-outline" title="Löschen" onPress={() => { del('expenses', old.id); navigation.goBack(); }} /></>)}
     </Screen>
   );
 }

@@ -3,15 +3,28 @@ import { Platform, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore, uid } from '../store';
 import { Badge, Button, EmptyState, Field, Gap, ListRow, Note, Screen, SearchBar, Section, notify, useColors } from '../ui';
-import { BESTAND_TEMPLATE, BankRow, MatchRow, applyMatches, scoreRows, parseBankCsv, pickTextFile, paymentsFromMatches, planBestandImport, BestandPlan, planZaehlerImport, ZaehlerPlan, ZAEHLER_TEMPLATE } from '../csv';
+import { BESTAND_TEMPLATE, BankRow, MatchRow, applyMatches, scoreRows, parseBankCsv, pickTextFile, paymentsFromMatches, planBestandImport, BestandPlan, planZaehlerImport, ZaehlerPlan, ZAEHLER_TEMPLATE, previewBestand } from '../csv';
 import { saveText } from '../backup';
 import { dateDE, eur, monthLabel, today } from '../calc';
 import { type } from '../theme';
+import { useUpdateAvailable } from '../pwa';
+
+/** Verhindert Importe mit einer veralteten App-Version (alte Versionen können Dateien falsch lesen). */
+function UpdateGuard() {
+  const { available, apply } = useUpdateAvailable();
+  if (!available) return null;
+  return (
+    <Section>
+      <ListRow icon="cloud-download-outline" iconTone="warn" title="Erst die App aktualisieren" subtitle="Eine neue Version liegt bereit. Importiere erst danach, damit alle Spalten richtig gelesen werden." right="Jetzt" onPress={apply} />
+    </Section>
+  );
+}
 
 /* ───────── Kontoauszug importieren ───────── */
 
 export function StatementImport({ navigation }: any) {
   const { db, replaceAll } = useStore();
+  const outdated = useUpdateAvailable().available;
   const c = useColors();
   const [text, setText] = useState('');
   const [parsed, setParsed] = useState<{ rows: BankRow[]; skipped: number; columns?: string } | null>(null);
@@ -97,6 +110,7 @@ export function StatementImport({ navigation }: any) {
 
   return (
     <Screen>
+      <UpdateGuard />
       <Text accessibilityRole="header" style={{ fontSize: 30, fontWeight: '800', color: c.text, letterSpacing: -0.6, marginTop: 6, marginBottom: 6 }}>{rows.length} Eingänge</Text>
       <Text style={{ color: c.muted, fontSize: type.subhead, marginBottom: 16 }}>
         {counts.sicher} sicher · {counts.pruefen} prüfen · {counts.offen} offen · {counts.doppelt} doppelt{parsed.skipped ? ` · ${parsed.skipped} Ausgänge übersprungen` : ''}{rows.length > 60 ? '. Zeilen mit Prüfbedarf stehen oben.' : ''}
@@ -135,7 +149,7 @@ export function StatementImport({ navigation }: any) {
       </Section>
       {ordered.length > limit && <Button kind="secondary" icon="chevron-down" title={`Weitere ${Math.min(60, ordered.length - limit)} anzeigen (${ordered.length - limit} übrig)`} onPress={() => setLimit(limit + 60)} />}
       {ordered.length > limit && <Gap h={8} />}
-      <Button icon="checkmark" title={chosen.length ? `${chosen.length} Zahlungen buchen (${eur(total)})` : 'Nichts ausgewählt'} onPress={book} disabled={chosen.length === 0} />
+      <Button icon="checkmark" title={outdated ? 'Erst die App aktualisieren' : chosen.length ? `${chosen.length} Zahlungen buchen (${eur(total)})` : 'Nichts ausgewählt'} onPress={book} disabled={chosen.length === 0 || outdated} />
       <Gap h={10} />
       <Button kind="plain" title="Andere Datei wählen" onPress={() => { setParsed(null); setText(''); }} />
     </Screen>
@@ -146,6 +160,7 @@ export function StatementImport({ navigation }: any) {
 
 export function BestandImport({ navigation }: any) {
   const { db, replaceAll } = useStore();
+  const outdated = useUpdateAvailable().available;
   const c = useColors();
   const [text, setText] = useState('');
   const [plan, setPlan] = useState<BestandPlan | null>(null);
@@ -168,6 +183,7 @@ export function BestandImport({ navigation }: any) {
       <Text accessibilityRole="header" style={{ fontSize: 30, fontWeight: '800', color: c.text, letterSpacing: -0.6, marginTop: 6, marginBottom: 6 }}>Bestand importieren</Text>
       <Text style={{ color: c.muted, fontSize: type.body, marginBottom: 20 }}>Trage Häuser, Einheiten und Mieter in einer Tabelle ein und lade sie hoch. So legst du alles auf einmal an.</Text>
 
+      <UpdateGuard />
       <Section title="1. Vorlage" footer="Öffne die Vorlage in Excel, Numbers oder Google Sheets, trage deine Einheiten ein und speichere sie als CSV. Pro Zeile eine Einheit; leere Mieter-Spalten bedeuten Leerstand. Nur Haus und Einheit sind Pflicht, alle anderen Spalten sind optional. Nenne Einheiten „Wohnung 1“, „Wohnung 2“ …, daraus entstehen die Wohnungs-IDs (z. B. H01-W01). Leere Zellen ändern bei einem erneuten Import nichts.">
         <ListRow icon="download-outline" title="Vorlage herunterladen" subtitle="CSV mit allen Spalten und Beispielzeilen" onPress={() => saveText('bestand-vorlage.csv', BESTAND_TEMPLATE).catch((e) => notify(String(e?.message ?? e)))} />
       </Section>
@@ -188,10 +204,26 @@ export function BestandImport({ navigation }: any) {
             <ListRow icon="people" title="Neue Mieter" right={String(s.tenants)} />
             <ListRow icon="refresh" title="Aktualisiert" right={String(s.updated)} />
           </Section>
+          {(() => {
+            const pv = previewBestand(db, plan.db);
+            if (!pv.length) return null;
+            const bad = pv.filter((x) => x.problem).length;
+            return (
+              <Section title={`Pro Einheit (${pv.length})`} footer={bad ? `${bad} Einheit${bad === 1 ? '' : 'en'} mit Auffälligkeit. Prüfe die Auszugsdaten, bevor du importierst.` : 'So sieht jede Einheit nach dem Import aus.'}>
+                {pv.slice(0, 40).map((x) => (
+                  <ListRow key={x.house + x.unit} icon={x.problem ? 'alert-circle' : x.change === 'neu' ? 'add-circle-outline' : 'refresh'} iconTone={x.problem ? 'warn' : undefined}
+                    title={`${x.unit}${pv.some((y) => y.house !== x.house) ? ` · ${x.house}` : ''}`}
+                    subtitle={x.problem ?? `${x.current.length ? `Aktuell: ${x.current[0]}${x.since ? ` seit ${dateDE(x.since)}` : ''}` : 'Leerstand'}${x.history ? ` · ${x.history} frühere${x.history === 1 ? 'r' : ''} in der Historie` : ''}`}
+                    badge={{ text: x.change === 'neu' ? 'Neu' : 'Geändert', tone: x.change === 'neu' ? 'ok' : 'neutral' }} />
+                ))}
+                {pv.length > 40 && <Note>… und {pv.length - 40} weitere Einheiten.</Note>}
+              </Section>
+            );
+          })()}
           {plan.warnings.length > 0 && (
             <Section title="Hinweise">{plan.warnings.map((w) => <Note key={w}>{w}</Note>)}</Section>
           )}
-          <Button icon="checkmark" title="Jetzt importieren" onPress={apply} />
+          <Button icon="checkmark" title={outdated ? 'Erst aktualisieren' : 'Jetzt importieren'} onPress={apply} disabled={outdated} />
           <Gap h={6} />
           <Note>Tipp: Erstelle vorher unter „Daten“ eine Sicherung.</Note>
         </>
@@ -205,6 +237,7 @@ export function BestandImport({ navigation }: any) {
 
 export function ZaehlerImport({ navigation }: any) {
   const { db, replaceAll } = useStore();
+  const outdated = useUpdateAvailable().available;
   const c = useColors();
   const [text, setText] = useState('');
   const [plan, setPlan] = useState<ZaehlerPlan | null>(null);
@@ -225,6 +258,7 @@ export function ZaehlerImport({ navigation }: any) {
     <Screen>
       <Text accessibilityRole="header" style={{ fontSize: 30, fontWeight: '800', color: c.text, letterSpacing: -0.6, marginTop: 6, marginBottom: 6 }}>Zähler importieren</Text>
       <Text style={{ color: c.muted, fontSize: type.body, marginBottom: 20 }}>Lege Zähler samt Ablesungen auf einmal an. Pro Zeile ein Stand. Haus und Einheit müssen schon in der App existieren.</Text>
+      <UpdateGuard />
       <Section title="1. Vorlage" footer="Spalten: Haus, Einheit (leer = Haus allgemein), Zähler (Heizung, Kaltwasser, Warmwasser, Strom, Gas), Zählernummer, Datum, Stand. Vorhandene Zähler werden erkannt, nichts wird doppelt angelegt.">
         <ListRow icon="download-outline" title="Vorlage herunterladen" subtitle="CSV mit Beispielzeilen" onPress={() => saveText('zaehler-vorlage.csv', ZAEHLER_TEMPLATE).catch((e) => notify(String(e?.message ?? e)))} />
       </Section>
@@ -243,7 +277,7 @@ export function ZaehlerImport({ navigation }: any) {
             <ListRow icon="refresh" title="Geänderte Stände" right={String(s.updated)} />
           </Section>
           {plan.warnings.length > 0 && <Section title="Hinweise">{plan.warnings.map((w) => <Note key={w}>{w}</Note>)}</Section>}
-          <Button icon="checkmark" title="Jetzt importieren" onPress={apply} />
+          <Button icon="checkmark" title={outdated ? 'Erst aktualisieren' : 'Jetzt importieren'} onPress={apply} disabled={outdated} />
           <Gap h={6} />
           <Note>Tipp: Erstelle vorher unter „Daten“ eine Sicherung.</Note>
         </>

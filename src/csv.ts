@@ -428,3 +428,28 @@ export function planZaehlerImport(db: DB, text: string): ZaehlerPlan {
   });
   return { db: next, summary: sum, warnings: warnings.slice(0, 10) };
 }
+
+/* ───────── Vorschau des Bestand-Imports pro Einheit ───────── */
+
+export interface UnitPreview {
+  house: string; unit: string; change: 'neu' | 'geaendert';
+  current: string[]; since: string; history: number; problem?: string;
+}
+
+/** Was der Import je Einheit bewirkt: wer ist danach aktueller Mieter, wie viele frühere gibt es. Nur neue und veränderte Einheiten. */
+export function previewBestand(before: DB, after: DB): UnitPreview[] {
+  const out: UnitPreview[] = [];
+  for (const u of after.units) {
+    const old = before.units.find((x) => x.id === u.id);
+    const tNow = after.tenants.filter((t) => t.unitId === u.id);
+    const tOld = before.tenants.filter((t) => t.unitId === u.id);
+    if (old && JSON.stringify(old) === JSON.stringify(u) && JSON.stringify(tOld) === JSON.stringify(tNow)) continue;
+    const active = tNow.filter((t) => !t.moveOut || t.moveOut >= today());
+    out.push({
+      house: after.properties.find((p) => p.id === u.propertyId)?.name ?? '', unit: u.name, change: old ? 'geaendert' : 'neu',
+      current: active.map((t) => t.name), since: active[0]?.moveIn ?? '', history: tNow.length - active.length,
+      problem: active.length > 1 ? `${active.length} aktive Mieter: Bei früheren Mietern fehlt der Auszug.` : undefined,
+    });
+  }
+  return out.sort((a, b) => a.house.localeCompare(b.house, 'de') || a.unit.localeCompare(b.unit, 'de', { numeric: true }));
+}

@@ -7,6 +7,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StoreProvider, useStore } from '../store';
 import { SettingsProvider } from '../settings';
 import { SyncProvider } from '../syncProvider';
+import { UndoProvider } from '../undo';
 import { ThemeProvider, useColors, useIsDark } from '../theme';
 import { filesSupported, requestPersistence } from '../files';
 import { LockOverlay, LockProvider, useLock } from '../lock';
@@ -81,6 +82,7 @@ function Shell() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="suche" options={{ title: 'Suche' }} />
         <Stack.Screen name="daten" options={{ title: 'Daten' }} />
+        <Stack.Screen name="aufgaben" options={{ title: 'Aufgaben' }} />
         <Stack.Screen name="cloud" options={{ title: 'Cloud' }} />
         <Stack.Screen name="sperre" options={{ title: 'App-Sperre' }} />
         <Stack.Screen name="briefe" options={{ title: 'Briefe und Regeln' }} />
@@ -123,7 +125,9 @@ export default function RootLayout() {
               <SettingsProvider>
                 <StoreProvider>
                   <SyncProvider>
-                    <Shell />
+                    <UndoProvider>
+                      <Shell />
+                    </UndoProvider>
                   </SyncProvider>
                 </StoreProvider>
               </SettingsProvider>

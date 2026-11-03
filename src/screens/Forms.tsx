@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 
 import { useStore, uid } from '../store';
+import { useDelete } from '../undo';
 import { Button, ChipField, DateField, Disclosure, Field, Gap, Note, OptionRow, Row, Screen, Section, Segmented, confirm, infoRows } from '../ui';
 import { sourceLong, sourceOf, stamp } from '../payments';
 import { defaultUnitName, houseId, nextHouseNo, nextUnitNo, unitLetter, unitPrefix, unitRef } from '../ids';
@@ -19,14 +20,14 @@ const isDate = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(Date.parse
 const isMonth = (s: string) => /^\d{4}-(0[1-9]|1[0-2])$/.test(s);
 
 function Footer({ kind, id, nav, onSave, label = 'Speichern', deleteText }: { kind: Kind; id?: string; nav: any; onSave: () => boolean; label?: string; deleteText?: string }) {
-  const { remove } = useStore();
+  const del = useDelete();
   return (
     <>
       <Button title={label} icon="checkmark" onPress={() => onSave() && nav.goBack()} />
       {id ? (
         <>
           <Gap h={22} />
-          <Button kind="destructive" icon="trash-outline" title="Löschen" onPress={() => confirm('Wirklich löschen?', () => { remove(kind, id); nav.goBack(); }, 'Löschen', deleteText ?? 'Das kann nicht rückgängig gemacht werden.')} />
+          <Button kind="destructive" icon="trash-outline" title="Löschen" onPress={() => { del(kind, id); nav.goBack(); }} />
         </>
       ) : null}
     </>
