@@ -1,4 +1,4 @@
-import { DB, Payment, Tenant, UnitKind } from './types';
+import { DB, MeterType, Payment, Tenant, UnitKind } from './types';
 import { addDays, oldestOpenMonth, today, unitDue } from './calc';
 import { uid } from './uid';
 import { unitLetter } from './ids';
@@ -366,5 +366,65 @@ export function planBestandImport(db: DB, text: string): BestandPlan {
   next.properties = stampChanged(next.properties, db.properties);
   next.units = stampChanged(next.units, db.units);
   next.tenants = stampChanged(next.tenants, db.tenants);
+  return { db: next, summary: sum, warnings: warnings.slice(0, 10) };
+}
+
+/* ───────── Zähler und Zählerstände importieren ───────── */
+
+export const ZAEHLER_TEMPLATE =
+  'Haus;Einheit;Zähler;Zählernummer;Datum;Stand\n' +
+  'Haus Lindenstraße;Wohnung 1;Heizung;12345678;31.12.2024;1250\n' +
+  'Haus Lindenstraße;Wohnung 1;Heizung;12345678;31.12.2025;1810\n' +
+  'Haus Lindenstraße;Wohnung 1;Kaltwasser;W-1001;31.12.2025;142,350\n' +
+  'Haus Lindenstraße;;Strom;S-77;31.12.2025;5120\n';
+
+export interface ZaehlerPlan { db: DB; summary: { meters: number; readings: number; updated: number }; warnings: string[]; error?: string }
+
+const METER_TYPE_BY_NAME: Record<string, MeterType> = {
+  heizung: 'heizung', waerme: 'heizung', kaltwasser: 'wasser_kalt', wasserkalt: 'wasser_kalt', wasser: 'wasser_kalt', warmwasser: 'wasser_warm', wasserwarm: 'wasser_warm', strom: 'strom', allgemeinstrom: 'strom', gas: 'gas',
+};
+
+/** Zähler (je Einheit oder „Haus allgemein“) und ihre Stände aus einer CSV anlegen. Vorhandene Zähler werden erkannt (Haus, Einheit, Art, Nummer). */
+export function planZaehlerImport(db: DB, text: string): ZaehlerPlan {
+  const all = parseCsv(text);
+  const none = (error: string): ZaehlerPlan => ({ db, summary: { meters: 0, readings: 0, updated: 0 }, warnings: [], error });
+  if (all.length < 2) return none('Die Datei enthält keine Datenzeilen.');
+  const h = all[0];
+  const col = (...names: string[]) => findCol(h, (k) => names.some((n) => k === normKey(n)));
+  const c = { haus: col('Haus', 'Objekt'), einheit: col('Einheit', 'Wohnung'), art: col('Zähler', 'Zaehler', 'Art', 'Zählerart'), nr: col('Zählernummer', 'Zaehlernummer', 'Nummer', 'Zähler-Nr'), datum: col('Datum', 'Stichtag', 'Ablesedatum'), stand: col('Stand', 'Zählerstand', 'Wert') };
+  if (c.haus < 0 || c.art < 0 || c.nr < 0) return none('Die Spalten „Haus“, „Zähler“ und „Zählernummer“ werden benötigt. Lade die Vorlage herunter.');
+  const warnings: string[] = [];
+  const get = (r: string[], i: number) => (i >= 0 ? (r[i] ?? '').trim() : '');
+  const next: DB = { ...db, meters: [...db.meters], readings: [...db.readings] };
+  const sum = { meters: 0, readings: 0, updated: 0 };
+  const touched = new Set<string>();
+  const nowIso = new Date().toISOString();
+  all.slice(1).forEach((r, i) => {
+    const line = i + 2;
+    const hausName = get(r, c.haus), einheitName = get(r, c.einheit), nr = get(r, c.nr);
+    if (!hausName || !nr) { warnings.push(`Zeile ${line}: Haus oder Zählernummer fehlt – übersprungen.`); return; }
+    const prop = db.properties.find((p) => norm(p.name) === norm(hausName));
+    if (!prop) { warnings.push(`Zeile ${line}: Haus „${hausName}“ gibt es nicht – übersprungen.`); return; }
+    let unitId = '';
+    if (einheitName) {
+      const u = db.units.find((x) => x.propertyId === prop.id && norm(x.name) === norm(einheitName));
+      if (!u) { warnings.push(`Zeile ${line}: Einheit „${einheitName}“ gibt es in „${prop.name}“ nicht – übersprungen.`); return; }
+      unitId = u.id;
+    }
+    const type = METER_TYPE_BY_NAME[normKey(get(r, c.art))];
+    if (!type) { warnings.push(`Zeile ${line}: Zählerart „${get(r, c.art)}“ unbekannt (Heizung, Kaltwasser, Warmwasser, Strom, Gas) – übersprungen.`); return; }
+    let meter = next.meters.find((m) => m.propertyId === prop.id && m.unitId === unitId && m.type === type && m.number === nr);
+    if (!meter) { meter = { id: uid(), updatedAt: nowIso, propertyId: prop.id, unitId, type, number: nr }; next.meters.push(meter); sum.meters++; }
+    const dateRaw = get(r, c.datum), valRaw = get(r, c.stand);
+    if (!dateRaw && !valRaw) return; // Zähler ohne Stand
+    const date = parseDate(dateRaw), value = parseAmount(valRaw);
+    if (!date || value === null) { warnings.push(`Zeile ${line}: Datum oder Stand nicht lesbar – Stand übersprungen.`); return; }
+    const k = `${meter.id}|${date}`;
+    if (touched.has(k)) { warnings.push(`Zeile ${line}: Für ${dateRaw} gibt es schon einen Stand dieses Zählers in der Datei – übersprungen.`); return; }
+    touched.add(k);
+    const ex = next.readings.find((x) => x.meterId === meter!.id && x.date === date);
+    if (!ex) { next.readings.push({ id: uid(), updatedAt: nowIso, meterId: meter.id, date, value }); sum.readings++; }
+    else if (ex.value !== value) { next.readings = next.readings.map((x) => (x === ex ? { ...x, value, updatedAt: nowIso } : x)); sum.updated++; }
+  });
   return { db: next, summary: sum, warnings: warnings.slice(0, 10) };
 }

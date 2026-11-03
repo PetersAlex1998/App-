@@ -3,7 +3,7 @@ import { Platform, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore, uid } from '../store';
 import { Badge, Button, EmptyState, Field, Gap, ListRow, Note, Screen, SearchBar, Section, notify, useColors } from '../ui';
-import { BESTAND_TEMPLATE, BankRow, MatchRow, applyMatches, scoreRows, parseBankCsv, pickTextFile, paymentsFromMatches, planBestandImport, BestandPlan } from '../csv';
+import { BESTAND_TEMPLATE, BankRow, MatchRow, applyMatches, scoreRows, parseBankCsv, pickTextFile, paymentsFromMatches, planBestandImport, BestandPlan, planZaehlerImport, ZaehlerPlan, ZAEHLER_TEMPLATE } from '../csv';
 import { saveText } from '../backup';
 import { dateDE, eur, monthLabel, today } from '../calc';
 import { type } from '../theme';
@@ -191,6 +191,58 @@ export function BestandImport({ navigation }: any) {
           {plan.warnings.length > 0 && (
             <Section title="Hinweise">{plan.warnings.map((w) => <Note key={w}>{w}</Note>)}</Section>
           )}
+          <Button icon="checkmark" title="Jetzt importieren" onPress={apply} />
+          <Gap h={6} />
+          <Note>Tipp: Erstelle vorher unter „Daten“ eine Sicherung.</Note>
+        </>
+      )}
+    </Screen>
+  );
+}
+
+
+/* ───────── Zähler und Stände importieren ───────── */
+
+export function ZaehlerImport({ navigation }: any) {
+  const { db, replaceAll } = useStore();
+  const c = useColors();
+  const [text, setText] = useState('');
+  const [plan, setPlan] = useState<ZaehlerPlan | null>(null);
+  const [error, setError] = useState('');
+  const load = (content: string) => {
+    const p = planZaehlerImport(db, content);
+    if (p.error) { setError(p.error); setPlan(null); return; }
+    setError(''); setPlan(p);
+  };
+  const apply = () => {
+    if (!plan) return;
+    replaceAll(plan.db);
+    notify('Zähler und Stände wurden importiert.');
+    navigation.goBack();
+  };
+  const s = plan?.summary;
+  return (
+    <Screen>
+      <Text accessibilityRole="header" style={{ fontSize: 30, fontWeight: '800', color: c.text, letterSpacing: -0.6, marginTop: 6, marginBottom: 6 }}>Zähler importieren</Text>
+      <Text style={{ color: c.muted, fontSize: type.body, marginBottom: 20 }}>Lege Zähler samt Ablesungen auf einmal an. Pro Zeile ein Stand. Haus und Einheit müssen schon in der App existieren.</Text>
+      <Section title="1. Vorlage" footer="Spalten: Haus, Einheit (leer = Haus allgemein), Zähler (Heizung, Kaltwasser, Warmwasser, Strom, Gas), Zählernummer, Datum, Stand. Vorhandene Zähler werden erkannt, nichts wird doppelt angelegt.">
+        <ListRow icon="download-outline" title="Vorlage herunterladen" subtitle="CSV mit Beispielzeilen" onPress={() => saveText('zaehler-vorlage.csv', ZAEHLER_TEMPLATE).catch((e) => notify(String(e?.message ?? e)))} />
+      </Section>
+      <Section title="2. Datei hochladen">
+        {Platform.OS === 'web' ? <ListRow icon="document-attach-outline" title="CSV-Datei auswählen" onPress={() => pickTextFile().then((t) => t && load(t.text)).catch((e) => setError(String(e?.message ?? e)))} /> : null}
+        <Field label="Oder Inhalt einfügen" value={text} onChangeText={setText} multiline placeholder="Inhalt der CSV-Datei" />
+      </Section>
+      {text.trim() && !plan ? <Button kind="secondary" title="Einlesen" onPress={() => load(text)} /> : null}
+      {error ? <View style={{ marginTop: 10 }}><Badge text={error} tone="danger" /></View> : null}
+      {plan && s && (
+        <>
+          <Gap h={12} />
+          <Section title="3. Vorschau">
+            <ListRow icon="speedometer-outline" title="Neue Zähler" right={String(s.meters)} />
+            <ListRow icon="analytics-outline" title="Neue Stände" right={String(s.readings)} />
+            <ListRow icon="refresh" title="Geänderte Stände" right={String(s.updated)} />
+          </Section>
+          {plan.warnings.length > 0 && <Section title="Hinweise">{plan.warnings.map((w) => <Note key={w}>{w}</Note>)}</Section>}
           <Button icon="checkmark" title="Jetzt importieren" onPress={apply} />
           <Gap h={6} />
           <Note>Tipp: Erstelle vorher unter „Daten“ eine Sicherung.</Note>

@@ -19,7 +19,7 @@ const ROUTES: Record<string, string> = {
   // Abläufe und Einstellungen
   Mahnlauf: '/mahnlauf', Sperre: '/sperre', NkLauf: '/nk-lauf', Outbox: '/briefausgang', Briefe: '/briefe', Daten: '/daten', Search: '/suche',
   Cloud: '/cloud', Ausgaben: '/ausgaben', ExpenseForm: '/ausgabe/formular', AnlageV: '/anlage-v',
-  StatementImport: '/kontoauszug', BestandImport: '/bestand-import',
+  StatementImport: '/kontoauszug', ZaehlerImport: '/zaehler-import', BestandImport: '/bestand-import',
 };
 const TABS = new Set(['Tabs', 'Übersicht', 'Objekte', 'Mieter', 'Zahlungen']);
 

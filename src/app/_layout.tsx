@@ -88,6 +88,7 @@ function Shell() {
         <Stack.Screen name="mahnlauf" options={{ title: 'Mahnlauf' }} />
         <Stack.Screen name="nk-lauf" options={{ title: 'Nebenkosten-Lauf' }} />
         <Stack.Screen name="kontoauszug" options={{ title: 'Kontoauszug' }} />
+        <Stack.Screen name="zaehler-import" options={{ title: 'Zähler importieren' }} />
         <Stack.Screen name="bestand-import" options={{ title: 'Bestand importieren' }} />
         <Stack.Screen name="objekt/[id]" options={{ title: 'Objekt' }} />
         <Stack.Screen name="objekt/formular" options={edit('Neues Objekt', 'Objekt bearbeiten')} />

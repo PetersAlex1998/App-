@@ -116,6 +116,7 @@ export function DataScreen({ navigation }: any) {
 
       <Section title="Importieren">
         <ListRow icon="albums-outline" title="Bestand aus CSV importieren" subtitle="Häuser, Einheiten und Mieter auf einmal anlegen" onPress={() => navigation.navigate('BestandImport')} />
+        <ListRow icon="speedometer-outline" title="Zähler und Stände importieren" subtitle="Heizung, Wasser und Strom aus einer Tabelle" onPress={() => navigation.navigate('ZaehlerImport')} />
         <ListRow icon="swap-vertical-outline" title="Kontoauszug importieren" subtitle="Zahlungseingänge automatisch zuordnen" onPress={() => navigation.navigate('StatementImport')} />
       </Section>
 

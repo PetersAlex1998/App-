@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { BESTAND_TEMPLATE, applyMatches, matchRows, parseAmount, parseBankCsv, parseCsv, parseDate, paymentsFromMatches, planBestandImport, scoreRows } from '../../src/csv';
+import { BESTAND_TEMPLATE, applyMatches, matchRows, parseAmount, parseBankCsv, parseCsv, parseDate, paymentsFromMatches, planBestandImport, planZaehlerImport, scoreRows } from '../../src/csv';
 import { emptyDB } from '../../src/types';
 import { dueMonths } from '../../src/calc';
 import { normalizeIds } from '../../src/ids';
@@ -304,5 +304,37 @@ describe('Bestand-Import: Änderungszeit für den Cloud-Abgleich', () => {
     expect(u1.updatedAt).toBe('2020-01-01T00:00:00.000Z'); // unverändert
     expect(u2.updatedAt).not.toBe('2020-01-01T00:00:00.000Z'); // Miete geändert
     expect(second.tenants.every((t) => t.updatedAt === '2020-01-01T00:00:00.000Z')).toBe(true);
+  });
+});
+
+describe('Zähler-Import', () => {
+  const base = () => planBestandImport(emptyDB, 'Haus;Einheit;Typ;Mieter\nHaus Test;Wohnung 1;Wohnung;\nHaus Test;Wohnung 2;Wohnung;').db;
+  const head = 'Haus;Einheit;Zähler;Zählernummer;Datum;Stand';
+  it('legt Zähler und Stände an, ein Zähler über mehrere Zeilen', () => {
+    const r = planZaehlerImport(base(), `${head}\nHaus Test;Wohnung 1;Heizung;123;19.10.2013;0\nHaus Test;Wohnung 1;Heizung;123;11.01.2014;1.882\nHaus Test;Wohnung 2;Heizung;456;11.01.2014;813\nHaus Test;;Strom;S1;31.12.2025;5120,5`);
+    expect(r.error).toBeUndefined();
+    expect(r.summary).toEqual({ meters: 3, readings: 4, updated: 0 });
+    const m = r.db.meters.find((x) => x.number === '123')!;
+    expect(m).toMatchObject({ type: 'heizung' });
+    expect(r.db.readings.filter((x) => x.meterId === m.id).map((x) => [x.date, x.value])).toEqual([['2013-10-19', 0], ['2014-01-11', 1882]]);
+    expect(r.db.meters.find((x) => x.number === 'S1')!.unitId).toBe('');
+  });
+  it('erneuter Import legt nichts doppelt an; geänderter Stand wird aktualisiert', () => {
+    const csv = `${head}\nHaus Test;Wohnung 1;Heizung;123;11.01.2014;1882`;
+    const first = planZaehlerImport(base(), csv).db;
+    const again = planZaehlerImport(first, csv);
+    expect(again.summary).toEqual({ meters: 0, readings: 0, updated: 0 });
+    const changed = planZaehlerImport(first, csv.replace('1882', '1900'));
+    expect(changed.summary).toEqual({ meters: 0, readings: 0, updated: 1 });
+    expect(changed.db.readings[0].value).toBe(1900);
+  });
+  it('unbekannte Einheit, Haus oder Art werden gemeldet und übersprungen', () => {
+    const r = planZaehlerImport(base(), `${head}\nHaus Test;Wohnung 9;Heizung;1;01.01.2020;1\nHaus X;Wohnung 1;Heizung;1;01.01.2020;1\nHaus Test;Wohnung 1;Dampf;1;01.01.2020;1\nHaus Test;Wohnung 1;Gas;2;??;1`);
+    expect(r.summary.readings).toBe(0);
+    expect(r.warnings).toHaveLength(4);
+    expect(r.db.meters.filter((m) => m.number === '1')).toHaveLength(0);
+  });
+  it('Fehler ohne Pflichtspalten', () => {
+    expect(planZaehlerImport(base(), 'A;B\n1;2').error).toMatch(/Spalten/);
   });
 });
