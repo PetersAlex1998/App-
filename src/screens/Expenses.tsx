@@ -2,6 +2,8 @@ import React, { useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
 import { useStore, uid } from '../store';
 import { useDelete } from '../undo';
+import { useCloud } from '../syncProvider';
+import { fillFromReceipt, readReceipt } from '../receipt';
 import { Badge, Button, ChipField, DateField, EmptyState, Field, FilterChips, Gap, ListRow, Note, Row, Screen, Section, Stat, StatGrid, confirm, notify, useColors } from '../ui';
 import { dateDE, eur, num, today } from '../calc';
 import { houseId } from '../ids';
@@ -54,7 +56,9 @@ export function ExpensesScreen({ route, navigation }: any) {
         <Stat label="Ohne Beleg" value={String(missing)} tone={missing ? 'danger' : 'ok'} icon="alert-circle-outline" />
       </StatGrid>
       <Gap h={16} />
-      <Button icon="add" title="Ausgabe erfassen" onPress={() => navigation.navigate('ExpenseForm', { propertyId: propertyId || db.properties[0]?.id })} disabled={db.properties.length === 0} />
+      <Button icon="camera-outline" title="Beleg fotografieren" onPress={() => navigation.navigate('ExpenseForm', { propertyId: propertyId || db.properties[0]?.id })} disabled={db.properties.length === 0} />
+      <Gap h={8} />
+      <Button kind="secondary" icon="add" title="Ausgabe erfassen" onPress={() => navigation.navigate('ExpenseForm', { propertyId: propertyId || db.properties[0]?.id })} disabled={db.properties.length === 0} />
       <Gap h={8} />
       <Button kind="secondary" icon="document-text-outline" title="Auswertung für die Steuer (Anlage V)" onPress={() => navigation.navigate('AnlageV', { propertyId: propertyId || undefined, year })} />
       <Gap h={22} />
@@ -81,15 +85,33 @@ export function ExpenseForm({ route, navigation }: any) {
   const [vendor, setVendor] = useState(old?.vendor ?? '');
   const [description, setDescription] = useState(old?.description ?? '');
   const [allocatable, setAllocatable] = useState(old?.allocatable ?? false);
+  const cloud = useCloud();
   const [picked, setPicked] = useState<File | null>(null);
+  const [reading, setReading] = useState(false);
+  const [aiNote, setAiNote] = useState('');
+  const [dateTouched, setDateTouched] = useState(!!old);
+  const [categoryTouched, setCategoryTouched] = useState(!!old);
   const [dropReceipt, setDropReceipt] = useState(false);
   const [err, setErr] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const receipt = !dropReceipt && !picked ? db.documents.find((d) => d.id === old?.receiptId) : undefined;
 
+  const scan = async (file: File) => {
+    setAiNote('');
+    if (!cloud.email) return setAiNote('Tipp: Melde dich unter Daten → Cloud an, dann liest die App Belege automatisch aus.');
+    setReading(true);
+    try {
+      const d = await readReceipt(await shrinkImage(file));
+      if (!d) { setAiNote('Der Beleg war nicht lesbar. Bitte trage die Angaben selbst ein.'); return; }
+      const { fields, filled } = fillFromReceipt({ amount, date, vendor, description, category, categoryTouched, dateTouched }, d);
+      setAmount(fields.amount); setDate(fields.date); setVendor(fields.vendor); setDescription(fields.description); setCategory(fields.category);
+      setAiNote(filled.length ? `Automatisch ausgefüllt: ${filled.join(', ')}. Bitte kurz prüfen.` : 'Es gab nichts Neues auszufüllen.');
+    } catch (e: any) { setAiNote(String(e?.message ?? e)); }
+    finally { setReading(false); }
+  };
   const choose = async (camera: boolean) => {
     const f = await pickFiles({ camera, multiple: false });
-    if (f[0]) { setPicked(f[0]); setDropReceipt(false); }
+    if (f[0]) { setPicked(f[0]); setDropReceipt(false); if (!old) scan(f[0]); }
   };
   const submit = async () => {
     const e: Record<string, string> = {};
@@ -119,25 +141,27 @@ export function ExpenseForm({ route, navigation }: any) {
   const labels = db.properties.map(propLabel);
   return (
     <Screen>
+      {filesSupported() && (
+        <Section title="Beleg" footer={picked ? `Ausgewählt: ${picked.name} (${fmtSize(picked.size)})` : receipt ? undefined : 'Foto mit der Kamera oder PDF. Fotos werden automatisch verkleinert.'}>
+          {receipt && <ListRow icon="receipt" title={receipt.name} subtitle={fmtSize(receipt.size)} onPress={() => navigation.navigate('DocumentViewer', { id: receipt.id })} />}
+          <ListRow icon="camera" title={receipt || picked ? 'Anderes Foto aufnehmen' : 'Beleg fotografieren'} subtitle={!old && cloud.email ? 'Die App füllt Betrag, Datum und Lieferant automatisch aus' : undefined} onPress={() => choose(true)} />
+          <ListRow icon="folder-open" title="Foto oder PDF auswählen" onPress={() => choose(false)} />
+          {picked && cloud.email && !reading ? <ListRow icon="sparkles-outline" title="Beleg erneut auslesen" onPress={() => scan(picked)} /> : null}
+          {(receipt || picked) && <ListRow icon="close-circle-outline" title="Beleg entfernen" onPress={() => { setPicked(null); setDropReceipt(true); }} />}
+        </Section>
+      )}
+      {reading ? <View style={{ marginBottom: 12 }}><Badge text="Beleg wird gelesen …" tone="neutral" /></View> : aiNote ? <View style={{ marginBottom: 12 }}><Badge text={aiNote} tone={aiNote.startsWith('Automatisch') ? 'ok' : 'warn'} /></View> : null}
       <Section title="Ausgabe">
         {db.properties.length > 1 && <ChipField label="Objekt" value={propLabel(db.properties.find((p) => p.id === propertyId) ?? { name: '' })} options={labels} onChange={(v) => { const p = db.properties[labels.indexOf(v)]; if (p) setPropertyId(p.id); }} />}
-        <DateField label="Datum der Zahlung" value={date} onChange={setDate} error={err.date} />
+        <DateField label="Datum der Zahlung" value={date} onChange={(v) => { setDate(v); setDateTouched(true); }} error={err.date} />
         <Field label="Betrag (brutto)" value={amount} onChangeText={setAmount} keyboard="numeric" suffix="€" error={err.amount} />
         <Field label="Lieferant / Handwerker" value={vendor} onChangeText={setVendor} placeholder="z. B. Sanitär Meier" />
         <Field label="Beschreibung" value={description} onChangeText={setDescription} placeholder="z. B. Rohrbruch Keller" />
       </Section>
       <Section title="Kategorie" footer={ANLAGE_V_HINT[category]}>
-        <ChipField label="Kategorie" value={EXPENSE_LABEL[category]} options={EXPENSE_CATEGORIES.map((k) => EXPENSE_LABEL[k])} onChange={(v) => v && setCategory(EXPENSE_CATEGORIES.find((k) => EXPENSE_LABEL[k] === v)!)} />
+        <ChipField label="Kategorie" value={EXPENSE_LABEL[category]} options={EXPENSE_CATEGORIES.map((k) => EXPENSE_LABEL[k])} onChange={(v) => { if (v) { setCategory(EXPENSE_CATEGORIES.find((k) => EXPENSE_LABEL[k] === v)!); setCategoryTouched(true); } }} />
         <ListRow icon={allocatable ? 'checkbox' : 'square-outline'} title="Auf Mieter umlagefähig" subtitle="Nur als Hinweis für die Nebenkostenabrechnung" onPress={() => setAllocatable(!allocatable)} />
       </Section>
-      {filesSupported() && (
-        <Section title="Beleg" footer={picked ? `Ausgewählt: ${picked.name} (${fmtSize(picked.size)})` : receipt ? undefined : 'Foto mit der Kamera oder PDF. Fotos werden automatisch verkleinert.'}>
-          {receipt && <ListRow icon="receipt" title={receipt.name} subtitle={fmtSize(receipt.size)} onPress={() => navigation.navigate('DocumentViewer', { id: receipt.id })} />}
-          <ListRow icon="camera" title={receipt || picked ? 'Anderes Foto aufnehmen' : 'Beleg fotografieren'} onPress={() => choose(true)} />
-          <ListRow icon="folder-open" title="Foto oder PDF auswählen" onPress={() => choose(false)} />
-          {(receipt || picked) && <ListRow icon="close-circle-outline" title="Beleg entfernen" onPress={() => { setPicked(null); setDropReceipt(true); }} />}
-        </Section>
-      )}
       {err.property ? <View style={{ marginBottom: 12 }}><Badge text={err.property} tone="danger" /></View> : null}
       <Button icon="checkmark" title={busy ? 'Wird gespeichert …' : 'Speichern'} onPress={submit} disabled={busy} />
       {old && (<><Gap h={22} /><Button kind="destructive" icon="trash-outline" title="Löschen" onPress={() => { del('expenses', old.id); navigation.goBack(); }} /></>)}

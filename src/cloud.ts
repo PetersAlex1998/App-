@@ -139,3 +139,12 @@ export async function loadSyncState(userId: string): Promise<SyncState> {
   return freshState(userId);
 }
 export const saveSyncState = (s: SyncState) => AsyncStorage.setItem(STATE_KEY, JSON.stringify(s));
+
+/** Ruft eine Supabase-Funktion auf (mit der Anmeldung des Nutzers). */
+export async function callFunction<T>(name: string, body: unknown): Promise<T> {
+  if (!(await loadSession())) throw new Error('Dafür musst du in der Cloud angemeldet sein (Daten → Cloud).');
+  const res = await api(`/functions/v1/${name}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  const json: any = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json?.error || json?.message || `Fehler ${res.status}`);
+  return json as T;
+}
