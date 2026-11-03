@@ -8,7 +8,9 @@ import { demoData } from '../demo';
 import { EncryptedBackupError, exportBackup, isEncryptedBackup, parseBackupAny, pickBackupFile, restoreFiles } from '../backup';
 import { cryptoAvailable } from '../crypto';
 import { dateDE } from '../calc';
+import { stamp } from '../payments';
 import { useOfflineReady, useOnline } from '../pwa';
+import { useCloud } from '../syncProvider';
 import { filesSupported, fmtSize, requestPersistence, storageInfo } from '../files';
 
 export function DataScreen({ navigation }: any) {
@@ -26,6 +28,7 @@ export function DataScreen({ navigation }: any) {
   const docBytes = db.documents.reduce((a, d) => a + d.size, 0);
   const offline = useOfflineReady();
   const online = useOnline();
+  const cloud = useCloud();
 
   const lastBackup = cfg.lastBackupAt ? Date.parse(cfg.lastBackupAt) : 0;
   const daysAgo = lastBackup ? Math.floor((Date.now() - lastBackup) / 86400000) : null;
@@ -85,6 +88,12 @@ export function DataScreen({ navigation }: any) {
           {store ? <ListRow icon={store.persisted ? 'shield-checkmark' : 'shield-outline'} iconTone={store.persisted ? 'ok' : 'warn'} title={store.persisted ? 'Dauerhaft gesichert' : 'Dauerhaften Speicher anfordern'} subtitle={store.persisted ? 'Der Browser löscht die Daten nicht von selbst.' : 'Schützt vor automatischem Löschen'} onPress={store.persisted ? undefined : () => requestPersistence().then((ok) => { refreshStore(); if (!ok) notify('Der Browser hat den Antrag abgelehnt. Lege die App auf den Home-Bildschirm und versuche es erneut.'); })} /> : null}
         </Section>
       )}
+
+      <Section title="Cloud" footer="Deine Daten werden verschlüsselt übertragen und in der EU (Frankfurt) gespeichert. Die lokale Kopie auf dem Gerät bleibt immer erhalten.">
+        <ListRow icon={cloud.email ? (cloud.status === 'fehler' ? 'cloud-offline' : 'cloud-done') : 'cloud-upload-outline'} iconTone={cloud.status === 'fehler' ? 'warn' : cloud.email ? 'ok' : undefined}
+          title={cloud.email ? 'Mit Cloud verbunden' : 'Cloud-Abgleich einrichten'}
+          subtitle={cloud.email ? (cloud.status === 'fehler' ? 'Abgleich fehlgeschlagen' : cloud.lastSyncAt ? `Zuletzt ${stamp(cloud.lastSyncAt)}` : cloud.email) : 'Auf mehreren Geräten und mit Sicherung in der Cloud'} onPress={() => navigation.navigate('Cloud')} />
+      </Section>
 
       <Section title="Sicherheit">
         <ListRow icon="lock-closed-outline" title="App-Sperre" subtitle="Code beim Öffnen der App verlangen" onPress={() => navigation.navigate('Sperre')} />

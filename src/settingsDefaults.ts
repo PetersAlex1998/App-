@@ -1,5 +1,6 @@
 /** Einstellungen (Absender, Mahnregeln, Sicherung) und ihre Standardwerte. */
 export interface Settings {
+  updatedAt?: string; // letzte Änderung (für den Cloud-Abgleich)
   name: string; street: string; zip: string; city: string; phone: string; email: string;
   bank: string; iban: string; bic: string;
   fee2: number; fee3: number; deadlineDays: number; rentDueDay: number; graceDays: number;

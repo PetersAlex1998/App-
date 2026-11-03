@@ -25,7 +25,19 @@ async function tx<T>(mode: IDBTransactionMode, fn: (s: IDBObjectStore) => IDBReq
   });
 }
 export const putBlob = (id: string, blob: Blob) => tx('readwrite', (s) => s.put(blob, id)).then(() => undefined);
-export const getBlob = (id: string) => tx<Blob | undefined>('readonly', (s) => s.get(id));
+const getLocalBlob = (id: string) => tx<Blob | undefined>('readonly', (s) => s.get(id));
+let remoteFallback: ((id: string) => Promise<Blob | null>) | null = null;
+/** Cloud-Abruf für Dateien, die auf diesem Gerät fehlen (wird vom Abgleich gesetzt). */
+export const setBlobFallback = (fn: ((id: string) => Promise<Blob | null>) | null) => { remoteFallback = fn; };
+export const hasBlob = async (id: string) => (await getLocalBlob(id)) !== undefined;
+export const getBlob = async (id: string): Promise<Blob | undefined> => {
+  const local = await getLocalBlob(id);
+  if (local || !remoteFallback) return local;
+  const remote = await remoteFallback(id).catch(() => null);
+  if (!remote) return undefined;
+  await putBlob(id, remote).catch(() => {});
+  return remote;
+};
 export const deleteBlob = (id: string) => tx('readwrite', (s) => s.delete(id)).then(() => undefined);
 
 /** Dauerhaften Speicher anfordern, damit der Browser die Dateien nicht von selbst löscht. */

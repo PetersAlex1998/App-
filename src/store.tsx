@@ -15,6 +15,7 @@ interface Ctx {
   save: <K extends Kind>(kind: K, item: DB[K][number]) => void;
   remove: (kind: Kind, id: string) => void;
   replaceAll: (next: DB) => void;
+  mergeRemote: (fn: (d: DB) => DB) => void; // Stand aus der Cloud übernehmen (ohne neue Änderungszeit)
   startEmpty: () => void; // nach Ladefehler mit leeren Daten weitermachen (defekte Kopie bleibt erhalten)
 }
 
@@ -80,7 +81,9 @@ export function StoreProvider({ children, repo = localRepository }: { children: 
     });
   }, []);
 
+  const mergeRemote = useCallback((fn: (d: DB) => DB) => setDb((d) => fn(d)), []);
+
   const replaceAll = useCallback((next: DB) => setDb(normalizeIds(next)), []);
 
-  return <StoreCtx.Provider value={{ db, ready, loadKind, loadError, saveError, save, remove, replaceAll, startEmpty }}>{children}</StoreCtx.Provider>;
+  return <StoreCtx.Provider value={{ db, ready, loadKind, loadError, saveError, save, remove, replaceAll, mergeRemote, startEmpty }}>{children}</StoreCtx.Provider>;
 }

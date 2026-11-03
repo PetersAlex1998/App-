@@ -1,4 +1,4 @@
--- Immo Verwaltung: Cloud-Abgleich. Eigene Tabellen mit Präfix, bestehende Tabellen (z. B. public.items) bleiben unberührt.
+-- Immo Verwaltung: Cloud-Abgleich (Projekt immo-verwaltung, Frankfurt). Eigene Tabelle mit Präfix immo_.
 create table if not exists public.immo_records (
   user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
   kind text not null,
