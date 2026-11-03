@@ -9,8 +9,9 @@ export interface Settings {
   lastBackupAt: string; // ISO-Zeitpunkt der letzten Sicherung ('' = nie)
   backupRemindDays: number; // Erinnerung nach N Tagen ohne Sicherung, 0 = aus
   dismissedTasks: string[]; // als erledigt markierte Aufgaben (IDs)
+  calcDefaults: Partial<import('./calculator').CalcInput>; // zuletzt benutzte Annahmen des Immokalkulators
 }
 export const defaultSettings: Settings = {
   name: '', street: '', zip: '', city: '', phone: '', email: '', bank: '', iban: '', bic: '',
-  fee2: 5, fee3: 10, deadlineDays: 7, rentDueDay: 3, graceDays: 5, logo: '', footer: '', lastBackupAt: '', backupRemindDays: 30, dismissedTasks: [],
+  fee2: 5, fee3: 10, deadlineDays: 7, rentDueDay: 3, graceDays: 5, logo: '', footer: '', lastBackupAt: '', backupRemindDays: 30, dismissedTasks: [], calcDefaults: {},
 };

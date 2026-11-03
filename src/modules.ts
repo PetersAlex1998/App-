@@ -25,6 +25,7 @@ export const MODULES: AppModule[] = [
 
   { id: 'ausgaben', group: 'Finanzen', icon: 'receipt-outline', title: 'Ausgaben und Belege', subtitle: 'Rechnungen erfassen, Beleg fotografieren', screen: 'Ausgaben' },
   { id: 'anlagev', group: 'Finanzen', icon: 'document-text-outline', title: 'Auswertung für die Steuer', subtitle: 'Anlage V und CSV für den Steuerberater', screen: 'AnlageV' },
+  { id: 'kalkulator', group: 'Finanzen', icon: 'calculator', title: 'Immokalkulator', subtitle: 'Kaufobjekte durchrechnen, Höchstpreis ermitteln', screen: 'Kalkulator' },
   { id: 'kontoauszug', group: 'Finanzen', icon: 'swap-vertical-outline', title: 'Kontoauszug importieren', subtitle: 'Zahlungseingänge automatisch zuordnen', screen: 'StatementImport' },
 
   { id: 'bestandimport', group: 'Importieren', icon: 'albums-outline', title: 'Bestand importieren', subtitle: 'Häuser, Einheiten und Mieter aus CSV', screen: 'BestandImport' },

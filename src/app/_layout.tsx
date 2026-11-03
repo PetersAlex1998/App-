@@ -82,6 +82,8 @@ function Shell() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="suche" options={{ title: 'Suche' }} />
         <Stack.Screen name="daten" options={{ title: 'Daten' }} />
+        <Stack.Screen name="kalkulator/index" options={{ title: 'Immokalkulator' }} />
+        <Stack.Screen name="kalkulator/formular" options={{ title: 'Kalkulation' }} />
         <Stack.Screen name="aufgaben" options={{ title: 'Aufgaben' }} />
         <Stack.Screen name="cloud" options={{ title: 'Cloud' }} />
         <Stack.Screen name="sperre" options={{ title: 'App-Sperre' }} />

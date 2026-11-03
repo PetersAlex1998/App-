@@ -136,6 +136,14 @@ export interface Expense {
   allocatable?: boolean; // umlagefähig auf Mieter (Hinweis für die Nebenkosten)
 }
 
+export interface Calculation {
+  id: ID;
+  updatedAt?: string;
+  name: string; // Adresse oder Bezeichnung des Kaufobjekts
+  createdAt: string; // ISO
+  input: import('./calculator').CalcInput;
+}
+
 export type DocOwner = 'property' | 'unit' | 'tenant';
 export type DocCategory = 'energieausweis' | 'mietvertrag' | 'foto' | 'versicherung' | 'grundbuch' | 'rechnung' | 'protokoll' | 'brief' | 'sonstiges';
 export interface Doc {
@@ -164,6 +172,7 @@ export interface DB {
   reminders: Reminder[];
   costs: Cost[];
   expenses: Expense[];
+  calculations: Calculation[];
   meters: Meter[];
   readings: Reading[];
   documents: Doc[];
@@ -178,6 +187,7 @@ export const emptyDB: DB = {
   reminders: [],
   costs: [],
   expenses: [],
+  calculations: [],
   meters: [],
   readings: [],
   documents: [],
