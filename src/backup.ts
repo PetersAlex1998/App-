@@ -73,8 +73,12 @@ export function pickBackupFile(): Promise<string | null> {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'application/json,.json';
+    input.style.display = 'none';
+    // Im Dokument verankern: manche Browser (iOS Safari) feuern „change“ sonst nicht zuverlässig
+    document.body.appendChild(input);
     input.onchange = () => {
       const f = input.files?.[0];
+      input.remove();
       if (!f) return resolve(null);
       f.text().then(resolve, reject);
     };

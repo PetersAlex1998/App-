@@ -1,7 +1,7 @@
 // Macht aus dem Expo-Web-Export eine installierbare Web-App (Vollbild auf dem Home-Bildschirm).
 const fs = require('fs');
 const path = require('path');
-const dist = path.join(__dirname, '..', 'dist');
+const dist = process.env.DIST_DIR ? path.resolve(process.env.DIST_DIR) : path.join(__dirname, '..', 'dist');
 // BASE_URL='' erlaubt (lokaler Test unter /), sonst Standard für GitHub Pages
 const base = (process.env.BASE_URL !== undefined ? process.env.BASE_URL : '/App-').replace(/\/$/, '');
 const crypto = require('crypto');

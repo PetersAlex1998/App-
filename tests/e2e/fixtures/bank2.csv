@@ -1,0 +1,3 @@
+"Auftragskonto";"Buchungstag";"Valutadatum";"Buchungstext";"Verwendungszweck";"Beguenstigter/Zahlungspflichtiger";"Kontonummer/IBAN";"BIC (SWIFT-Code)";"Betrag";"Waehrung";"Info"
+"DE11500105170000000001";"03.11.26";"03.11.26";"GUTSCHRIFT";"Miete H01-W01";"Anna Schmidt";"DE89370400440532013000";"COBADEFF";"800,00";"EUR";"Umsatz gebucht"
+"DE11500105170000000001";"04.11.26";"04.11.26";"GUTSCHRIFT";"Miete H01-W02";"Max Becker";"DE00000000000000000000";"XX";"800,00";"EUR";"Umsatz gebucht"

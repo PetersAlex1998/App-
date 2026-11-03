@@ -1,6 +1,6 @@
 import { DB, Payment, Tenant, UnitKind } from './types';
 import { addDays, oldestOpenMonth, today, unitDue } from './calc';
-import { uid } from './store';
+import { uid } from './uid';
 import { unitLetter } from './ids';
 
 /* ───────── CSV lesen ───────── */
@@ -190,7 +190,9 @@ export function applyMatches(db: DB, scores: RowScore[], overrides: Record<strin
     let score = sc.score;
     if (ov && 'tenantId' in ov) { tenantId = ov.tenantId ?? null; score = tenantId ? 100 : 0; }
     const tenant = tenantId ? tenantById.get(tenantId) : undefined;
-    let status: MatchStatus = !tenant ? 'offen' : score >= 75 && !sc.tie ? 'sicher' : 'pruefen';
+    // Eine von Hand getroffene Zuordnung ist immer sicher (auch wenn die Erkennung vorher mehrdeutig war)
+    const manual = !!(ov && 'tenantId' in ov && ov.tenantId);
+    let status: MatchStatus = !tenant ? 'offen' : manual || (score >= 75 && !sc.tie) ? 'sicher' : 'pruefen';
     if (tenant && existing.has(`${tenant.id}|${r.date}|${r.amount.toFixed(2)}`)) status = 'doppelt';
     const text = `${r.purpose} ${r.name}`;
     const nt = norm(text);

@@ -2,7 +2,7 @@ import { Doc, Tenant } from './types';
 import type { LetterModel } from './letters';
 import { modelToPdf, mergePdfs } from './pdfgen';
 import { getBlob, putBlob } from './files';
-import { uid } from './store';
+import { uid } from './uid';
 import { today } from './calc';
 
 /** Uint8Array -> PDF-Blob (eigener ArrayBuffer, damit Typen und Browser zufrieden sind). */
