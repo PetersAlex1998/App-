@@ -346,9 +346,10 @@ export function planBestandImport(db: DB, text: string): BestandPlan {
         ...(former ? { moveOut: auszug } : {}),
       });
       // Wiedererkennen beim erneuten Import: aktive Mieter am Namen, frühere Mieter an Name + Einzug
-      const ex = next.tenants.find((x) => x.unitId === unit!.id && norm(x.name) === norm(tenantName) && (former ? x.moveIn === (einzug ?? '') && !!x.moveOut : !x.moveOut));
+      // Frühere Mieter werden auch dann erkannt, wenn sie bei einem älteren Import fälschlich als aktiv angelegt wurden
+      const ex = next.tenants.find((x) => x.unitId === unit!.id && norm(x.name) === norm(tenantName) && (former ? !einzug || x.moveIn === einzug : !x.moveOut));
       if (ex) {
-        const merged = { ...ex, ...tenData, ...(einzug ? { moveIn: einzug } : {}) };
+        const merged = { ...ex, ...tenData, ...(einzug ? { moveIn: einzug } : {}), ...(former ? { trackFrom: afterOut(auszug!), ...(einzug ? {} : { moveIn: '' }) } : {}) };
         if (JSON.stringify(merged) !== JSON.stringify(ex)) { next.tenants = next.tenants.map((x) => (x.id === ex.id ? merged : x)); sum.updated++; }
       } else {
         next.tenants.push({ id: uid(), unitId: unit.id, name: tenantName, email: '', phone: '', moveIn: einzug ?? (former ? '' : today()), moveOut: '', deposit: 0, trackFrom: former ? afterOut(auszug!) : ab ?? today().slice(0, 7), ...tenData });
@@ -356,5 +357,14 @@ export function planBestandImport(db: DB, text: string): BestandPlan {
       }
     }
   });
+  // Geänderte und neue Datensätze bekommen eine Änderungszeit, damit der Cloud-Abgleich sie überträgt
+  const nowIso = new Date().toISOString();
+  const stampChanged = <T extends { id: string }>(list: T[], before: T[]): T[] => {
+    const old = new Map(before.map((x) => [x.id, x]));
+    return list.map((x) => (old.get(x.id) === x ? x : { ...x, updatedAt: nowIso }));
+  };
+  next.properties = stampChanged(next.properties, db.properties);
+  next.units = stampChanged(next.units, db.units);
+  next.tenants = stampChanged(next.tenants, db.tenants);
   return { db: next, summary: sum, warnings: warnings.slice(0, 10) };
 }

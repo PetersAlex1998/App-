@@ -275,3 +275,34 @@ describe('Bestand-Import: Mieterhistorie', () => {
     expect(r.db.properties).toHaveLength(1);
   });
 });
+
+describe('Bestand-Import: Reparatur nach altem Import ohne Auszug', () => {
+  const head = 'Haus;Einheit;Typ;Fläche;Kaltmiete;Nebenkosten;Mieter;Einzug;Auszug;Kaltmiete damals';
+  it('als aktiv angelegte frühere Mieter werden korrigiert statt verdoppelt', () => {
+    // alter Import: Spalte „Auszug“ kannte er nicht, alle Mieter wurden aktiv
+    const oldImport = planBestandImport(emptyDB, 'Haus;Einheit;Typ;Fläche;Kaltmiete;Nebenkosten;Mieter;Einzug\nHaus Test;Wohnung 4;Wohnung;;;;Alt Eins;01.12.2009\nHaus Test;Wohnung 4;Wohnung;77,02;480;140;Neu Zwei;01.04.2019\nHaus Test;Wohnung 4;Wohnung;;;;Ohne Datum;????').db;
+    expect(oldImport.tenants.every((t) => !t.moveOut)).toBe(true);
+    const fixed = planBestandImport(oldImport, `${head}\nHaus Test;Wohnung 4;Wohnung;;;;Alt Eins;01.12.2009;31.03.2019;440\nHaus Test;Wohnung 4;Wohnung;77,02;480;140;Neu Zwei;01.04.2019;;\nHaus Test;Wohnung 4;Wohnung;;;;Ohne Datum;;31.07.2023;`).db;
+    expect(fixed.tenants).toHaveLength(3);
+    const by = (n: string) => fixed.tenants.find((t) => t.name === n)!;
+    expect(by('Alt Eins')).toMatchObject({ moveOut: '2019-03-31', coldRent: 440, trackFrom: '2019-04' });
+    expect(by('Ohne Datum')).toMatchObject({ moveIn: '', moveOut: '2023-07-31', trackFrom: '2023-08' });
+    expect(by('Neu Zwei').moveOut).toBe('');
+    expect(dueMonths(by('Alt Eins'))).toEqual([]);
+    expect(dueMonths(by('Ohne Datum'))).toEqual([]);
+  });
+});
+
+describe('Bestand-Import: Änderungszeit für den Cloud-Abgleich', () => {
+  it('neue und geänderte Datensätze werden gestempelt, unveränderte nicht', () => {
+    const head = 'Haus;Einheit;Typ;Fläche;Kaltmiete;Nebenkosten;Mieter;Einzug';
+    const first = planBestandImport(emptyDB, `${head}\nHaus Test;Wohnung 1;Wohnung;50;300;100;Anna;01.01.2020\nHaus Test;Wohnung 2;Wohnung;60;350;100;Bernd;01.01.2020`).db;
+    expect(first.tenants.every((t) => !!t.updatedAt)).toBe(true);
+    const marked = { ...first, tenants: first.tenants.map((t) => ({ ...t, updatedAt: '2020-01-01T00:00:00.000Z' })), units: first.units.map((u) => ({ ...u, updatedAt: '2020-01-01T00:00:00.000Z' })), properties: first.properties.map((p) => ({ ...p, updatedAt: '2020-01-01T00:00:00.000Z' })) };
+    const second = planBestandImport(marked, `${head}\nHaus Test;Wohnung 1;Wohnung;50;300;100;Anna;01.01.2020\nHaus Test;Wohnung 2;Wohnung;60;400;100;Bernd;01.01.2020`).db;
+    const u1 = second.units.find((u) => u.name === 'Wohnung 1')!, u2 = second.units.find((u) => u.name === 'Wohnung 2')!;
+    expect(u1.updatedAt).toBe('2020-01-01T00:00:00.000Z'); // unverändert
+    expect(u2.updatedAt).not.toBe('2020-01-01T00:00:00.000Z'); // Miete geändert
+    expect(second.tenants.every((t) => t.updatedAt === '2020-01-01T00:00:00.000Z')).toBe(true);
+  });
+});
