@@ -15,6 +15,7 @@ export function demoData(): DB {
   const pay = (id: string, tenantId: string, list: string[], amount: number) =>
     list.map((mo) => ({ id: `${id}-${mo}`, tenantId, date: `${mo}-03`, month: mo, amount, kind: 'miete' as const, note: '' }));
   return {
+    expenses: [],
     properties: [{ id: 'demo-p1', name: 'Haus Lindenstraße', street: 'Lindenstr. 12', zip: '50667', city: 'Köln', yearBuilt: '1998', notes: 'Beispielobjekt' }],
     units: [
       { id: 'demo-u1', propertyId: 'demo-p1', name: 'WE 1, EG links', area: 62, rooms: 2, coldRent: 640, advance: 160 },

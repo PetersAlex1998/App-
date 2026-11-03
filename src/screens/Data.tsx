@@ -90,6 +90,11 @@ export function DataScreen({ navigation }: any) {
         <ListRow icon="lock-closed-outline" title="App-Sperre" subtitle="Code beim Öffnen der App verlangen" onPress={() => navigation.navigate('Sperre')} />
       </Section>
 
+      <Section title="Finanzen">
+        <ListRow icon="receipt-outline" title="Ausgaben und Belege" subtitle="Rechnungen erfassen, Beleg fotografieren" onPress={() => navigation.navigate('Ausgaben')} />
+        <ListRow icon="document-text-outline" title="Auswertung für die Steuer" subtitle="Anlage V und CSV für den Steuerberater" onPress={() => navigation.navigate('AnlageV')} />
+      </Section>
+
       <Section title="Briefe und Mahnwesen">
         <ListRow icon="mail-open-outline" title="Briefausgang" subtitle="Erstellte Briefe teilen und als versendet markieren" onPress={() => navigation.navigate('Outbox')} />
         <ListRow icon="mail-outline" title="Absender und Mahnregeln" subtitle="Adresse, IBAN, Gebühren, Fristen" onPress={() => navigation.navigate('Briefe')} />

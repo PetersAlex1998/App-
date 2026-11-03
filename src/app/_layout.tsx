@@ -95,6 +95,9 @@ function Shell() {
         <Stack.Screen name="person/[id]" options={{ title: 'Mieter' }} />
         <Stack.Screen name="person/formular" options={edit('Neuer Mieter', 'Mieter bearbeiten')} />
         <Stack.Screen name="zahlung/formular" options={edit('Zahlung erfassen', 'Zahlung bearbeiten')} />
+        <Stack.Screen name="ausgaben" options={{ title: 'Ausgaben' }} />
+        <Stack.Screen name="anlage-v" options={{ title: 'Anlage V' }} />
+        <Stack.Screen name="ausgabe/formular" options={edit('Ausgabe erfassen', 'Ausgabe bearbeiten')} />
         <Stack.Screen name="kosten/formular" options={edit('Neue Kostenposition', 'Kostenposition bearbeiten')} />
         <Stack.Screen name="zaehler/[id]" options={{ title: 'Zähler' }} />
         <Stack.Screen name="zaehler/formular" options={edit('Neuer Zähler', 'Zähler bearbeiten')} />

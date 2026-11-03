@@ -121,6 +121,20 @@ export interface Cost {
   consumptionShare?: number; // % nach Verbrauch (Rest = Grundkosten nach Wohnfläche); fehlt = 100
 }
 
+export type ExpenseCategory = 'schuldzinsen' | 'grundsteuer' | 'versicherung' | 'instandhaltung' | 'verwaltung' | 'betriebskosten' | 'hausmeister' | 'fahrtkosten' | 'afa' | 'sonstiges';
+export interface Expense {
+  id: ID;
+  updatedAt?: string;
+  propertyId: ID;
+  date: string; // YYYY-MM-DD (Zahlungsdatum, maßgeblich für die Steuer)
+  amount: number; // brutto, immer positiv
+  category: ExpenseCategory;
+  vendor: string; // Lieferant / Handwerker
+  description: string;
+  receiptId?: ID; // Dokument-ID des Belegs
+  allocatable?: boolean; // umlagefähig auf Mieter (Hinweis für die Nebenkosten)
+}
+
 export type DocOwner = 'property' | 'unit' | 'tenant';
 export type DocCategory = 'energieausweis' | 'mietvertrag' | 'foto' | 'versicherung' | 'grundbuch' | 'rechnung' | 'protokoll' | 'brief' | 'sonstiges';
 export interface Doc {
@@ -148,6 +162,7 @@ export interface DB {
   payments: Payment[];
   reminders: Reminder[];
   costs: Cost[];
+  expenses: Expense[];
   meters: Meter[];
   readings: Reading[];
   documents: Doc[];
@@ -161,6 +176,7 @@ export const emptyDB: DB = {
   payments: [],
   reminders: [],
   costs: [],
+  expenses: [],
   meters: [],
   readings: [],
   documents: [],

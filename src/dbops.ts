@@ -24,13 +24,17 @@ export function removeItem(d: DB, kind: Kind, id: string): { db: DB; goneDocs: D
     unitIds.forEach((x) => ownerIds.add(x));
     d.tenants.filter((t) => unitIds.includes(t.unitId)).forEach((t) => ownerIds.add(t.id));
   } else if (kind === 'units') d.tenants.filter((t) => t.unitId === id).forEach((t) => ownerIds.add(t.id));
-  const goneDocs = d.documents.filter((x) => (kind === 'documents' ? x.id === id : ownerIds.has(x.ownerId)));
+  const receiptIds = new Set<string>();
+  if (kind === 'expenses') { const r = d.expenses.find((e) => e.id === id)?.receiptId; if (r) receiptIds.add(r); }
+  if (kind === 'properties') d.expenses.filter((e) => e.propertyId === id && e.receiptId).forEach((e) => receiptIds.add(e.receiptId!));
+  const goneDocs = d.documents.filter((x) => (kind === 'documents' ? x.id === id : ownerIds.has(x.ownerId) || receiptIds.has(x.id)));
 
   const n = { ...d, [kind]: (d[kind] as { id: string }[]).filter((x) => x.id !== id) } as DB;
   if (kind === 'properties') {
     const unitIds = d.units.filter((u) => u.propertyId === id).map((u) => u.id);
     n.units = d.units.filter((u) => u.propertyId !== id);
     n.costs = d.costs.filter((c) => c.propertyId !== id);
+    n.expenses = d.expenses.filter((e) => e.propertyId !== id);
     const mIds = d.meters.filter((m) => m.propertyId === id).map((m) => m.id);
     n.meters = d.meters.filter((m) => m.propertyId !== id);
     n.readings = d.readings.filter((r) => !mIds.includes(r.meterId));
@@ -52,6 +56,7 @@ export function removeItem(d: DB, kind: Kind, id: string): { db: DB; goneDocs: D
     n.payments = d.payments.filter((p) => p.tenantId !== id);
     n.reminders = d.reminders.filter((r) => r.tenantId !== id);
   }
+  if (kind === 'documents') n.expenses = d.expenses.map((e) => (e.receiptId === id ? { ...e, receiptId: undefined } : e));
   n.documents = d.documents.filter((x) => !goneDocs.includes(x));
   return { db: n, goneDocs };
 }

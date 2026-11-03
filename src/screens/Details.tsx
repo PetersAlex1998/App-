@@ -109,6 +109,10 @@ export function PropertyDetail({ route, navigation }: any) {
 
       {years.length > 0 && <><Button kind="secondary" icon="calculator-outline" title="Nebenkostenabrechnung für alle Mieter" onPress={() => navigation.navigate('NkLauf', { propertyId: p.id })} /><Gap h={22} /></>}
 
+      <Section title="Ausgaben und Belege">
+        <ListRow icon="receipt-outline" title="Ausgaben dieses Objekts" subtitle={`${db.expenses.filter((x) => x.propertyId === p.id).length} erfasst`} onPress={() => navigation.navigate('Ausgaben', { propertyId: p.id })} />
+      </Section>
+
       <Section title="Betriebskosten" action={{ label: '+ Hinzufügen', onPress: () => navigation.navigate('CostForm', { propertyId: p.id }) }}
         footer="Aus diesen Positionen entsteht die Nebenkostenabrechnung der Mieter.">
         {years.length === 0 && <Note>Noch keine Kosten erfasst.</Note>}
