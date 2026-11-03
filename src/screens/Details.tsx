@@ -15,7 +15,7 @@ import { filesSupported } from '../files';
 import { useSettings } from '../settings';
 import { dunningPlans, feeFor, makeReminder, overdueItems, relevantReminders } from '../dunning';
 import { type } from '../theme';
-import { fmtVal, latestReading, meterIcon, meterLabel, meterTypeLabel, meterUnitLabel } from '../meters';
+import { fmtVal, meterIcon, meterTypeLabel, readingsOf } from '../meters';
 
 
 function useHeaderAction(navigation: any, label: string, onPress: () => void) {
@@ -44,6 +44,7 @@ export function PropertyDetail({ route, navigation }: any) {
   const occ = units.length ? Math.round((units.filter((u) => active(u.id)).length / units.length) * 100) : 0;
   const years = [...new Set(db.costs.filter((x) => x.propertyId === p.id).map((x) => x.year))].sort((a, b) => b - a);
   const meters = db.meters.filter((m) => m.propertyId === p.id);
+  const lastReadingDate = db.readings.filter((r) => meters.some((m) => m.id === r.meterId)).reduce((d, r) => (r.date > d ? r.date : d), '');
 
   return (
     <Screen>
@@ -97,15 +98,11 @@ export function PropertyDetail({ route, navigation }: any) {
         <ListRow icon="copy-outline" title="Mehrere Einheiten auf einmal anlegen" subtitle="z. B. Wohnung 1 bis Wohnung 20" onPress={() => navigation.navigate('UnitSeries', { propertyId: p.id })} />
       </Section>
 
-      <Section title="Zähler" action={{ label: '+ Hinzufügen', onPress: () => navigation.navigate('MeterForm', { propertyId: p.id }) }}
-        footer={meters.length ? 'Die Verbrauchswerte fließen in die Nebenkostenabrechnung ein, wenn eine Kostenposition „nach Verbrauch“ verteilt wird.' : undefined}>
-        {meters.length === 0 && <Note>Noch keine Zähler. Lege Wasser-, Heiz- oder Stromzähler an, um nach Verbrauch abzurechnen.</Note>}
-        {meters.map((m) => {
-          const last = latestReading(db, m.id);
-          return <ListRow key={m.id} icon={meterIcon(m.type)} title={meterLabel(db, m)} subtitle={`Nr. ${m.number}${last ? ` · Stand ${fmtVal(last.value)} ${meterUnitLabel(m.type)} (${dateDE(last.date)})` : ' · noch kein Stand'}`} onPress={() => navigation.navigate('MeterDetail', { id: m.id })} />;
-        })}
+      <Section title="Zähler" footer="Die Stände siehst du in den einzelnen Wohnungen. Verbrauchswerte fließen in die Nebenkostenabrechnung ein.">
+        <ListRow icon="create-outline" title="Zählerstände erfassen" subtitle={meters.length ? `${meters.length} Zähler${lastReadingDate ? ` · letzte Ablesung ${dateDE(lastReadingDate)}` : ''}` : 'Zuerst einen Zähler hinzufügen'}
+          onPress={() => (meters.length ? navigation.navigate('Ablesung', { propertyId: p.id }) : navigation.navigate('MeterForm', { propertyId: p.id }))} />
+        <ListRow icon="add-circle-outline" title="Zähler hinzufügen" subtitle="Heizung, Wasser, Strom oder Gas" onPress={() => navigation.navigate('MeterForm', { propertyId: p.id })} />
       </Section>
-      {meters.length > 0 && <><Button kind="secondary" icon="create-outline" title="Zählerstände erfassen" onPress={() => navigation.navigate('Ablesung', { propertyId: p.id })} /><Gap h={22} /></>}
 
       {years.length > 0 && <><Button kind="secondary" icon="calculator-outline" title="Nebenkostenabrechnung für alle Mieter" onPress={() => navigation.navigate('NkLauf', { propertyId: p.id })} /><Gap h={22} /></>}
 
@@ -350,8 +347,17 @@ export function UnitDetail({ route, navigation }: any) {
         return rows.length ? <Section title="Lage und Ausstattung">{rows}</Section> : null;
       })()}
       {meters.length > 0 && (
-        <Section title="Zähler">
-          {meters.map((m) => <ListRow key={m.id} icon={meterIcon(m.type)} title={meterTypeLabel(m.type)} subtitle={`Nr. ${m.number}${latestReading(db, m.id) ? ` · Stand ${fmtVal(latestReading(db, m.id)!.value)} ${meterUnitLabel(m.type)}` : ''}`} onPress={() => navigation.navigate('MeterDetail', { id: m.id })} />)}
+        <Section title="Zähler" footer="Tippe auf einen Zähler, um alle Ablesungen zu sehen oder einen neuen Stand einzutragen.">
+          {meters.map((m) => {
+            const list = readingsOf(db, m.id);
+            const last = list[list.length - 1], prev = list[list.length - 2];
+            const used = last && prev ? Math.round((last.value - prev.value) * 1000) / 1000 : null;
+            return (
+              <ListRow key={m.id} icon={meterIcon(m.type)} title={meterTypeLabel(m.type)}
+                subtitle={`Nr. ${m.number}${last ? ` · Stand ${fmtVal(last.value)} (${dateDE(last.date)})` : ' · noch kein Stand'}${used !== null ? ` · ${used >= 0 ? '+' : ''}${fmtVal(used)} seit ${dateDE(prev.date)}` : ''}`}
+                onPress={() => navigation.navigate('MeterDetail', { id: m.id })} />
+            );
+          })}
         </Section>
       )}
       <DocumentsSection ownerKind="unit" ownerId={u.id} navigation={navigation} />

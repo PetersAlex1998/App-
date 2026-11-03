@@ -14,4 +14,12 @@ test('Zähler und Stände per CSV importieren und in der Wohnung sehen', async (
   expect(db.meters.map((m: any) => m.number).sort()).toEqual(['111', '222']);
   await page.goto('/wohnung/u1');
   await expect.poll(() => body(page)).toContain('Nr. 111');
+  expect(await body(page)).toMatch(/Stand 1\.882 \(11\.01\.2014\) · \+1\.882 seit 19\.10\.2013/);
+  // Objekt bleibt übersichtlich: keine Zählerliste, nur Erfassen und Hinzufügen
+  await page.goto('/objekt/p1');
+  await expect.poll(() => body(page)).toContain('Zählerstände erfassen');
+  const t = await body(page);
+  expect(t).toContain('2 Zähler · letzte Ablesung 11.01.2014');
+  expect(t).not.toContain('Nr. 111');
+  expect(t).toContain('Zähler hinzufügen');
 });
