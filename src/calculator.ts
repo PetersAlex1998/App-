@@ -134,3 +134,33 @@ export function stress(i: CalcInput) {
     rentMinus10: calculate({ ...i, rentMonth: i.rentMonth * 0.9 }).cashflowMonth,
   };
 }
+
+/* ───────── Eigenkapital durchspielen ───────── */
+
+export interface EquityScenario { pct: number; equity: number; loan: number; debtMonth: number; cashflowMonth: number; equityReturn: number | null; maxPrice: number | null }
+
+/** Dieselbe Kalkulation mit unterschiedlichem Eigenkapital: was bleibt monatlich übrig, wie rentiert sich das Eigenkapital, wie hoch darf der Preis sein. */
+export function equityScenarios(i: CalcInput, pcts: number[] = [0, 10, 20, 30, 40, 50, 100]): EquityScenario[] {
+  return pcts.map((pct) => {
+    const x = { ...i, equityPct: pct };
+    const r = calculate(x);
+    return { pct, equity: r.equity, loan: r.loan, debtMonth: r2(r.debtServiceYear / 12), cashflowMonth: r.cashflowMonth, equityReturn: r.equityReturn, maxPrice: maxPrice(x).recommended };
+  });
+}
+
+/** Wie viel Eigenkapital (in % der Gesamtinvestition) nötig ist, damit der Cashflow mindestens `minCashflow` pro Monat beträgt. null = auch mit 100 % nicht erreichbar. */
+export function minEquityPct(i: CalcInput, minCashflow = i.minCashflow ?? 0): { pct: number | null; amount: number | null } {
+  const r = calculate(i);
+  const room = r.noi - minCashflow * 12; // so viel Kapitaldienst verträgt das Objekt pro Jahr
+  if (room < 0) return { pct: null, amount: null };
+  const k = (i.interest + i.amortization) / 100;
+  if (r.totalInvestment <= 0 || k <= 0) return { pct: 0, amount: 0 };
+  const pct = Math.max(0, Math.ceil((1 - room / (r.totalInvestment * k)) * 1000) / 10);
+  return { pct, amount: r2(r.totalInvestment * (pct / 100)) };
+}
+
+/** Hebel: Solange die Netto-Rendite über dem Zins liegt, steigert mehr Fremdkapital die Eigenkapitalrendite. */
+export function leverage(i: CalcInput): { positive: boolean; netYield: number | null; interest: number } {
+  const r = calculate(i);
+  return { positive: r.netYield !== null && r.netYield > i.interest, netYield: r.netYield, interest: i.interest };
+}

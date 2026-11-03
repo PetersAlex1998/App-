@@ -1,12 +1,12 @@
 import React, { useMemo, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Platform, Pressable, Text, View } from 'react-native';
 import { useStore, uid } from '../store';
 import { useSettings } from '../settings';
 import { useDelete } from '../undo';
 import { Badge, Button, ChipField, Disclosure, EmptyState, Field, Gap, LargeHeader, ListRow, Note, Row, Screen, Section, Stat, StatGrid, notify, useColors } from '../ui';
 import { eur, num } from '../calc';
 import { type } from '../theme';
-import { CRITERION_LABEL, CalcInput, DEFAULT_INPUT, GRUNDERWERBSTEUER, calculate, maxPrice, stress, verdict } from '../calculator';
+import { CRITERION_LABEL, CalcInput, DEFAULT_INPUT, GRUNDERWERBSTEUER, calculate, equityScenarios, leverage, maxPrice, minEquityPct, stress, verdict } from '../calculator';
 
 const pct = (n: number | null) => (n === null ? '–' : `${n.toLocaleString('de-DE', { maximumFractionDigits: 2 })} %`);
 const VERDICT = {
@@ -85,6 +85,17 @@ export function CalculatorForm({ route, navigation }: any) {
   const m = useMemo(() => maxPrice(input), [input]);
   const v = verdict(input.price, m.max);
   const st = useMemo(() => stress(input), [input]);
+  const scen = useMemo(() => (input.price > 0 && input.rentMonth > 0 ? equityScenarios(input) : []), [input]);
+  const minEq = useMemo(() => minEquityPct(input), [input]);
+  const lev = useMemo(() => leverage(input), [input]);
+  const [eurDraft, setEurDraft] = useState<string | null>(null);
+  const eqPct = Math.min(100, Math.max(0, num(f.equityPct) || 0));
+  const setPct = (p: number) => { setEurDraft(null); setF((cur) => ({ ...cur, equityPct: String(Math.round(Math.min(100, Math.max(0, p)) * 10) / 10).replace('.', ',') })); };
+  const setEurEquity = (v: string) => {
+    setEurDraft(v);
+    const e = num(v) || 0;
+    if (r.totalInvestment > 0) setF((cur) => ({ ...cur, equityPct: String(Math.round(Math.min(100, (e / r.totalInvestment) * 100) * 10) / 10).replace('.', ',') }));
+  };
   const ready = input.rentMonth > 0;
 
   const pickLand = (name: string) => { const t = GRUNDERWERBSTEUER[name]; if (t !== undefined) setF((cur) => ({ ...cur, land: name, landTax: String(t).replace('.', ',') })); };
@@ -122,6 +133,65 @@ export function CalculatorForm({ route, navigation }: any) {
         <Field label="Sanierung / Einmalkosten" value={f.renovation} onChangeText={set('renovation')} keyboard="numeric" suffix="€" placeholder="optional" />
       </Section>
 
+      <Section title="Eigenkapital und Finanzierung" footer={input.price > 0 ? undefined : 'Gib einen Kaufpreis ein, dann kannst du mit dem Eigenkapital spielen.'}>
+        <View style={{ padding: 14, gap: 10 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' }}>
+            <Text style={{ color: c.text, fontSize: 28, fontWeight: '800', fontVariant: ['tabular-nums'] }}>{eqPct.toLocaleString('de-DE', { maximumFractionDigits: 1 })} %</Text>
+            <Text style={{ color: c.muted, fontSize: type.body, fontVariant: ['tabular-nums'] }}>{eur(r.equity)}</Text>
+          </View>
+          {Platform.OS === 'web' && React.createElement('input', { type: 'range', min: 0, max: 100, step: 1, value: eqPct, 'aria-label': 'Eigenkapital in Prozent', onChange: (e: any) => setPct(Number(e.target.value)), style: { width: '100%', accentColor: c.primary, height: 28 } })}
+          <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+            {[0, 10, 20, 30, 40, 50, 100].map((p) => (
+              <Pressable key={p} accessibilityRole="button" accessibilityLabel={`${p} Prozent Eigenkapital`} onPress={() => setPct(p)}
+                style={{ minHeight: 38, paddingHorizontal: 12, borderRadius: 19, justifyContent: 'center', backgroundColor: eqPct === p ? c.ink : c.fill }}>
+                <Text style={{ color: eqPct === p ? c.onInk : c.text, fontSize: type.subhead, fontWeight: '600' }}>{p} %</Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+        <Field label="Eigenkapital in Euro" value={eurDraft ?? (r.equity ? String(Math.round(r.equity)) : '')} onChangeText={setEurEquity} keyboard="numeric" suffix="€" hint={`Darlehen ${eur(r.loan)} · Rate ${eur(r.debtServiceYear / 12)} pro Monat`} />
+        <Field label="Zins" value={f.interest} onChangeText={set('interest')} keyboard="numeric" suffix="%" />
+        <Field label="Tilgung" value={f.amortization} onChangeText={set('amortization')} keyboard="numeric" suffix="%" />
+      </Section>
+
+      {scen.length > 0 && (
+        <Section title="Eigenkapital im Vergleich" footer="Tippe auf eine Zeile, um den Wert zu übernehmen. Höchstpreis nach deinen Zielwerten.">
+          <View style={{ flexDirection: 'row', paddingHorizontal: 14, paddingVertical: 8, gap: 6 }}>
+            {['Eigenkapital', 'Cashflow / Mon.', 'EK-Rendite', 'Höchstpreis'].map((h, k) => (
+              <Text key={h} style={{ flex: k === 0 ? 1.2 : 1, textAlign: k === 0 ? 'left' : 'right', color: c.muted, fontSize: type.caption, fontWeight: '600' }}>{h}</Text>
+            ))}
+          </View>
+          {scen.map((x) => {
+            const on = x.pct === eqPct;
+            return (
+              <Pressable key={x.pct} accessibilityRole="button" accessibilityLabel={`${x.pct} Prozent Eigenkapital: Cashflow ${eur(x.cashflowMonth)} pro Monat`} onPress={() => setPct(x.pct)}
+                style={{ flexDirection: 'row', paddingHorizontal: 14, paddingVertical: 12, gap: 6, alignItems: 'center', backgroundColor: on ? c.primarySoft : 'transparent' }}>
+                <View style={{ flex: 1.2 }}>
+                  <Text style={{ color: c.text, fontSize: type.subhead, fontWeight: '700' }}>{x.pct} %</Text>
+                  <Text style={{ color: c.muted, fontSize: type.caption }}>{eur(x.equity)}</Text>
+                </View>
+                <Text style={{ flex: 1, textAlign: 'right', color: x.cashflowMonth < 0 ? c.danger : c.ok, fontSize: type.subhead, fontWeight: '600', fontVariant: ['tabular-nums'] }}>{eur(x.cashflowMonth)}</Text>
+                <Text style={{ flex: 1, textAlign: 'right', color: c.text, fontSize: type.subhead, fontVariant: ['tabular-nums'] }}>{x.equityReturn === null ? '–' : pct(x.equityReturn)}</Text>
+                <Text style={{ flex: 1, textAlign: 'right', color: c.text, fontSize: type.subhead, fontVariant: ['tabular-nums'] }}>{x.maxPrice === null ? '–' : eur(x.maxPrice)}</Text>
+              </Pressable>
+            );
+          })}
+        </Section>
+      )}
+
+      {scen.length > 0 && (
+        <Section title="Was das bedeutet">
+          {minEq.pct === null
+            ? <Note>Mit dieser Miete bleibt auch mit 100 % Eigenkapital zu wenig Cashflow übrig (Ziel {eur(input.minCashflow ?? 0)} pro Monat). Der Preis ist zu hoch oder die Miete zu niedrig.</Note>
+            : minEq.pct === 0
+              ? <Note>Schon ohne Eigenkapital erreichst du {eur(input.minCashflow ?? 0)} Cashflow pro Monat.</Note>
+              : <ListRow icon="flag-outline" title={`Mindestens ${minEq.pct.toLocaleString('de-DE', { maximumFractionDigits: 1 })} % Eigenkapital`} subtitle={`${eur(minEq.amount ?? 0)} nötig für ${eur(input.minCashflow ?? 0)} Cashflow pro Monat`} right="Übernehmen" onPress={() => setPct(minEq.pct!)} />}
+          <Note>{lev.positive
+            ? `Positiver Hebel: Die Netto-Rendite (${pct(lev.netYield)}) liegt über dem Zins (${pct(lev.interest)}). Mehr Kredit steigert die Eigenkapitalrendite, erhöht aber das Risiko.`
+            : `Kein Hebel: Die Netto-Rendite (${pct(lev.netYield)}) liegt nicht über dem Zins (${pct(lev.interest)}). Fremdkapital kostet mehr, als das Objekt abwirft. Mehr Eigenkapital verbessert den Cashflow.`}</Note>
+        </Section>
+      )}
+
       {ready && (
         <>
           <StatGrid>
@@ -134,7 +204,7 @@ export function CalculatorForm({ route, navigation }: any) {
         </>
       )}
 
-      <Disclosure title="Annahmen" hint="Kaufnebenkosten, Kosten, Finanzierung, Steuer">
+      <Disclosure title="Annahmen" hint="Kaufnebenkosten, laufende Kosten, Steuer">
         <ChipField label="Bundesland (Grunderwerbsteuer)" value={f.land} options={Object.keys(GRUNDERWERBSTEUER)} onChange={(x) => x && pickLand(x)} />
         <Field label="Grunderwerbsteuer" value={f.landTax} onChangeText={set('landTax')} keyboard="numeric" suffix="%" />
         <Field label="Notar und Grundbuch" value={f.notary} onChangeText={set('notary')} keyboard="numeric" suffix="%" />
@@ -142,9 +212,6 @@ export function CalculatorForm({ route, navigation }: any) {
         <Field label="Leerstand und Mietausfall" value={f.vacancy} onChangeText={set('vacancy')} keyboard="numeric" suffix="% der Miete" />
         <Field label="Verwaltung" value={f.managementPerUnit} onChangeText={set('managementPerUnit')} keyboard="numeric" suffix="€ je Einheit und Jahr" />
         <Field label="Instandhaltung" value={f.maintenancePerSqm} onChangeText={set('maintenancePerSqm')} keyboard="numeric" suffix="€ je m² und Jahr" />
-        <Field label="Eigenkapital" value={f.equityPct} onChangeText={set('equityPct')} keyboard="numeric" suffix="% der Gesamtkosten" />
-        <Field label="Zins" value={f.interest} onChangeText={set('interest')} keyboard="numeric" suffix="%" />
-        <Field label="Tilgung" value={f.amortization} onChangeText={set('amortization')} keyboard="numeric" suffix="%" />
         <Field label="Persönlicher Steuersatz" value={f.taxRate} onChangeText={set('taxRate')} keyboard="numeric" suffix="%" />
         <Field label="Gebäudeanteil am Kaufpreis" value={f.buildingShare} onChangeText={set('buildingShare')} keyboard="numeric" suffix="%" />
         <Field label="Abschreibung (AfA)" value={f.afaRate} onChangeText={set('afaRate')} keyboard="numeric" suffix="%" />

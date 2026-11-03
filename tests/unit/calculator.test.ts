@@ -114,3 +114,45 @@ describe('Immokalkulator: Ampel und Stresstest', () => {
     expect(s.rentMinus10).toBeLessThan(calculate(i).cashflowMonth);
   });
 });
+
+import { equityScenarios, leverage, minEquityPct } from '../../src/calculator';
+
+describe('Immokalkulator: Eigenkapital durchspielen', () => {
+  it('Szenarien: mehr Eigenkapital senkt Rate und hebt den Cashflow', () => {
+    const rows = equityScenarios(base());
+    expect(rows.map((r) => r.pct)).toEqual([0, 10, 20, 30, 40, 50, 100]);
+    for (let k = 1; k < rows.length; k++) {
+      expect(rows[k].debtMonth).toBeLessThanOrEqual(rows[k - 1].debtMonth);
+      expect(rows[k].cashflowMonth).toBeGreaterThanOrEqual(rows[k - 1].cashflowMonth);
+      expect(rows[k].equity).toBeGreaterThan(rows[k - 1].equity);
+    }
+    const r20 = rows.find((r) => r.pct === 20)!;
+    expect(r20).toMatchObject({ equity: 67_242, loan: 268_968, cashflowMonth: -338.01 });
+    expect(rows[0].equityReturn).toBeNull(); // ohne Eigenkapital keine Eigenkapitalrendite
+    const full = rows[rows.length - 1];
+    expect(full.loan).toBe(0);
+    expect(full.debtMonth).toBe(0);
+  });
+  it('Höchstpreis wächst mit dem Eigenkapital (Cashflow-Kriterium)', () => {
+    const rows = equityScenarios(base({ targetNetYield: null, maxFactor: null, minCashflow: 0 }));
+    for (let k = 1; k < rows.length - 1; k++) expect(rows[k].maxPrice!).toBeGreaterThanOrEqual(rows[k - 1].maxPrice!);
+  });
+  it('Mindest-Eigenkapital für Cashflow ≥ 0 trifft den Cashflow genau', () => {
+    const inp = base();
+    const m = minEquityPct(inp, 0);
+    expect(m.pct).not.toBeNull();
+    const at = calculate({ ...inp, equityPct: m.pct! });
+    expect(at.cashflowMonth).toBeGreaterThanOrEqual(-0.5);
+    expect(calculate({ ...inp, equityPct: Math.max(0, m.pct! - 1) }).cashflowMonth).toBeLessThan(0);
+    expect(m.amount).toBeCloseTo(at.equity, 0);
+  });
+  it('Mindest-Eigenkapital: schon ohne Eigenkapital im Plus → 0 %; unerreichbar → null', () => {
+    expect(minEquityPct(base({ rentMonth: 3000 }), 0).pct).toBe(0);
+    expect(minEquityPct(base({ rentMonth: 100 }), 0)).toEqual({ pct: null, amount: null });
+    expect(minEquityPct(base({ interest: 0, amortization: 0 }), 0).pct).toBe(0);
+  });
+  it('Hebel positiv, wenn Netto-Rendite über dem Zins liegt', () => {
+    expect(leverage(base({ price: 150_000 })).positive).toBe(true);
+    expect(leverage(base({ price: 400_000 })).positive).toBe(false);
+  });
+});
