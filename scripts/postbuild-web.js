@@ -26,4 +26,6 @@ const head = `
 <style>html,body{background:#E9EAEE}body{overscroll-behavior-y:none}</style>`;
 html = html.replace('</head>', `${head}\n</head>`);
 fs.writeFileSync(path.join(dist, 'index.html'), html);
+// GitHub Pages: unbekannte Pfade (z. B. neu geladene /objekt/123) liefern 404.html. Die App-Shell übernimmt das Routing.
+fs.writeFileSync(path.join(dist, '404.html'), html);
 console.log('PWA-Dateien geschrieben (base ' + base + ')');
