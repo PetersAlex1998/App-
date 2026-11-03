@@ -1,7 +1,7 @@
 import React from 'react';
 import { useCompat } from '../../nav';
-import { Dashboard } from '../../screens/Lists';
+import { Cockpit } from '../../screens/Cockpit';
 
 export default function Route() {
-  return <Dashboard {...useCompat()} />;
+  return <Cockpit {...useCompat()} />;
 }

@@ -20,9 +20,9 @@ test('Datenprüfung: Aufgabe erscheint, führt zur Lösung und lässt sich als e
   data.tenants.push({ id: 't9', unitId: 'u1', name: 'Zweiter Mieter', email: '', phone: '', moveIn: '2025-01-01', moveOut: '', deposit: 0, trackFrom: '2026-10' });
   data.tenants[1].notes = 'Einzugsdatum fehlt in der Tabelle, bitte ergänzen.';
   await seedDb(page, data);
-  await expect.poll(() => body(page)).toContain('DATENPRÜFUNG (2)');
+  await expect.poll(() => body(page)).toContain('Datenprüfung (2)');
   await expect.poll(() => body(page)).toContain('2 aktive Mieter in Wohnung 1');
-  await tap(page, btn(page, /Alle Aufgaben ansehen/));
+  await tap(page, btn(page, /Datenprüfung \(2\)/));
   await expect.poll(() => body(page)).toContain('WICHTIG (1)');
   await tap(page, btn(page, /Erledigt: Prüfen: Max Becker/));
   await expect.poll(() => body(page)).not.toContain('Prüfen: Max Becker');
