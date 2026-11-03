@@ -333,6 +333,19 @@ export function UnitDetail({ route, navigation }: any) {
           : <ListRow icon="key-outline" iconTone="warn" title="Leerstand" subtitle="Mieter hinzufügen" onPress={() => navigation.navigate('TenantForm', { unitId: u.id })} />}
       </Section>
       {(() => {
+        const past = db.tenants.filter((t) => t.unitId === u.id && t.id !== tenant?.id).sort((a, b) => (b.moveIn || b.moveOut).localeCompare(a.moveIn || a.moveOut));
+        if (!past.length) return null;
+        return (
+          <Section title={`Mieterhistorie (${past.length})`} footer="Frühere Mieter dieser Wohnung, der neueste zuerst. Offene Posten zählen für sie nicht mehr.">
+            {past.map((t) => (
+              <ListRow key={t.id} avatar={initials(t.name)} title={t.name}
+                subtitle={`${t.moveIn ? dateDE(t.moveIn) : 'Einzug unbekannt'} – ${t.moveOut ? dateDE(t.moveOut) : 'heute'}${t.coldRent ? ` · Kaltmiete ${eur(t.coldRent)}` : ''}`}
+                onPress={() => navigation.navigate('TenantDetail', { id: t.id })} />
+            ))}
+          </Section>
+        );
+      })()}
+      {(() => {
         const rows = infoRows([['Etage', u.floor], ['Lage', u.position], ['Balkon / Terrasse', u.balcony], ['Keller', u.cellar], ['Stellplatz', u.parking], ['Küche', u.kitchen], ['Ausstattung', u.equipment], ['Notizen', u.notes]]);
         return rows.length ? <Section title="Lage und Ausstattung">{rows}</Section> : null;
       })()}

@@ -192,7 +192,7 @@ const defaultTrackFrom = () => today().slice(0, 7);
 export function TenantForm({ route, navigation }: any) {
   const { db, save } = useStore();
   const old = useItem<Tenant>('tenants', route.params?.id);
-  const [f, setF] = useState({ name: old?.name ?? '', email: old?.email ?? '', phone: old?.phone ?? '', moveIn: old?.moveIn ?? today(), moveOut: old?.moveOut ?? '', iban: old?.iban ?? '', trackFrom: old ? old.trackFrom ?? '' : defaultTrackFrom(), deposit: old ? String(old.deposit || '') : '', unitId: old?.unitId ?? route.params?.unitId ?? '' });
+  const [f, setF] = useState({ name: old?.name ?? '', email: old?.email ?? '', phone: old?.phone ?? '', moveIn: old?.moveIn ?? today(), moveOut: old?.moveOut ?? '', coldRent: old?.coldRent ? String(old.coldRent).replace('.', ',') : '', iban: old?.iban ?? '', trackFrom: old ? old.trackFrom ?? '' : defaultTrackFrom(), deposit: old ? String(old.deposit || '') : '', unitId: old?.unitId ?? route.params?.unitId ?? '' });
   const [x, setX] = useState({ salutation: old?.salutation ?? '', mobile: old?.mobile ?? '', postalAddress: old?.postalAddress ?? '', emergencyContact: old?.emergencyContact ?? '', contractEnd: old?.contractEnd ?? '', noticeMonths: old?.noticeMonths ?? '', rentAdjust: old?.rentAdjust ?? '', nextAdjust: old?.nextAdjust ?? '', depositType: old?.depositType ?? '', depositAccount: old?.depositAccount ?? '', notes: old?.notes ?? '' });
   const setx = (k: keyof typeof x) => (v: string) => setX({ ...x, [k]: v });
   const [err, setErr] = useState<Errors>({});
@@ -207,7 +207,7 @@ export function TenantForm({ route, navigation }: any) {
     if (f.email && !/^\S+@\S+\.\S+$/.test(f.email)) e.email = 'Das sieht nicht nach einer E-Mail-Adresse aus.';
     setErr(e);
     if (Object.keys(e).length) return false;
-    save('tenants', { ...x, id: old?.id ?? uid(), unitId: f.unitId, name: f.name.trim(), email: f.email.trim(), phone: f.phone.trim(), iban: f.iban.replace(/\s/g, '').toUpperCase(), moveIn: f.moveIn, moveOut: f.moveOut, deposit: num(f.deposit), trackFrom: f.trackFrom || undefined });
+    save('tenants', { ...old, ...x, id: old?.id ?? uid(), unitId: f.unitId, name: f.name.trim(), email: f.email.trim(), phone: f.phone.trim(), iban: f.iban.replace(/\s/g, '').toUpperCase(), moveIn: f.moveIn, moveOut: f.moveOut, deposit: num(f.deposit), trackFrom: f.trackFrom || undefined, coldRent: f.moveOut && num(f.coldRent) > 0 ? num(f.coldRent) : undefined });
     return true;
   };
   return (
@@ -232,6 +232,7 @@ export function TenantForm({ route, navigation }: any) {
       <Section title="Mietverhältnis">
         <DateField label="Einzug" value={f.moveIn} onChange={set('moveIn')} error={err.moveIn} />
         <DateField label="Auszug (leer lassen, wenn aktiv)" value={f.moveOut} onChange={set('moveOut')} error={err.moveOut} optional />
+        {f.moveOut ? <Field label="Kaltmiete während der Mietzeit (für die Historie)" value={f.coldRent} onChangeText={set('coldRent')} keyboard="numeric" suffix="€" placeholder="optional" /> : null}
         <Field label="Kaution" value={f.deposit} onChangeText={set('deposit')} keyboard="numeric" suffix="€" placeholder="optional" />
         <DateField label="Offene Posten zählen ab Monat" value={f.trackFrom} onChange={set('trackFrom')} mode="month" error={err.trackFrom} />
       </Section>

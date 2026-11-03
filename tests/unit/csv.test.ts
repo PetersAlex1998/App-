@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BESTAND_TEMPLATE, applyMatches, matchRows, parseAmount, parseBankCsv, parseCsv, parseDate, paymentsFromMatches, planBestandImport, scoreRows } from '../../src/csv';
 import { emptyDB } from '../../src/types';
+import { dueMonths } from '../../src/calc';
 import { normalizeIds } from '../../src/ids';
 import { dbWith, payment, property, resetIds, tenant, unit } from '../helpers/builders';
 
@@ -227,5 +228,50 @@ describe('Bestandsimport', () => {
   it('gleicher Name in Schreibvarianten wird erkannt (Umlaute, Groß/Klein)', () => {
     const p = planBestandImport(emptyDB, 'Haus;Einheit\nHaus Lindenstraße;Wohnung 1\nHAUS LINDENSTRASSE;wohnung 1\n');
     expect(p.summary).toMatchObject({ properties: 1, units: 1 });
+  });
+});
+
+describe('Bestand-Import: Mieterhistorie', () => {
+  const head = 'Haus;Einheit;Typ;Fläche;Kaltmiete;Nebenkosten;Mieter;Einzug;Auszug;Kaltmiete damals;Notizen Mieter';
+  const csv = [
+    head,
+    'Haus Test;Wohnung 4;Wohnung;;;;Alt Eins;01.12.2009;31.03.2019;440,00;',
+    'Haus Test;Wohnung 4;Wohnung;77,02;480,00;140,00;Neu Zwei;01.04.2019;;;',
+  ].join('\n');
+
+  it('legt frühere und aktuelle Mieter an; Einheitenwerte stammen vom aktuellen Mieter', () => {
+    const r = planBestandImport(emptyDB, csv);
+    expect(r.error).toBeUndefined();
+    expect(r.db.units).toHaveLength(1);
+    expect(r.db.units[0]).toMatchObject({ area: 77.02, coldRent: 480, advance: 140 });
+    const old = r.db.tenants.find((t) => t.name === 'Alt Eins')!;
+    const cur = r.db.tenants.find((t) => t.name === 'Neu Zwei')!;
+    expect(old).toMatchObject({ moveIn: '2009-12-01', moveOut: '2019-03-31', coldRent: 440, trackFrom: '2019-04' });
+    expect(cur.moveOut).toBe('');
+    expect(r.summary.tenants).toBe(2);
+  });
+  it('frühere Mieter haben nie offene Posten', () => {
+    const r = planBestandImport(emptyDB, csv);
+    const old = r.db.tenants.find((t) => t.name === 'Alt Eins')!;
+    expect(dueMonths(old)).toEqual([]);
+  });
+  it('erneuter Import legt nichts doppelt an', () => {
+    const first = planBestandImport(emptyDB, csv);
+    const again = planBestandImport(first.db, csv);
+    expect(again.db.tenants).toHaveLength(2);
+    expect(again.summary).toMatchObject({ tenants: 0, units: 0, properties: 0 });
+  });
+  it('unbekannter Einzug bei früherem Mieter bleibt leer (kein heutiges Datum)', () => {
+    const r = planBestandImport(emptyDB, `${head}\nHaus Test;Wohnung 5;Wohnung;;;;Unbekannt;????;31.07.2023;;`);
+    const t = r.db.tenants[0];
+    expect(t.moveIn).toBe('');
+    expect(t.moveOut).toBe('2023-07-31');
+    expect(r.warnings.some((w) => w.includes('bleibt leer'))).toBe(true);
+  });
+  it('bestehende Einheit wird ergänzt, nicht verdoppelt', () => {
+    const base = planBestandImport(emptyDB, `${head}\nHaus Test;Wohnung 4;Wohnung;50;300;100;Alt;01.01.2020;;;`).db;
+    const r = planBestandImport(base, csv);
+    expect(r.db.units).toHaveLength(1);
+    expect(r.db.properties).toHaveLength(1);
   });
 });

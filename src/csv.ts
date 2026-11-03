@@ -223,7 +223,7 @@ export function paymentsFromMatches(rows: MatchRow[], meta?: { importId: string;
 
 const BESTAND_HEADER = [
   'Haus', 'Straße', 'PLZ', 'Ort', 'Einheit', 'Typ', 'Fläche', 'Zimmer', 'Kaltmiete', 'Nebenkosten', 'USt',
-  'Mieter', 'E-Mail', 'Telefon', 'IBAN', 'Einzug', 'Kaution', 'Offene Posten ab',
+  'Mieter', 'E-Mail', 'Telefon', 'IBAN', 'Einzug', 'Auszug', 'Kaltmiete damals', 'Kaution', 'Offene Posten ab',
   // Objekt
   'Baujahr', 'Grundstück', 'Etagen', 'Heizung', 'Baujahr Heizung', 'Energieträger',
   'EA Art', 'EA Kennwert', 'EA Klasse', 'EA ausgestellt', 'EA gültig bis',
@@ -254,7 +254,7 @@ export function planBestandImport(db: DB, text: string): BestandPlan {
     haus: col('Haus', 'Objekt', 'Gebäude'), str: col('Straße', 'Strasse', 'Adresse'), plz: col('PLZ'), ort: col('Ort', 'Stadt'),
     einheit: col('Einheit', 'Wohnung', 'Bezeichnung'), typ: col('Typ', 'Art', 'Nutzung'), flaeche: col('Fläche', 'Flaeche', 'Wohnfläche', 'm²', 'qm'), zimmer: col('Zimmer'),
     kalt: col('Kaltmiete', 'Nettokaltmiete', 'Miete'), nk: col('Nebenkosten', 'NK', 'NK-Vorauszahlung', 'Vorauszahlung'), ust: col('USt', 'MwSt', 'Umsatzsteuer'),
-    mieter: col('Mieter', 'Name'), mail: col('E-Mail', 'Email', 'Mail'), tel: col('Telefon', 'Tel'), iban: col('IBAN'), einzug: col('Einzug', 'Mietbeginn'), kaution: col('Kaution'), ab: col('Offene Posten ab', 'Konto ab', 'Mietkonto ab'),
+    mieter: col('Mieter', 'Name'), mail: col('E-Mail', 'Email', 'Mail'), tel: col('Telefon', 'Tel'), iban: col('IBAN'), einzug: col('Einzug', 'Mietbeginn'), auszug: col('Auszug', 'Mietende bis', 'Ausgezogen'), kaltDamals: col('Kaltmiete damals', 'Kaltmiete Mieter'), kaution: col('Kaution'), ab: col('Offene Posten ab', 'Konto ab', 'Mietkonto ab'),
     // Objekt
     baujahr: col('Baujahr'), grundstueck: col('Grundstück', 'Grundstueck', 'Grundstücksfläche'), etagen: col('Etagen', 'Geschosse'), heizung: col('Heizung', 'Heizungsart'), heizBj: col('Baujahr Heizung', 'Heizung Baujahr'), traeger: col('Energieträger', 'Energietraeger'),
     eaArt: col('EA Art', 'Energieausweis Art'), eaWert: col('EA Kennwert', 'Energiekennwert'), eaKlasse: col('EA Klasse', 'Effizienzklasse'), eaAus: col('EA ausgestellt', 'EA Ausstellung'), eaBis: col('EA gültig bis', 'EA gueltig bis', 'EA bis'),
@@ -328,21 +328,30 @@ export function planBestandImport(db: DB, text: string): BestandPlan {
     if (tenantName) {
       const einzugRaw = get(r, c.einzug);
       const einzug = parseDate(einzugRaw);
-      if (!einzug) warnings.push(`Zeile ${line}: Einzugsdatum ${einzugRaw ? `„${einzugRaw}“ ist ungültig` : 'fehlt'} – heutiges Datum verwendet.`);
+      const auszugRaw = get(r, c.auszug);
+      const auszug = parseDate(auszugRaw);
+      if (auszugRaw && !auszug) warnings.push(`Zeile ${line}: Auszug „${auszugRaw}“ ist ungültig – als aktiver Mieter angelegt.`);
+      // Früherer Mieter (Historie): Auszug gesetzt. Dann zählen keine offenen Posten mehr.
+      const former = !!auszug;
+      if (!einzug) warnings.push(`Zeile ${line}: Einzugsdatum ${einzugRaw ? `„${einzugRaw}“ ist ungültig` : 'fehlt'} – ${former ? 'bleibt leer' : 'heutiges Datum verwendet'}.`);
       const abRaw = get(r, c.ab);
       const ab = abRaw.match(/^(\d{1,2})\.(\d{4})$/) ? `${abRaw.split('.')[1]}-${abRaw.split('.')[0].padStart(2, '0')}` : parseDate(abRaw)?.slice(0, 7);
+      const afterOut = (d: string) => { let y = Number(d.slice(0, 4)), m = Number(d.slice(5, 7)) + 1; if (m > 12) { m = 1; y++; } return `${y}-${String(m).padStart(2, '0')}`; };
       const tenData = defined({
         email: txt(r, c.mail), phone: txt(r, c.tel), iban: get(r, c.iban) ? get(r, c.iban).replace(/\s/g, '').toUpperCase() : undefined, deposit: numVal(r, c.kaution),
+        coldRent: numVal(r, c.kaltDamals),
         salutation: txt(r, c.anrede), mobile: txt(r, c.mobil), postalAddress: txt(r, c.post), emergencyContact: txt(r, c.notfall),
         contractEnd: dateIso(r, c.befristet), noticeMonths: numTxt(r, c.kuendigung), rentAdjust: txt(r, c.anpassung), nextAdjust: dateIso(r, c.naechste),
         depositType: txt(r, c.kautionsart), depositAccount: txt(r, c.kautionskonto), notes: txt(r, c.notizMieter),
+        ...(former ? { moveOut: auszug } : {}),
       });
-      const ex = next.tenants.find((x) => x.unitId === unit!.id && !x.moveOut && norm(x.name) === norm(tenantName));
+      // Wiedererkennen beim erneuten Import: aktive Mieter am Namen, frühere Mieter an Name + Einzug
+      const ex = next.tenants.find((x) => x.unitId === unit!.id && norm(x.name) === norm(tenantName) && (former ? x.moveIn === (einzug ?? '') && !!x.moveOut : !x.moveOut));
       if (ex) {
         const merged = { ...ex, ...tenData, ...(einzug ? { moveIn: einzug } : {}) };
         if (JSON.stringify(merged) !== JSON.stringify(ex)) { next.tenants = next.tenants.map((x) => (x.id === ex.id ? merged : x)); sum.updated++; }
       } else {
-        next.tenants.push({ id: uid(), unitId: unit.id, name: tenantName, email: '', phone: '', moveIn: einzug ?? today(), moveOut: '', deposit: 0, trackFrom: ab ?? today().slice(0, 7), ...tenData });
+        next.tenants.push({ id: uid(), unitId: unit.id, name: tenantName, email: '', phone: '', moveIn: einzug ?? (former ? '' : today()), moveOut: '', deposit: 0, trackFrom: former ? afterOut(auszug!) : ab ?? today().slice(0, 7), ...tenData });
         sum.tenants++;
       }
     }
