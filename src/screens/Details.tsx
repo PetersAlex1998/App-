@@ -5,8 +5,9 @@ import { Avatar, Badge, Button, EmptyState, Gap, ListRow, Note, Row, Screen, Sec
 import { CoverEmpty, CoverHero, DocumentsSection } from './Documents';
 import { expiryState } from '../docs';
 import { defaultUnitName, houseId, unitLetter, unitRef } from '../ids';
+import { kindText, sourceLabel, sourceTone } from '../payments';
 import { Platform } from 'react-native';
-import { addDays, dateDE, eur, initials, kindLabel, kindOf, monthLabel, unitDue, nkStatement, openItems, reminderLabel, today, totalOpen } from '../calc';
+import { addDays, dateDE, dueMonths, eur, initials, kindLabel, kindOf, monthLabel, unitDue, nkStatement, openItems, reminderLabel, today, totalOpen } from '../calc';
 import { exportPdf, nkHtml, reminderHtml } from '../pdf';
 import { nkModel, reminderModel } from '../letters';
 import { storeLetters } from '../outbox';
@@ -144,6 +145,7 @@ export function PropertyDetail({ route, navigation }: any) {
 
 export function TenantDetail({ route, navigation }: any) {
   const { db, save } = useStore();
+  const [showAllPay, setShowAllPay] = useState(false);
   const c = useColors();
   const { s: cfg } = useSettings();
   const t = db.tenants.find((x) => x.id === route.params.id);
@@ -217,6 +219,25 @@ export function TenantDetail({ route, navigation }: any) {
         {items.length > 1 && <Row bold left="Summe offen" right={eur(open)} color={c.danger} />}
       </Section>
       {dueNow.length > 0 && !ended && <><Button kind="destructive" icon="document-text" title={`${reminderLabel(nextLevel)} erstellen`} onPress={createReminder} /><Gap h={22} /></>}
+
+      {(() => {
+        const pays = db.payments.filter((p) => p.tenantId === t.id).sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt ?? '').localeCompare(a.createdAt ?? ''));
+        const paidRent = pays.filter((p) => p.kind === 'miete').reduce((s2, p) => s2 + p.amount, 0);
+        const soll = unit ? dueMonths(t).length * unitDue(unit) : 0;
+        const shown = showAllPay ? pays : pays.slice(0, 8);
+        return (
+          <Section title={`Zahlungen (${pays.length})`} action={{ label: '+ Erfassen', onPress: () => navigation.navigate('PaymentForm', { tenantId: t.id }) }}
+            footer={pays.length ? `Seit Kontoführung: Soll ${eur(soll)} · Mietzahlungen ${eur(paidRent)}. „Manuell“ = von Hand erfasst, „Kontoauszug“ = aus einer CSV eingelesen.` : undefined}>
+            {pays.length === 0 && <Note>Noch keine Zahlungen. Erfasse eine Zahlung von Hand oder importiere den Kontoauszug.</Note>}
+            {shown.map((p) => (
+              <ListRow key={p.id} icon="arrow-down" iconTone="ok" title={kindText(p.kind) + (p.kind === 'miete' ? ` ${monthLabel(p.month)}` : '')}
+                subtitle={`${dateDE(p.date)}${p.note ? ` · ${p.note}` : ''}`} right={`+ ${eur(p.amount)}`} rightColor={c.ok}
+                badge={{ text: sourceLabel(p) + (p.editedAt ? ' · geändert' : ''), tone: sourceTone(p) }} onPress={() => navigation.navigate('PaymentForm', { id: p.id })} />
+            ))}
+            {pays.length > 8 && <ListRow icon={showAllPay ? 'chevron-up' : 'chevron-down'} title={showAllPay ? 'Weniger anzeigen' : `Alle ${pays.length} Zahlungen anzeigen`} onPress={() => setShowAllPay(!showAllPay)} chevron={false} />}
+          </Section>
+        );
+      })()}
 
       {reminders.length > 0 && (
         <Section title="Mahnhistorie" footer="Antippen, um das PDF erneut zu erzeugen.">

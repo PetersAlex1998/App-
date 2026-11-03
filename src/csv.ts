@@ -15,7 +15,7 @@ export async function decodeFile(file: { arrayBuffer: () => Promise<ArrayBuffer>
   }
 }
 
-export function pickTextFile(accept = '.csv,text/csv,text/plain'): Promise<string | null> {
+export function pickTextFile(accept = '.csv,text/csv,text/plain'): Promise<{ name: string; text: string } | null> {
   return new Promise((resolve, reject) => {
     const input = document.createElement('input');
     input.type = 'file';
@@ -23,7 +23,7 @@ export function pickTextFile(accept = '.csv,text/csv,text/plain'): Promise<strin
     input.onchange = () => {
       const f = input.files?.[0];
       if (!f) return resolve(null);
-      decodeFile(f).then(resolve, reject);
+      decodeFile(f).then((text) => resolve({ name: f.name, text }), reject);
     };
     input.click();
   });
@@ -185,8 +185,12 @@ export function matchRows(db: DB, rows: BankRow[], overrides: Record<string, { t
   return out;
 }
 
-export function paymentsFromMatches(rows: MatchRow[]): Payment[] {
-  return rows.filter((r) => r.include && r.tenantId).map((r) => ({ id: uid(), tenantId: r.tenantId!, date: r.date, month: r.month, amount: r.amount, kind: r.kind, note: r.purpose.slice(0, 120) }));
+export function paymentsFromMatches(rows: MatchRow[], meta?: { importId: string; label: string }): Payment[] {
+  const at = new Date().toISOString();
+  return rows.filter((r) => r.include && r.tenantId).map((r) => ({
+    id: uid(), tenantId: r.tenantId!, date: r.date, month: r.month, amount: r.amount, kind: r.kind, note: r.purpose.slice(0, 120),
+    source: 'import' as const, createdAt: at, payer: r.name || undefined, importId: meta?.importId, importLabel: meta?.label,
+  }));
 }
 
 /* ───────── Bestand (Häuser, Einheiten, Mieter) ───────── */

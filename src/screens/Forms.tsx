@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 
 import { useStore, uid } from '../store';
-import { Button, ChipField, DateField, Disclosure, Field, Gap, Note, OptionRow, Row, Screen, Section, Segmented, confirm } from '../ui';
+import { Button, ChipField, DateField, Disclosure, Field, Gap, Note, OptionRow, Row, Screen, Section, Segmented, confirm, infoRows } from '../ui';
+import { sourceLong, sourceOf, stamp } from '../payments';
 import { defaultUnitName, houseId, nextHouseNo, nextUnitNo, unitLetter, unitPrefix, unitRef } from '../ids';
 import { Cost, Kind, Payment, Property, Tenant, Unit } from '../types';
 import { eur, monthLabel, num, suggestPayment, today } from '../calc';
@@ -259,7 +260,7 @@ export function TenantForm({ route, navigation }: any) {
 }
 
 export function PaymentForm({ route, navigation }: any) {
-  const { db, save } = useStore();
+  const { db, save, replaceAll } = useStore();
   const old = useItem<Payment>('payments', route.params?.id);
   const pre = route.params ?? {};
   const [f, setF] = useState(() => {
@@ -284,7 +285,14 @@ export function PaymentForm({ route, navigation }: any) {
     if (f.kind === 'miete' && !isMonth(f.month)) e.month = 'Bitte den Monat wählen, für den gezahlt wurde.';
     setErr(e);
     if (Object.keys(e).length) return false;
-    save('payments', { id: old?.id ?? uid(), tenantId: f.tenantId, date: f.date, month: f.kind === 'miete' ? f.month : f.date.slice(0, 7), amount: num(f.amount), kind: f.kind, note: f.note });
+    const next = { tenantId: f.tenantId, date: f.date, month: f.kind === 'miete' ? f.month : f.date.slice(0, 7), amount: num(f.amount), kind: f.kind, note: f.note };
+    if (old) {
+      // Herkunft bleibt erhalten; eine Änderung wird mit Zeitpunkt vermerkt
+      const changed = (Object.keys(next) as (keyof typeof next)[]).some((k) => old[k] !== next[k]);
+      save('payments', { ...old, ...next, ...(changed ? { editedAt: new Date().toISOString() } : {}) });
+    } else {
+      save('payments', { id: uid(), ...next, source: 'manuell', createdAt: new Date().toISOString() });
+    }
     return true;
   };
   return (
@@ -294,13 +302,34 @@ export function PaymentForm({ route, navigation }: any) {
         {tenants.length === 0 && <Note>Lege zuerst einen Mieter an.</Note>}
         {tenants.map((t) => <OptionRow key={t.id} selected={f.tenantId === t.id} onPress={() => pickTenant(t.id)} title={t.name} subtitle={db.units.find((u) => u.id === t.unitId)?.name} />)}
       </Section>
-      <Section title="Zahlung" footer={f.kind === 'miete' && f.tenantId ? 'Betrag und Monat sind mit dem ältesten offenen Posten vorbelegt.' : undefined}>
+      <Section title="Zahlung" footer={!old && f.kind === 'miete' && f.tenantId ? 'Betrag und Monat sind mit dem ältesten offenen Posten vorbelegt.' : undefined}>
         <Field label="Betrag" value={f.amount} onChangeText={set('amount')} keyboard="numeric" suffix="€" error={err.amount} />
         <DateField label="Zahlungsdatum" value={f.date} onChange={set('date')} error={err.date} />
         {f.kind === 'miete' && <DateField label="Miete für Monat" value={f.month} onChange={set('month')} mode="month" error={err.month} />}
         <Field label="Notiz" value={f.note} onChangeText={set('note')} placeholder="optional" />
       </Section>
-      <Footer kind="payments" id={old?.id} nav={navigation} onSave={submit} label={f.amount && num(f.amount) > 0 ? `${eur(num(f.amount))} buchen` : 'Buchen'} />
+      {old && (
+        <Section title="Herkunft" footer={sourceOf(old) === 'manuell' ? 'Diese Zahlung wurde von Hand erfasst.' : 'Diese Zahlung stammt aus einem eingelesenen Kontoauszug. Du kannst sie korrigieren; die Herkunft bleibt dokumentiert.'}>
+          {infoRows([
+            ['Quelle', sourceLong(old)],
+            ['Erfasst am', stamp(old.createdAt) || (old.createdAt ? '' : 'vor der Herkunftsangabe')],
+            ['Zuletzt geändert', stamp(old.editedAt)],
+            ['Absender (Konto)', old.payer],
+            ['Import', old.importLabel],
+          ])}
+        </Section>
+      )}
+      <Footer kind="payments" id={old?.id} nav={navigation} onSave={submit} label={old ? 'Änderungen speichern' : f.amount && num(f.amount) > 0 ? `${eur(num(f.amount))} buchen` : 'Buchen'} />
+      {old?.importId && (() => {
+        const batch = db.payments.filter((p) => p.importId === old.importId);
+        return (
+          <>
+            <Gap h={12} />
+            <Button kind="plain" icon="arrow-undo-outline" title={`Gesamten Import rückgängig machen (${batch.length})`}
+              onPress={() => confirm('Import rückgängig machen?', () => { replaceAll({ ...db, payments: db.payments.filter((p) => p.importId !== old.importId) }); navigation.goBack(); }, 'Rückgängig', `Alle ${batch.length} Zahlungen aus „${old.importLabel ?? 'diesem Import'}“ werden gelöscht. Manuell erfasste Zahlungen bleiben.`)} />
+          </>
+        );
+      })()}
     </Screen>
   );
 }

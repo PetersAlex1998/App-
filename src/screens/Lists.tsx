@@ -7,6 +7,7 @@ import { type } from '../theme';
 import { useSettings } from '../settings';
 import { houseId, unitRef } from '../ids';
 import { CoverThumb } from './Documents';
+import { sourceLabel, sourceOf, sourceTone } from '../payments';
 import { dunningPlans } from '../dunning';
 import { daysUntil, expiryState } from '../docs';
 import { dueStatements } from '../nk';
@@ -236,13 +237,14 @@ export function Tenants({ navigation }: any) {
 export function Payments({ navigation }: any) {
   const { db } = useStore();
   const [shown, setShown] = useState(6);
+  const [src, setSrc] = useState<'alle' | 'manuell' | 'import'>('alle');
   const c = useColors();
   const groups = useMemo(() => {
-    const sorted = [...db.payments].sort((a, b) => b.date.localeCompare(a.date));
+    const sorted = db.payments.filter((p) => src === 'alle' || sourceOf(p) === src).sort((a, b) => b.date.localeCompare(a.date));
     const map = new Map<string, typeof sorted>();
     sorted.forEach((p) => map.set(p.date.slice(0, 7), [...(map.get(p.date.slice(0, 7)) ?? []), p]));
     return [...map.entries()];
-  }, [db.payments]);
+  }, [db.payments, src]);
   const kindLabel2 = { miete: 'Miete', kaution: 'Kaution', nachzahlung: 'NK-Nachzahlung' } as const;
   return (
     <Screen tab>
@@ -252,8 +254,9 @@ export function Payments({ navigation }: any) {
           <ListRow icon="swap-vertical-outline" title="Kontoauszug importieren" subtitle="CSV hochladen, Eingänge automatisch zuordnen" onPress={() => navigation.navigate('StatementImport')} />
         </Section>
       )}
+      {db.payments.length > 0 && <Segmented value={src} onChange={setSrc} options={[{ label: 'Alle', value: 'alle' }, { label: 'Manuell', value: 'manuell' }, { label: 'Kontoauszug', value: 'import' }]} />}
       {groups.length === 0 ? (
-        <EmptyState icon="card" title="Noch keine Zahlungen" text="Erfasse eingehende Mieten, Kautionen und Nachzahlungen oder importiere deinen Kontoauszug. Offene Posten berechnet die App automatisch." actionLabel={db.tenants.length ? 'Zahlung erfassen' : undefined} onAction={() => navigation.navigate('PaymentForm', {})} />
+        <EmptyState icon="card" title={db.payments.length ? 'Keine Zahlungen in dieser Ansicht' : 'Noch keine Zahlungen'} text="Erfasse eingehende Mieten, Kautionen und Nachzahlungen oder importiere deinen Kontoauszug. Offene Posten berechnet die App automatisch." actionLabel={db.tenants.length ? 'Zahlung erfassen' : undefined} onAction={() => navigation.navigate('PaymentForm', {})} />
       ) : (
         <>
           {groups.slice(0, shown).map(([month, list]) => (
@@ -262,7 +265,7 @@ export function Payments({ navigation }: any) {
                 {list.map((p) => (
                   <ListRow key={p.id} icon="arrow-down" iconTone="ok" title={db.tenants.find((t) => t.id === p.tenantId)?.name ?? 'Unbekannt'}
                     subtitle={`${kindLabel2[p.kind]}${p.kind === 'miete' ? ` ${monthLabel(p.month)}` : ''} · ${dateDE(p.date)}`}
-                    right={`+ ${eur(p.amount)}`} rightColor={c.ok} onPress={() => navigation.navigate('PaymentForm', { id: p.id })} />
+                    right={`+ ${eur(p.amount)}`} rightColor={c.ok} badge={{ text: sourceLabel(p) + (p.editedAt ? ' · geändert' : ''), tone: sourceTone(p) }} onPress={() => navigation.navigate('PaymentForm', { id: p.id })} />
                 ))}
               </Section>
             </View>

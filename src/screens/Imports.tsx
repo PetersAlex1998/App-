@@ -1,11 +1,11 @@
 import React, { useMemo, useState } from 'react';
 import { Platform, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useStore } from '../store';
+import { useStore, uid } from '../store';
 import { Badge, Button, EmptyState, Field, Gap, ListRow, Note, Screen, SearchBar, Section, notify, useColors } from '../ui';
 import { BESTAND_TEMPLATE, BankRow, MatchRow, matchRows, parseBankCsv, pickTextFile, paymentsFromMatches, planBestandImport, BestandPlan } from '../csv';
 import { saveText } from '../backup';
-import { dateDE, eur, monthLabel } from '../calc';
+import { dateDE, eur, monthLabel, today } from '../calc';
 import { type } from '../theme';
 
 /* ───────── Kontoauszug importieren ───────── */
@@ -19,8 +19,10 @@ export function StatementImport({ navigation }: any) {
   const [pickFor, setPickFor] = useState<string | null>(null);
   const [q, setQ] = useState('');
   const [error, setError] = useState('');
+  const [fileName, setFileName] = useState('');
 
-  const load = (content: string) => {
+  const load = (content: string, name = '') => {
+    setFileName(name);
     const res = parseBankCsv(content);
     if (res.error) { setError(res.error); setParsed(null); return; }
     if (res.rows.length === 0) { setError('Die Datei enthält keine Zahlungseingänge.'); setParsed(null); return; }
@@ -32,10 +34,10 @@ export function StatementImport({ navigation }: any) {
   const tenantName = (id: string | null) => db.tenants.find((t) => t.id === id)?.name;
 
   const book = () => {
-    const pays = paymentsFromMatches(rows);
+    const pays = paymentsFromMatches(rows, { importId: uid(), label: `Kontoauszug-Import ${dateDE(today())}${fileName ? ` · ${fileName}` : ''}` });
     if (pays.length === 0) return notify('Es ist keine Zahlung ausgewählt.');
     replaceAll({ ...db, payments: [...db.payments, ...pays] });
-    notify(`${pays.length} Zahlungen über ${eur(total)} gebucht.`);
+    notify(`${pays.length} Zahlungen über ${eur(total)} gebucht. Sie sind als „Kontoauszug“ gekennzeichnet.`);
     navigation.goBack();
   };
 
@@ -61,7 +63,7 @@ export function StatementImport({ navigation }: any) {
       <Screen>
         <Text accessibilityRole="header" style={{ fontSize: 30, fontWeight: '800', color: c.text, letterSpacing: -0.6, marginTop: 6, marginBottom: 6 }}>Kontoauszug importieren</Text>
         <Text style={{ color: c.muted, fontSize: type.body, marginBottom: 20 }}>Lade den CSV-Export deines Mieteingangskontos hoch. Die App ordnet die Eingänge den Mietern zu, du prüfst und bestätigst.</Text>
-        {Platform.OS === 'web' && <Button icon="document-attach-outline" title="CSV-Datei auswählen" onPress={() => pickTextFile().then((t) => t && load(t)).catch((e) => setError(String(e?.message ?? e)))} />}
+        {Platform.OS === 'web' && <Button icon="document-attach-outline" title="CSV-Datei auswählen" onPress={() => pickTextFile().then((t) => t && load(t.text, t.name)).catch((e) => setError(String(e?.message ?? e)))} />}
         <Gap h={16} />
         <Section title="Oder Inhalt einfügen">
           <Field label="CSV-Inhalt" value={text} onChangeText={setText} multiline placeholder="Inhalt der CSV-Datei einfügen" />
@@ -159,7 +161,7 @@ export function BestandImport({ navigation }: any) {
       </Section>
 
       <Section title="2. Datei hochladen">
-        {Platform.OS === 'web' ? <ListRow icon="document-attach-outline" title="CSV-Datei auswählen" onPress={() => pickTextFile().then((t) => t && load(t)).catch((e) => setError(String(e?.message ?? e)))} /> : null}
+        {Platform.OS === 'web' ? <ListRow icon="document-attach-outline" title="CSV-Datei auswählen" onPress={() => pickTextFile().then((t) => t && load(t.text)).catch((e) => setError(String(e?.message ?? e)))} /> : null}
         <Field label="Oder Inhalt einfügen" value={text} onChangeText={setText} multiline placeholder="Inhalt der CSV-Datei" />
       </Section>
       {text.trim() && !plan ? <Button kind="secondary" title="Einlesen" onPress={() => load(text)} /> : null}

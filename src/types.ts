@@ -65,6 +65,13 @@ export interface Payment {
   amount: number;
   kind: PaymentKind;
   note: string;
+  // Herkunft der Buchung (Nachweis). Fehlt bei älteren Einträgen = manuell.
+  source?: 'manuell' | 'import';
+  createdAt?: string; // ISO-Zeitpunkt der Erfassung
+  editedAt?: string; // ISO-Zeitpunkt der letzten Änderung
+  payer?: string; // Absender laut Kontoauszug
+  importId?: string; // gleiche ID = gleicher Import (für „Import rückgängig“)
+  importLabel?: string; // z. B. „Kontoauszug-Import 03.11.2026 · auszug.csv“
 }
 
 export interface Reminder {
