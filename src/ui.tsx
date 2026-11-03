@@ -252,8 +252,8 @@ function FieldShell({ label, error, hint, children }: { label: string; error?: s
   );
 }
 
-export function Field({ label, value, onChangeText, keyboard, multiline, placeholder, error, suffix, hint }: {
-  label: string; value: string; onChangeText: (v: string) => void; keyboard?: 'numeric' | 'email-address' | 'phone-pad'; multiline?: boolean; placeholder?: string; error?: string; suffix?: string; hint?: string;
+export function Field({ label, value, onChangeText, keyboard, multiline, placeholder, error, suffix, hint, secure }: {
+  label: string; value: string; onChangeText: (v: string) => void; keyboard?: 'numeric' | 'email-address' | 'phone-pad'; multiline?: boolean; placeholder?: string; error?: string; suffix?: string; hint?: string; secure?: boolean;
 }) {
   const c = useColors();
   return (
@@ -261,7 +261,7 @@ export function Field({ label, value, onChangeText, keyboard, multiline, placeho
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
         <TextInput accessibilityLabel={label} value={value} onChangeText={onChangeText}
           keyboardType={keyboard === 'numeric' ? 'decimal-pad' : keyboard} autoCapitalize={keyboard === 'email-address' ? 'none' : 'sentences'}
-          multiline={multiline} placeholder={placeholder} placeholderTextColor={c.muted}
+          multiline={multiline} placeholder={placeholder} placeholderTextColor={c.muted} secureTextEntry={secure} autoCorrect={secure ? false : undefined}
           style={[{ flex: 1, color: c.text, fontSize: type.body, paddingVertical: 6, minHeight: multiline ? 80 : 36 }, Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null]} />
         {suffix ? <Text style={{ color: c.muted, fontSize: type.body, marginLeft: 6 }}>{suffix}</Text> : null}
       </View>

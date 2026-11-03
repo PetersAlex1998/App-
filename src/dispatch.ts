@@ -31,9 +31,9 @@ export function downloadBlob(blob: Blob, name: string) {
 
 export const canShareFiles = () => Platform.OS === 'web' && typeof navigator !== 'undefined' && typeof (navigator as any).canShare === 'function';
 
-/** Teilen-Menü des Geräts (Mail, Nachrichten, Dateien, Post-App …); sonst Download. */
-export async function shareFiles(files: { name: string; blob: Blob }[], title: string): Promise<'shared' | 'downloaded' | 'cancelled'> {
-  const list = files.map((f) => new File([f.blob], `${safeName(f.name)}.pdf`, { type: 'application/pdf' }));
+/** Teilen-Menü des Geräts (Mail, Nachrichten, Dateien, Post-App, iCloud/Drive …); sonst Download. */
+export async function shareFiles(files: { name: string; blob: Blob; ext?: string }[], title: string): Promise<'shared' | 'downloaded' | 'cancelled'> {
+  const list = files.map((f) => new File([f.blob], `${safeName(f.name)}.${f.ext ?? 'pdf'}`, { type: f.blob.type || (f.ext === 'json' ? 'application/json' : 'application/pdf') }));
   const nav = navigator as any;
   if (canShareFiles() && nav.canShare({ files: list })) {
     try { await nav.share({ files: list, title }); return 'shared'; }

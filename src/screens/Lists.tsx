@@ -16,7 +16,7 @@ const LIMIT = 5;
 const isActive = (t: { moveOut: string }) => !t.moveOut || t.moveOut >= today();
 
 export function Dashboard({ navigation }: any) {
-  const { db } = useStore();
+  const { db, saveError } = useStore();
   const { s: cfg } = useSettings();
   const c = useColors();
   const activeTenants = db.tenants.filter(isActive);
@@ -57,6 +57,12 @@ export function Dashboard({ navigation }: any) {
     const left = daysUntil(d.deadline);
     dues.push({ key: 'nk' + d.prop.id, icon: 'calculator', tone: left <= 90 ? 'danger' : 'warn', title: `Nebenkosten ${d.year}: ${d.prop.name}`, subtitle: `${d.open} von ${d.total} Abrechnungen offen · Frist ${dateDE(d.deadline)}`, go: () => navigation.navigate('NkLauf', { propertyId: d.prop.id }) });
   });
+  // Sicherung fällig?
+  const lastBk = cfg.lastBackupAt ? Date.parse(cfg.lastBackupAt) : 0;
+  const bkDays = lastBk ? Math.floor((Date.now() - lastBk) / 86400000) : null;
+  if (cfg.backupRemindDays > 0 && db.properties.length > 0 && (bkDays === null || bkDays >= cfg.backupRemindDays)) {
+    dues.unshift({ key: 'backup', icon: 'cloud-upload', tone: bkDays === null || bkDays >= cfg.backupRemindDays * 2 ? 'danger' : 'warn', title: 'Sicherung fällig', subtitle: bkDays === null ? 'Noch nie gesichert. Deine Daten liegen nur auf diesem Gerät.' : `Die letzte Sicherung ist ${bkDays} Tage alt.`, go: () => navigation.navigate('Daten') });
+  }
   const todoCount = dues.length + arrears.length + vacant.length + depositMissing.length;
 
   // Erste Schritte
@@ -81,6 +87,11 @@ export function Dashboard({ navigation }: any) {
     <Screen tab>
       <LargeHeader navTitle="Übersicht" title="Dein Bestand im Blick" action={{ label: 'Daten und Einstellungen', icon: 'settings-outline', onPress: () => navigation.navigate('Daten') }} subtitle={`${db.properties.length} Objekt${db.properties.length === 1 ? '' : 'e'} · ${db.units.length} Wohneinheit${db.units.length === 1 ? '' : 'en'}`} />
 
+      {saveError && (
+        <Section>
+          <ListRow icon="warning" iconTone="danger" title="Speichern fehlgeschlagen" subtitle="Änderungen sind noch nicht gesichert. Ist der Speicher voll? Erstelle jetzt eine Sicherung." onPress={() => navigation.navigate('Daten')} />
+        </Section>
+      )}
       <StatGrid>
         <Stat label="Offene Posten" value={eur(open)} tone={open > 0 ? 'danger' : 'ok'} icon="alert-circle-outline" />
         <Stat label="Soll-Miete / Monat" value={eur(rentRoll)} icon="cash-outline" />

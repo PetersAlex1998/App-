@@ -2,6 +2,7 @@ export type ID = string;
 
 export interface Property {
   id: ID;
+  updatedAt?: string; // letzte Änderung (Grundlage für den späteren Cloud-Abgleich)
   name: string;
   street: string;
   zip: string;
@@ -26,6 +27,7 @@ export type UnitKind = 'wohnung' | 'gewerbe' | 'eigentum';
 
 export interface Unit {
   id: ID;
+  updatedAt?: string; // letzte Änderung (Grundlage für den späteren Cloud-Abgleich)
   kind?: UnitKind; // fehlt = Wohnung
   no?: number; // laufende Nummer im Haus („Wohnung 12“) -> Wohnungs-ID „H03-W12“
   vat?: number; // USt-Satz in % (nur Gewerbe mit Umsatzsteuer-Option)
@@ -40,6 +42,7 @@ export interface Unit {
 
 export interface Tenant {
   id: ID;
+  updatedAt?: string; // letzte Änderung (Grundlage für den späteren Cloud-Abgleich)
   unitId: ID;
   name: string;
   email: string;
@@ -59,6 +62,7 @@ export type PaymentKind = 'miete' | 'kaution' | 'nachzahlung';
 
 export interface Payment {
   id: ID;
+  updatedAt?: string; // letzte Änderung (Grundlage für den späteren Cloud-Abgleich)
   tenantId: ID;
   date: string; // YYYY-MM-DD
   month: string; // YYYY-MM (Zuordnung bei Miete)
@@ -76,6 +80,7 @@ export interface Payment {
 
 export interface Reminder {
   id: ID;
+  updatedAt?: string; // letzte Änderung (Grundlage für den späteren Cloud-Abgleich)
   tenantId: ID;
   date: string;
   level: 1 | 2 | 3; // Zahlungserinnerung, 1. Mahnung, 2. Mahnung
@@ -90,6 +95,7 @@ export type MeterType = 'wasser_kalt' | 'wasser_warm' | 'heizung' | 'strom' | 'g
 
 export interface Meter {
   id: ID;
+  updatedAt?: string; // letzte Änderung (Grundlage für den späteren Cloud-Abgleich)
   propertyId: ID;
   unitId: ID; // '' = Allgemein (Haus)
   type: MeterType;
@@ -97,6 +103,7 @@ export interface Meter {
 }
 export interface Reading {
   id: ID;
+  updatedAt?: string; // letzte Änderung (Grundlage für den späteren Cloud-Abgleich)
   meterId: ID;
   date: string; // YYYY-MM-DD
   value: number;
@@ -104,6 +111,7 @@ export interface Reading {
 
 export interface Cost {
   id: ID;
+  updatedAt?: string; // letzte Änderung (Grundlage für den späteren Cloud-Abgleich)
   propertyId: ID;
   year: number;
   category: string;
@@ -117,6 +125,7 @@ export type DocOwner = 'property' | 'unit' | 'tenant';
 export type DocCategory = 'energieausweis' | 'mietvertrag' | 'foto' | 'versicherung' | 'grundbuch' | 'rechnung' | 'protokoll' | 'brief' | 'sonstiges';
 export interface Doc {
   id: ID;
+  updatedAt?: string; // letzte Änderung (Grundlage für den späteren Cloud-Abgleich)
   ownerKind: DocOwner;
   ownerId: ID;
   category: DocCategory;

@@ -1,5 +1,6 @@
 import React from 'react';
-import { ActivityIndicator } from 'react-native';
+import { ActivityIndicator, Text, View } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DefaultTheme, Stack, ThemeProvider as NavThemeProvider } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -7,15 +8,51 @@ import { StoreProvider, useStore } from '../store';
 import { SettingsProvider } from '../settings';
 import { ThemeProvider, useColors, useIsDark } from '../theme';
 import { filesSupported, requestPersistence } from '../files';
+import { LockOverlay, LockProvider, useLock } from '../lock';
+import { KEY_DEFEKT } from '../repo';
+import { downloadBlob } from '../dispatch';
+import { Button, Gap, Screen, useColors as useUiColors } from '../ui';
 
 const edit = (neu: string, bearbeiten: string) => ({ route }: any) => ({ title: route.params?.id ? bearbeiten : neu });
 
+/** Verbirgt die App komplett, solange sie gesperrt ist (Zustand bleibt erhalten, nichts ist sichtbar oder auslesbar). */
+function Guarded({ children }: { children: React.ReactNode }) {
+  const { locked } = useLock();
+  return <View style={{ flex: 1, display: locked ? 'none' : 'flex' }}>{children}</View>;
+}
+
+function DataProblem() {
+  const { loadError, loadKind, startEmpty } = useStore();
+  const col = useUiColors();
+  const saveCopy = async () => {
+    const raw = await AsyncStorage.getItem(KEY_DEFEKT);
+    if (raw) downloadBlob(new Blob([raw], { type: 'application/json' }), 'immo-defekte-daten.json');
+  };
+  return (
+    <Screen>
+      <Gap h={40} />
+      <Text accessibilityRole="header" style={{ fontSize: 24, fontWeight: '800', marginBottom: 10, color: col.text }}>Daten konnten nicht geladen werden</Text>
+      <Text style={{ fontSize: 16, marginBottom: 20, color: col.text }}>{loadError}</Text>
+      <Button title="Erneut versuchen" icon="refresh" onPress={() => window.location.reload()} />
+      {loadKind === 'corrupt' && (
+        <>
+          <Gap h={10} />
+          <Button kind="secondary" title="Defekte Daten als Datei sichern" icon="download-outline" onPress={saveCopy} />
+          <Gap h={10} />
+          <Button kind="destructive" title="Mit leeren Daten starten" onPress={() => { if (window.confirm('Mit leeren Daten starten? Die defekte Kopie bleibt im Browser gespeichert. Spiele danach am besten deine Sicherung ein.')) startEmpty(); }} />
+        </>
+      )}
+    </Screen>
+  );
+}
+
 function Shell() {
-  const { ready } = useStore();
+  const { ready, loadError } = useStore();
   const c = useColors();
   const dark = useIsDark();
   React.useEffect(() => { if (filesSupported()) requestPersistence(); }, []);
   if (!ready) return <ActivityIndicator style={{ flex: 1 }} />;
+  if (loadError) return <DataProblem />;
   const theme = { ...DefaultTheme, dark, colors: { primary: c.primary, background: c.bg, card: c.card, text: c.text, border: c.line, notification: c.danger } };
   return (
     <NavThemeProvider value={theme}>
@@ -24,6 +61,7 @@ function Shell() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="suche" options={{ title: 'Suche' }} />
         <Stack.Screen name="daten" options={{ title: 'Daten' }} />
+        <Stack.Screen name="sperre" options={{ title: 'App-Sperre' }} />
         <Stack.Screen name="briefe" options={{ title: 'Briefe und Regeln' }} />
         <Stack.Screen name="briefausgang" options={{ title: 'Briefausgang' }} />
         <Stack.Screen name="mahnlauf" options={{ title: 'Mahnlauf' }} />
@@ -54,11 +92,18 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <ThemeProvider>
-        <SettingsProvider>
-          <StoreProvider>
-            <Shell />
-          </StoreProvider>
-        </SettingsProvider>
+        <LockProvider>
+          <View style={{ flex: 1 }}>
+            <Guarded>
+              <SettingsProvider>
+                <StoreProvider>
+                  <Shell />
+                </StoreProvider>
+              </SettingsProvider>
+            </Guarded>
+            <LockOverlay />
+          </View>
+        </LockProvider>
       </ThemeProvider>
     </SafeAreaProvider>
   );
