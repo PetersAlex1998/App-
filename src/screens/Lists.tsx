@@ -11,12 +11,14 @@ import { sourceLabel, sourceOf, sourceTone } from '../payments';
 import { dunningPlans } from '../dunning';
 import { daysUntil, expiryState } from '../docs';
 import { dueStatements } from '../nk';
+import { useOnline } from '../pwa';
 
 const LIMIT = 5;
 const isActive = (t: { moveOut: string }) => !t.moveOut || t.moveOut >= today();
 
 export function Dashboard({ navigation }: any) {
   const { db, saveError } = useStore();
+  const online = useOnline();
   const { s: cfg } = useSettings();
   const c = useColors();
   const activeTenants = db.tenants.filter(isActive);
@@ -87,6 +89,11 @@ export function Dashboard({ navigation }: any) {
     <Screen tab>
       <LargeHeader navTitle="Übersicht" title="Dein Bestand im Blick" action={{ label: 'Daten und Einstellungen', icon: 'settings-outline', onPress: () => navigation.navigate('Daten') }} subtitle={`${db.properties.length} Objekt${db.properties.length === 1 ? '' : 'e'} · ${db.units.length} Wohneinheit${db.units.length === 1 ? '' : 'en'}`} />
 
+      {!online && (
+        <Section>
+          <ListRow icon="cloud-offline" iconTone="warn" title="Du bist offline" subtitle="Alles funktioniert weiter. Deine Änderungen liegen sicher auf diesem Gerät." />
+        </Section>
+      )}
       {saveError && (
         <Section>
           <ListRow icon="warning" iconTone="danger" title="Speichern fehlgeschlagen" subtitle="Änderungen sind noch nicht gesichert. Ist der Speicher voll? Erstelle jetzt eine Sicherung." onPress={() => navigation.navigate('Daten')} />
@@ -247,7 +254,7 @@ export function Tenants({ navigation }: any) {
 
 export function Payments({ navigation }: any) {
   const { db } = useStore();
-  const [shown, setShown] = useState(6);
+  const [shown, setShown] = useState(4);
   const [src, setSrc] = useState<'alle' | 'manuell' | 'import'>('alle');
   const c = useColors();
   const groups = useMemo(() => {
@@ -281,7 +288,7 @@ export function Payments({ navigation }: any) {
               </Section>
             </View>
           ))}
-          {groups.length > shown && <Button kind="secondary" title="Ältere Monate anzeigen" onPress={() => setShown(shown + 6)} />}
+          {groups.length > shown && <Button kind="secondary" title="Ältere Monate anzeigen" onPress={() => setShown(shown + 4)} />}
         </>
       )}
       <Gap h={4} />

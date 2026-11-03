@@ -8,6 +8,7 @@ import { demoData } from '../demo';
 import { EncryptedBackupError, exportBackup, isEncryptedBackup, parseBackupAny, pickBackupFile, restoreFiles } from '../backup';
 import { cryptoAvailable } from '../crypto';
 import { dateDE } from '../calc';
+import { useOfflineReady, useOnline } from '../pwa';
 import { filesSupported, fmtSize, requestPersistence, storageInfo } from '../files';
 
 export function DataScreen({ navigation }: any) {
@@ -23,6 +24,8 @@ export function DataScreen({ navigation }: any) {
   const refreshStore = () => { if (filesSupported()) storageInfo().then(setStore); };
   useEffect(refreshStore, [db.documents.length]);
   const docBytes = db.documents.reduce((a, d) => a + d.size, 0);
+  const offline = useOfflineReady();
+  const online = useOnline();
 
   const lastBackup = cfg.lastBackupAt ? Date.parse(cfg.lastBackupAt) : 0;
   const daysAgo = lastBackup ? Math.floor((Date.now() - lastBackup) / 86400000) : null;
@@ -66,6 +69,14 @@ export function DataScreen({ navigation }: any) {
         <ListRow icon="people" title="Mieter" right={String(db.tenants.length)} />
         <ListRow icon="card" title="Zahlungen" right={String(db.payments.length)} />
       </Section>
+
+      {Platform.OS === 'web' && (
+        <Section title="Offline-Nutzung" footer={offline === 'bereit' ? 'Die App startet auch ohne Internet, zum Beispiel im Keller. Neue Versionen meldet sie dir und aktualisiert erst, wenn du es bestätigst.' : offline === 'wartet' ? 'Öffne die App einmal mit Internet und lade sie danach neu. Dann startet sie auch ohne Netz.' : 'In dieser Umgebung ist der Offline-Modus nicht verfügbar.'}>
+          <ListRow icon={offline === 'bereit' ? 'cloud-offline' : 'cloud-download-outline'} iconTone={offline === 'bereit' ? 'ok' : 'warn'} title="Offline-Modus"
+            right={offline === 'bereit' ? 'Bereit' : offline === 'wartet' ? 'Wird vorbereitet' : 'Nicht verfügbar'} />
+          <ListRow icon={online ? 'wifi' : 'wifi-outline'} title="Verbindung" right={online ? 'Online' : 'Offline'} />
+        </Section>
+      )}
 
       {filesSupported() && (
         <Section title="Speicher" footer={store && !store.persisted ? 'Der Browser darf diese Daten im Notfall löschen, z. B. bei Speichermangel. Lege die App auf den Home-Bildschirm und fordere dauerhaften Speicher an. Sichere außerdem regelmäßig.' : undefined}>

@@ -1,5 +1,5 @@
 import { DB, Payment, Tenant, UnitKind } from './types';
-import { addDays, openItems, today, unitDue } from './calc';
+import { addDays, oldestOpenMonth, today, unitDue } from './calc';
 import { uid } from './store';
 import { unitLetter } from './ids';
 
@@ -131,58 +131,82 @@ function monthFromText(text: string): string | null {
   return m ? `${m[2]}-${String(MONTH_NAMES.indexOf(m[1]) + 1).padStart(2, '0')}` : null;
 }
 
-function scoreTenant(db: DB, t: Tenant, r: BankRow): number {
-  const hay = ` ${norm(`${r.name} ${r.purpose}`)} `;
-  let s = 0;
-  if (t.iban && r.iban && t.iban.replace(/\s/g, '').toUpperCase() === r.iban) s += 100;
-  const tokens = norm(t.name).split(' ').filter((w) => w.length >= 2);
-  const last = tokens[tokens.length - 1];
-  if (tokens.length >= 2 && tokens.every((w) => hay.includes(` ${w} `))) s += 70;
-  else if (last && last.length >= 3 && hay.includes(` ${last} `)) s += 50;
-  const unit = db.units.find((u) => u.id === t.unitId);
-  // Eindeutige Wohnungs-ID (H03-W12) im Verwendungszweck: sicherster Treffer
-  const prop = db.properties.find((p) => p.id === unit?.propertyId);
-  if (prop?.houseNo && unit?.no) {
-    const re = new RegExp(`(?:^|[^A-Za-z0-9])H\\s*0*${prop.houseNo}\\s*[-–_./ ]?\\s*${unitLetter(unit.kind)}\\s*0*${unit.no}(?![0-9])`, 'i');
-    if (re.test(`${r.purpose} ${r.name}`)) s += 100;
+/** Zwischenergebnis der Bewertung: pro Zeile der beste Mieter. Unabhängig von manuellen Änderungen, daher nur einmal zu rechnen. */
+export interface RowScore { row: BankRow; tenantId: string | null; score: number; tie: boolean }
+
+const REF_RE = /(?:^|[^A-Za-z0-9])H\s*0*(\d{1,3})\s*[-–_./ ]?\s*([WG])\s*0*(\d{1,3})(?!\d)/gi;
+
+/** Bewertet alle Zeilen. Vorab berechnete Mieterdaten und eine Nachschlagetabelle für Wohnungs-IDs halten das schnell (auch bei tausenden Zeilen). */
+export function scoreRows(db: DB, rows: BankRow[]): RowScore[] {
+  const unitById = new Map(db.units.map((u) => [u.id, u]));
+  const propById = new Map(db.properties.map((p) => [p.id, p]));
+  const infos = db.tenants.map((t) => {
+    const unit = unitById.get(t.unitId);
+    const tokens = norm(t.name).split(' ').filter((w) => w.length >= 2);
+    return { t, unit, tokens, last: tokens[tokens.length - 1], un: unit ? norm(unit.name) : '', iban: (t.iban ?? '').replace(/\s/g, '').toUpperCase(), due: unit ? unitDue(unit) : NaN };
+  });
+  // Wohnungs-ID -> Mieter dieser Einheit
+  const byRef = new Map<string, typeof infos>();
+  for (const i of infos) {
+    const prop = i.unit ? propById.get(i.unit.propertyId) : undefined;
+    if (!prop?.houseNo || !i.unit?.no) continue;
+    const key = `${prop.houseNo}|${unitLetter(i.unit.kind)}|${i.unit.no}`;
+    byRef.set(key, [...(byRef.get(key) ?? []), i]);
   }
-  const un = unit ? norm(unit.name) : '';
-  if (un.length >= 3 && hay.includes(` ${un} `)) s += 25;
-  if (unit && Math.abs(r.amount - unitDue(unit)) < 0.01) s += 25;
-  return s;
+  return [...rows].sort((a, b) => a.date.localeCompare(b.date)).map((r) => {
+    const hay = ` ${norm(`${r.name} ${r.purpose}`)} `;
+    const lo = addDays(r.date, 31), hi = addDays(r.date, -62);
+    // Wohnungs-IDs im Text (H03-W12): sicherster Treffer
+    const refHits = new Set<string>();
+    for (const m of `${r.purpose} ${r.name}`.matchAll(REF_RE)) for (const i of byRef.get(`${Number(m[1])}|${m[2].toUpperCase()}|${Number(m[3])}`) ?? []) refHits.add(i.t.id);
+    let best: { id: string; s: number } | null = null, second = 0;
+    for (const i of infos) {
+      if (!(i.t.moveIn <= lo && (!i.t.moveOut || i.t.moveOut >= hi))) continue;
+      let s = 0;
+      if (i.iban && r.iban && i.iban === r.iban) s += 100;
+      if (i.tokens.length >= 2 && i.tokens.every((w) => hay.includes(` ${w} `))) s += 70;
+      else if (i.last && i.last.length >= 3 && hay.includes(` ${i.last} `)) s += 50;
+      if (refHits.has(i.t.id)) s += 100;
+      if (i.un.length >= 3 && hay.includes(` ${i.un} `)) s += 25;
+      if (i.unit && Math.abs(r.amount - i.due) < 0.01) s += 25;
+      if (!best || s > best.s) { second = best?.s ?? 0; best = { id: i.t.id, s }; }
+      else if (s > second) second = s;
+    }
+    const tie = !!best && best.s > 0 && second === best.s;
+    return { row: r, tenantId: best && best.s >= 40 ? best.id : null, score: best?.s ?? 0, tie };
+  });
 }
 
-/** Ordnet Eingänge Mietern zu. `overrides`: manuelle Zuordnung (Mieter-ID oder null = ignorieren) und Häkchen. */
-export function matchRows(db: DB, rows: BankRow[], overrides: Record<string, { tenantId?: string | null; include?: boolean }> = {}): MatchRow[] {
-  const sorted = [...rows].sort((a, b) => a.date.localeCompare(b.date));
-  let sim: DB = { ...db, payments: [...db.payments] }; // Simulation: Buchungen dieses Laufs zählen für „ältester offener Monat“
+/** Wendet manuelle Änderungen an und ermittelt Monat, Art und Status. Schnell: wird bei jedem Häkchen neu gerechnet. */
+export function applyMatches(db: DB, scores: RowScore[], overrides: Record<string, { tenantId?: string | null; include?: boolean }> = {}): MatchRow[] {
+  const tenantById = new Map(db.tenants.map((t) => [t.id, t]));
+  const existing = new Set(db.payments.map((p) => `${p.tenantId}|${p.date}|${p.amount.toFixed(2)}`));
+  const extra = new Map<string, number>(); // Buchungen dieses Laufs zählen für „ältester offener Monat“
   const out: MatchRow[] = [];
-  for (const r of sorted) {
-    const candidates = db.tenants.filter((t) => t.moveIn <= addDays(r.date, 31) && (!t.moveOut || t.moveOut >= addDays(r.date, -62)));
-    const scored = candidates.map((t) => ({ t, s: scoreTenant(db, t, r) })).sort((a, b) => b.s - a.s);
+  for (const sc of scores) {
+    const r = sc.row;
     const ov = overrides[r.id];
-    let tenantId: string | null = scored[0] && scored[0].s >= 40 ? scored[0].t.id : null;
-    let score = scored[0]?.s ?? 0;
-    const tie = scored.length > 1 && scored[0].s === scored[1].s && scored[0].s > 0;
+    let tenantId = sc.tenantId;
+    let score = sc.score;
     if (ov && 'tenantId' in ov) { tenantId = ov.tenantId ?? null; score = tenantId ? 100 : 0; }
-    const tenant = db.tenants.find((t) => t.id === tenantId);
-    let status: MatchStatus = !tenant ? 'offen' : score >= 75 && !tie ? 'sicher' : 'pruefen';
-    const dup = tenant && db.payments.some((p) => p.tenantId === tenant.id && p.date === r.date && Math.abs(p.amount - r.amount) < 0.01);
-    if (dup) status = 'doppelt';
+    const tenant = tenantId ? tenantById.get(tenantId) : undefined;
+    let status: MatchStatus = !tenant ? 'offen' : score >= 75 && !sc.tie ? 'sicher' : 'pruefen';
+    if (tenant && existing.has(`${tenant.id}|${r.date}|${r.amount.toFixed(2)}`)) status = 'doppelt';
     const text = `${r.purpose} ${r.name}`;
     const nt = norm(text);
     const kind: Payment['kind'] = nt.includes('kaution') ? 'kaution' : /nebenkosten|betriebskosten|nachzahlung|abrechnung/.test(nt) ? 'nachzahlung' : 'miete';
     let month = r.date.slice(0, 7);
-    if (tenant && kind === 'miete') {
-      month = monthFromText(text) ?? openItems(sim, tenant)[0]?.month ?? month;
-    }
+    if (tenant && kind === 'miete') month = monthFromText(text) ?? oldestOpenMonth(db, tenant, extra) ?? month;
     const include = ov?.include ?? status === 'sicher';
-    if (tenant && include && status !== 'doppelt') {
-      sim = { ...sim, payments: [...sim.payments, { id: r.id, tenantId: tenant.id, date: r.date, month, amount: r.amount, kind, note: '' }] };
-    }
+    if (tenant && include && status !== 'doppelt' && kind === 'miete') extra.set(`${tenant.id}|${month}`, (extra.get(`${tenant.id}|${month}`) ?? 0) + r.amount);
     out.push({ ...r, tenantId: tenant?.id ?? null, score, status, month, kind, include: include && !!tenant && status !== 'doppelt' });
   }
   return out;
+}
+
+/** Ordnet Eingänge Mietern zu. `overrides`: manuelle Zuordnung (Mieter-ID oder null = ignorieren) und Häkchen. */
+export function matchRows(db: DB, rows: BankRow[], overrides: Record<string, { tenantId?: string | null; include?: boolean }> = {}): MatchRow[] {
+  return applyMatches(db, scoreRows(db, rows), overrides);
 }
 
 export function paymentsFromMatches(rows: MatchRow[], meta?: { importId: string; label: string }): Payment[] {

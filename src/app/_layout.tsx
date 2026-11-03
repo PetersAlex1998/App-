@@ -12,6 +12,9 @@ import { LockOverlay, LockProvider, useLock } from '../lock';
 import { KEY_DEFEKT } from '../repo';
 import { downloadBlob } from '../dispatch';
 import { Button, Gap, Screen, useColors as useUiColors } from '../ui';
+import { useUpdateAvailable } from '../pwa';
+import { Pressable } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const edit = (neu: string, bearbeiten: string) => ({ route }: any) => ({ title: route.params?.id ? bearbeiten : neu });
 
@@ -46,6 +49,21 @@ function DataProblem() {
   );
 }
 
+/** Hinweis, wenn eine neue App-Version bereitliegt. Aktualisiert wird erst auf Tipp, nie mitten in der Arbeit. */
+function UpdateBanner() {
+  const { available, apply } = useUpdateAvailable();
+  const insets = useSafeAreaInsets();
+  const col = useUiColors();
+  if (!available) return null;
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel="Neue Version verfügbar. Jetzt aktualisieren" onPress={apply}
+      style={{ position: 'absolute', top: insets.top + 8, left: 16, right: 16, zIndex: 100, backgroundColor: col.ink, borderRadius: 16, paddingVertical: 12, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+      <Text style={{ color: col.onInk, fontWeight: '600', fontSize: 15, flex: 1 }}>Neue Version verfügbar</Text>
+      <Text style={{ color: col.onInk, fontWeight: '800', fontSize: 15 }}>Aktualisieren</Text>
+    </Pressable>
+  );
+}
+
 function Shell() {
   const { ready, loadError } = useStore();
   const c = useColors();
@@ -57,6 +75,7 @@ function Shell() {
   return (
     <NavThemeProvider value={theme}>
       <StatusBar style={dark ? 'light' : 'dark'} />
+      <UpdateBanner />
       <Stack screenOptions={{ headerStyle: { backgroundColor: c.bg }, headerShadowVisible: false, headerTintColor: c.primary, headerTitleStyle: { color: c.text, fontWeight: '700' }, headerBackTitle: 'Zurück', headerTitleAlign: 'center', contentStyle: { backgroundColor: c.bg } }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="suche" options={{ title: 'Suche' }} />

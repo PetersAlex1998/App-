@@ -52,6 +52,20 @@ function paidIndex(db: DB): Map<string, number> {
   return m;
 }
 
+/** Ältester offener Mietmonat; `extra` = zusätzlich (noch nicht gebuchte) Zahlungen je „Mieter|Monat“. */
+export function oldestOpenMonth(db: DB, t: Tenant, extra?: Map<string, number>): string | undefined {
+  const unit = db.units.find((u) => u.id === t.unitId);
+  if (!unit) return undefined;
+  const due = unitDue(unit);
+  const idx = paidIndex(db);
+  for (const month of dueMonths(t)) {
+    const key = `${t.id}|${month}`;
+    const paid = (idx.get(key) ?? 0) + (extra?.get(key) ?? 0);
+    if (Math.round((due - paid) * 100) / 100 > 0.005) return month;
+  }
+  return undefined;
+}
+
 export function openItems(db: DB, t: Tenant): OpenItem[] {
   const unit = db.units.find((u) => u.id === t.unitId);
   if (!unit) return [];

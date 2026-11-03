@@ -3,7 +3,7 @@ import { Platform, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore, uid } from '../store';
 import { Badge, Button, EmptyState, Field, Gap, ListRow, Note, Screen, SearchBar, Section, notify, useColors } from '../ui';
-import { BESTAND_TEMPLATE, BankRow, MatchRow, matchRows, parseBankCsv, pickTextFile, paymentsFromMatches, planBestandImport, BestandPlan } from '../csv';
+import { BESTAND_TEMPLATE, BankRow, MatchRow, applyMatches, scoreRows, parseBankCsv, pickTextFile, paymentsFromMatches, planBestandImport, BestandPlan } from '../csv';
 import { saveText } from '../backup';
 import { dateDE, eur, monthLabel, today } from '../calc';
 import { type } from '../theme';
@@ -26,9 +26,19 @@ export function StatementImport({ navigation }: any) {
     const res = parseBankCsv(content);
     if (res.error) { setError(res.error); setParsed(null); return; }
     if (res.rows.length === 0) { setError('Die Datei enthält keine Zahlungseingänge.'); setParsed(null); return; }
-    setError(''); setOverrides({}); setParsed({ rows: res.rows, skipped: res.skippedOutgoing, columns: res.columns });
+    setError(''); setOverrides({}); setLimit(60); setParsed({ rows: res.rows, skipped: res.skippedOutgoing, columns: res.columns });
   };
-  const rows: MatchRow[] = useMemo(() => (parsed ? matchRows(db, parsed.rows, overrides) : []), [db, parsed, overrides]);
+  // Bewertung nur einmal; Änderungen (Häkchen, manuelle Zuordnung) wenden nur noch das Ergebnis neu an
+  const scores = useMemo(() => (parsed ? scoreRows(db, parsed.rows) : []), [db, parsed]);
+  const rows: MatchRow[] = useMemo(() => applyMatches(db, scores, overrides), [db, scores, overrides]);
+  // Feste Reihenfolge: erst was geprüft werden muss, dann sichere Treffer, dann bereits gebuchte
+  const order = useMemo(() => {
+    const rank = { pruefen: 0, offen: 1, sicher: 2, doppelt: 3 } as const;
+    return applyMatches(db, scores).sort((a, b) => rank[a.status] - rank[b.status] || a.date.localeCompare(b.date)).map((r) => r.id);
+  }, [db, scores]);
+  const [limit, setLimit] = useState(60);
+  const byId = useMemo(() => new Map(rows.map((r) => [r.id, r])), [rows]);
+  const ordered = order.map((id) => byId.get(id)!).filter(Boolean);
   const chosen = rows.filter((r) => r.include);
   const total = chosen.reduce((s, r) => s + r.amount, 0);
   const tenantName = (id: string | null) => db.tenants.find((t) => t.id === id)?.name;
@@ -89,10 +99,10 @@ export function StatementImport({ navigation }: any) {
     <Screen>
       <Text accessibilityRole="header" style={{ fontSize: 30, fontWeight: '800', color: c.text, letterSpacing: -0.6, marginTop: 6, marginBottom: 6 }}>{rows.length} Eingänge</Text>
       <Text style={{ color: c.muted, fontSize: type.subhead, marginBottom: 16 }}>
-        {counts.sicher} sicher · {counts.pruefen} prüfen · {counts.offen} offen · {counts.doppelt} doppelt{parsed.skipped ? ` · ${parsed.skipped} Ausgänge übersprungen` : ''}
+        {counts.sicher} sicher · {counts.pruefen} prüfen · {counts.offen} offen · {counts.doppelt} doppelt{parsed.skipped ? ` · ${parsed.skipped} Ausgänge übersprungen` : ''}{rows.length > 60 ? '. Zeilen mit Prüfbedarf stehen oben.' : ''}
       </Text>
       <Section>
-        {rows.map((r) => {
+        {ordered.slice(0, limit).map((r) => {
           const st = label[r.status];
           const disabled = r.status === 'doppelt';
           return (
@@ -123,6 +133,8 @@ export function StatementImport({ navigation }: any) {
           );
         })}
       </Section>
+      {ordered.length > limit && <Button kind="secondary" icon="chevron-down" title={`Weitere ${Math.min(60, ordered.length - limit)} anzeigen (${ordered.length - limit} übrig)`} onPress={() => setLimit(limit + 60)} />}
+      {ordered.length > limit && <Gap h={8} />}
       <Button icon="checkmark" title={chosen.length ? `${chosen.length} Zahlungen buchen (${eur(total)})` : 'Nichts ausgewählt'} onPress={book} disabled={chosen.length === 0} />
       <Gap h={10} />
       <Button kind="plain" title="Andere Datei wählen" onPress={() => { setParsed(null); setText(''); }} />
