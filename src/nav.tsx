@@ -8,7 +8,7 @@ import { router, useLocalSearchParams, useNavigation } from 'expo-router';
  */
 const ROUTES: Record<string, string> = {
   // Tabs
-  Tabs: '/', 'Übersicht': '/', Objekte: '/objekte', Mieter: '/mieter', Zahlungen: '/zahlungen',
+  Tabs: '/', 'Übersicht': '/', Objekte: '/objekte', Mieter: '/mieter', Zahlungen: '/zahlungen', Module: '/module',
   // Details und Formulare
   PropertyDetail: '/objekt/[id]', PropertyForm: '/objekt/formular',
   UnitDetail: '/wohnung/[id]', UnitForm: '/wohnung/formular', UnitSeries: '/wohnung/serie',
@@ -21,7 +21,7 @@ const ROUTES: Record<string, string> = {
   Aufgaben: '/aufgaben', Cloud: '/cloud', Ausgaben: '/ausgaben', ExpenseForm: '/ausgabe/formular', AnlageV: '/anlage-v',
   StatementImport: '/kontoauszug', ZaehlerImport: '/zaehler-import', BestandImport: '/bestand-import',
 };
-const TABS = new Set(['Tabs', 'Übersicht', 'Objekte', 'Mieter', 'Zahlungen']);
+const TABS = new Set(['Tabs', 'Übersicht', 'Objekte', 'Mieter', 'Zahlungen', 'Module']);
 
 const clean = (p?: Record<string, unknown>) =>
   Object.fromEntries(Object.entries(p ?? {}).filter(([, v]) => v !== undefined && v !== null).map(([k, v]) => [k, String(v)]));
