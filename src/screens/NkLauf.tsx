@@ -5,11 +5,13 @@ import { useStore } from '../store';
 import { useSettings } from '../settings';
 import { Badge, Button, EmptyState, FilterChips, Gap, ListRow, Note, Row, Screen, Section, Segmented, confirm, notify, useColors } from '../ui';
 import { nkOverview } from '../nk';
+import { suggestCosts } from '../nkCosts';
+import { advanceProposal, effectiveFrom } from '../advance';
 import { exportPdf, nkHtml } from '../pdf';
-import { nkModel } from '../letters';
+import { advanceModel, nkModel } from '../letters';
 import { storeLetters } from '../outbox';
 import { filesSupported } from '../files';
-import { dateDE, eur } from '../calc';
+import { dateDE, eur, today } from '../calc';
 import { type } from '../theme';
 
 export function NkLauf({ route, navigation }: any) {
@@ -23,6 +25,10 @@ export function NkLauf({ route, navigation }: any) {
   const prop = db.properties.find((p) => p.id === propertyId);
   const years = [0, 1, 2, 3].map((o) => new Date().getFullYear() - o);
   const ov = useMemo(() => (prop ? nkOverview(db, prop, year) : null), [db, prop, year]);
+
+  const fromExp = useMemo(() => (prop ? suggestCosts(db, prop.id, year) : []), [db, prop, year]);
+  const open = fromExp.filter((x) => !x.existing || Math.abs(x.existing.amount - x.amount) > 0.005);
+  const adv = useMemo(() => (ov && prop ? ov.rows.map((r) => ({ r, p: advanceProposal(db, r.tenant, r.unit, year) })).filter((x) => x.p && x.p.change && (!x.r.tenant.moveOut || x.r.tenant.moveOut >= today()) && x.r.tenant.advanceChange?.amount !== x.p.proposed) : []), [db, ov, prop, year]);
 
   if (!prop || !ov) return <Screen><EmptyState icon="business" title="Kein Objekt" text="Lege zuerst ein Objekt mit Wohnungen und Mietern an." /></Screen>;
 
@@ -53,6 +59,23 @@ export function NkLauf({ route, navigation }: any) {
     }, 'Erstellen', `Jede Abrechnung wird als PDF im Briefausgang abgelegt. Nachzahlungen: ${eur(sumNach)} · Guthaben: ${eur(sumGut)}.`);
   };
 
+  const runAdvance = () => {
+    const date = today();
+    const from = effectiveFrom(date);
+    confirm(`${adv.length} Anpassung${adv.length === 1 ? '' : 'en'} der Vorauszahlung erstellen?`, async () => {
+      const picked = adv.filter((x) => x.p);
+      const ids = new Map(picked.map((x) => [x.r.tenant.id, x.p!]));
+      const tenants = db.tenants.map((t) => (ids.has(t.id) ? { ...t, advanceChange: { from, amount: ids.get(t.id)!.proposed, letterDate: date } } : t));
+      if (filesSupported()) {
+        try {
+          const docs = await storeLetters(picked.map((x) => ({ model: advanceModel(x.r.tenant, x.r.unit, prop, year, x.p!.current, x.p!.proposed, from, cfg), tenant: x.r.tenant, note: `Vorauszahlung ab ${dateDE(from)}` })));
+          replaceAll({ ...db, tenants, documents: [...db.documents, ...docs] });
+          navigation.replace('Outbox');
+        } catch (e: any) { notify(`PDF konnte nicht erstellt werden: ${e?.message ?? e}`); }
+      }
+    }, 'Erstellen', `Gilt ab ${dateDE(from)}. Die Briefe liegen danach im Briefausgang. Die neue Vorauszahlung übernimmst du in der Wohnung, sobald sie gilt (die App erinnert dich).`);
+  };
+
   return (
     <Screen>
       <Text accessibilityRole="header" style={{ fontSize: 30, fontWeight: '800', color: c.text, letterSpacing: -0.6, marginTop: 6, marginBottom: 6 }}>Nebenkosten-Lauf</Text>
@@ -68,6 +91,15 @@ export function NkLauf({ route, navigation }: any) {
         <Row left="Vorauszahlungen der Mieter" right={eur(ov.advances)} />
       </Section>
 
+      {fromExp.length > 0 && (
+        <Section>
+          <ListRow icon="receipt-outline" iconTone={open.length ? 'warn' : 'ok'} title={open.length ? `${open.length} Kostenart${open.length === 1 ? '' : 'en'} aus Ausgaben übernehmen` : 'Kosten sind aus den Ausgaben übernommen'}
+            subtitle={`${eur(fromExp.reduce((a, x) => a + x.amount, 0))} umlagefähige Ausgaben in ${year}`} onPress={() => navigation.navigate('NkKosten', { propertyId: prop.id, year })} />
+        </Section>
+      )}
+      {ov.totalCosts === 0 && fromExp.length === 0 && (
+        <Section><ListRow icon="receipt-outline" title="Kosten aus Ausgaben übernehmen" subtitle="Markiere Ausgaben als umlagefähig, dann entstehen die Kostenpositionen automatisch" onPress={() => navigation.navigate('NkKosten', { propertyId: prop.id, year })} /></Section>
+      )}
       {ov.totalCosts === 0 && (
         <Section><ListRow icon="alert-circle" iconTone="warn" title={`Für ${year} sind keine Kosten erfasst`} subtitle="Betriebskosten im Objekt eintragen" onPress={() => navigation.navigate('PropertyDetail', { id: prop.id })} /></Section>
       )}
@@ -105,6 +137,7 @@ export function NkLauf({ route, navigation }: any) {
                 {!r.hasCosts ? <Badge text="Keine Kosten erfasst" tone="neutral" /> : r.res.months === 0 ? <Badge text="Keine Mietmonate" tone="neutral" /> : null}
                 {r.done ? <Badge text={`Erstellt am ${dateDE(r.done)}`} tone="ok" /> : null}
                 {r.res.warnings.length > 0 ? <Badge text={`${r.res.warnings.length} Hinweis${r.res.warnings.length === 1 ? '' : 'e'}`} tone="warn" /> : null}
+                {(() => { const a = adv.find((x) => x.r.tenant.id === r.tenant.id)?.p; return a ? <Badge text={`Vorauszahlung ${eur(a.current)} → ${eur(a.proposed)}`} tone="neutral" /> : null; })()}
               </View>
             </View>
           );
@@ -117,6 +150,13 @@ export function NkLauf({ route, navigation }: any) {
         </View>
       )}
       <Button icon="document-text" title={chosen.length ? `${chosen.length} Abrechnung${chosen.length === 1 ? '' : 'en'} erstellen` : 'Niemand ausgewählt'} onPress={run} disabled={chosen.length === 0} />
+      {adv.length > 0 && (
+        <>
+          <Gap h={8} />
+          <Button kind="secondary" icon="trending-up" title={`Vorauszahlung anpassen (${adv.length})`} onPress={runAdvance} />
+          <Text style={{ color: c.muted, fontSize: type.footnote, textAlign: 'center', marginTop: 6 }}>Neue Vorauszahlung = tatsächliche Kosten pro Monat plus 5 %, auf 5 € aufgerundet.</Text>
+        </>
+      )}
       <Gap h={8} />
       <Button kind="plain" title="Briefe und Absender anpassen" onPress={() => navigation.navigate('Briefe')} />
     </Screen>

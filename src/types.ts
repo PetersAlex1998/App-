@@ -56,6 +56,7 @@ export interface Tenant {
   depositType?: string; depositAccount?: string; notes?: string;
   nkDone?: Record<string, string>; // Jahr -> Datum, an dem die Nebenkostenabrechnung erstellt wurde
   coldRent?: number; // Kaltmiete (netto) während der Mietzeit, für die Mieterhistorie der Wohnung
+  advanceChange?: { from: string; amount: number; letterDate: string }; // angekündigte neue NK-Vorauszahlung (gilt ab `from`)
   trackFrom?: string; // YYYY-MM: erst ab diesem Monat zählen Mieten als offen (ältere Monate sind außerhalb der App erledigt)
 }
 
@@ -120,6 +121,7 @@ export interface Cost {
   key: CostKey; // Verteilerschlüssel
   meterType?: MeterType; // bei key = 'consumption'
   consumptionShare?: number; // % nach Verbrauch (Rest = Grundkosten nach Wohnfläche); fehlt = 100
+  fromExpenses?: boolean; // aus den Ausgaben (umlagefähig) übernommen; wird bei erneutem Übernehmen aktualisiert
 }
 
 export type ExpenseCategory = 'schuldzinsen' | 'grundsteuer' | 'versicherung' | 'instandhaltung' | 'verwaltung' | 'betriebskosten' | 'hausmeister' | 'fahrtkosten' | 'afa' | 'sonstiges';

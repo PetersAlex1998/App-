@@ -271,7 +271,7 @@ export function TenantDetail({ route, navigation }: any) {
 }
 
 export function UnitDetail({ route, navigation }: any) {
-  const { db } = useStore();
+  const { db, save } = useStore();
   const c = useColors();
   const { s: cfg } = useSettings();
   const u = db.units.find((x) => x.id === route.params.id);
@@ -345,6 +345,13 @@ export function UnitDetail({ route, navigation }: any) {
               right={`+ ${eur(p.amount)}`} rightColor={c.ok} badge={{ text: sourceLabel(p), tone: sourceTone(p) }} onPress={() => navigation.navigate('PaymentForm', { id: p.id })} />
           ))}
           {pays.length > 5 && <ListRow icon="list" title={`Alle ${pays.length} Zahlungen ansehen`} onPress={() => navigation.navigate('TenantDetail', { id: tenant.id })} />}
+        </Section>
+      )}
+
+      {tenant?.advanceChange && (
+        <Section title="Angekündigte Änderung" footer="Die neue Vorauszahlung ist dem Mieter mitgeteilt. Übernimm sie in der Wohnung, sobald sie gilt, damit das Soll stimmt.">
+          <ListRow icon="trending-up" iconTone={tenant.advanceChange.from <= today() ? 'warn' : undefined} title={`Vorauszahlung ab ${dateDE(tenant.advanceChange.from)}: ${eur(tenant.advanceChange.amount)}`} subtitle={`bisher ${eur(u.advance)} · Mitteilung vom ${dateDE(tenant.advanceChange.letterDate)}`}
+            right={tenant.advanceChange.from <= today() ? 'Übernehmen' : 'Jetzt übernehmen'} onPress={() => { save('units', { ...u, advance: tenant.advanceChange!.amount }); save('tenants', { ...tenant, advanceChange: undefined }); }} />
         </Section>
       )}
 

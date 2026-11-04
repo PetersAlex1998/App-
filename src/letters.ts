@@ -136,6 +136,20 @@ export function nkModel(res: NkResult, t: Tenant, unit: Unit, prop: Property, ye
   ]);
 }
 
+/** Mitteilung über die Anpassung der Nebenkostenvorauszahlung nach einer Abrechnung (§ 560 Abs. 4 BGB). */
+export function advanceModel(t: Tenant, unit: Unit, prop: Property, year: number, current: number, proposed: number, from: string, s: Settings, date = new Date().toISOString().slice(0, 10)): LetterModel {
+  const up = proposed > current;
+  const fromDe = from.split('-').reverse().join('.');
+  return frame(s, t, prop, unit, date, [['Objekt', prop.name], ['Einheit', `${unit.name} (${unit.area} m²)`]], `Anpassung der Nebenkostenvorauszahlung – ${t.name}`, [
+    { t: 'h1', text: 'Anpassung der Nebenkostenvorauszahlung' },
+    { t: 'p', text: salutationText(t) },
+    { t: 'p', text: `auf Grundlage der Nebenkostenabrechnung für das Jahr ${year} passen wir die monatliche Vorauszahlung auf die Betriebskosten gemäß § 560 Abs. 4 BGB auf einen angemessenen Betrag an.` },
+    { t: 'kv', rows: [['Bisherige Vorauszahlung', eur(current)], ['Neue Vorauszahlung', eur(proposed)], [up ? 'Erhöhung' : 'Senkung', eur(Math.abs(proposed - current))], ['Gültig ab', fromDe], ['Neue Gesamtmiete', eur(unit.coldRent + proposed)]] },
+    { t: 'p', text: `Bitte zahlen Sie ab dem ${fromDe} monatlich die neue Vorauszahlung zusammen mit der Miete. ${up ? 'Die Anpassung beruht auf den tatsächlich entstandenen Kosten des Abrechnungsjahres.' : 'Die Vorauszahlung sinkt, weil die tatsächlichen Kosten niedriger waren.'}` },
+    { t: 'sign', lines: signatureLines(s) },
+  ]);
+}
+
 /** Fehlende Pflichtangaben für den Testbrief (Absender = Empfänger). */
 export function testLetterMissing(s: Settings): string[] {
   const m: string[] = [];

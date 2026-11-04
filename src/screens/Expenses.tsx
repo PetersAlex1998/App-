@@ -61,13 +61,19 @@ export function ExpensesScreen({ route, navigation }: any) {
       <Button kind="secondary" icon="add" title="Ausgabe erfassen" onPress={() => navigation.navigate('ExpenseForm', { propertyId: propertyId || db.properties[0]?.id })} disabled={db.properties.length === 0} />
       <Gap h={8} />
       <Button kind="secondary" icon="document-text-outline" title="Auswertung für die Steuer (Anlage V)" onPress={() => navigation.navigate('AnlageV', { propertyId: propertyId || undefined, year })} />
+      {list.some((e) => e.allocatable) && (
+        <>
+          <Gap h={8} />
+          <Button kind="secondary" icon="calculator-outline" title={`Für Nebenkosten ${year} übernehmen`} onPress={() => navigation.navigate('NkKosten', { propertyId: propertyId || db.properties[0]?.id, year })} />
+        </>
+      )}
       <Gap h={22} />
       <Section title={`${list.length} Ausgabe${list.length === 1 ? '' : 'n'}`}>
         {list.length === 0 && <Note>{db.properties.length === 0 ? 'Lege zuerst ein Objekt an.' : 'In diesem Jahr noch keine Ausgaben erfasst.'}</Note>}
         {list.map((e) => (
           <ListRow key={e.id} icon={e.receiptId ? 'receipt' : 'receipt-outline'} title={e.vendor || e.description || EXPENSE_LABEL[e.category]}
             subtitle={`${dateDE(e.date)} · ${EXPENSE_LABEL[e.category]}${db.properties.length > 1 ? ` · ${db.properties.find((p) => p.id === e.propertyId)?.name ?? ''}` : ''}`}
-            right={eur(e.amount)} badge={e.receiptId ? undefined : { text: 'Beleg fehlt', tone: 'warn' }} onPress={() => navigation.navigate('ExpenseForm', { id: e.id })} />
+            right={eur(e.amount)} badge={e.receiptId ? (e.allocatable ? { text: 'umlagefähig', tone: 'neutral' } : undefined) : { text: 'Beleg fehlt', tone: 'warn' }} onPress={() => navigation.navigate('ExpenseForm', { id: e.id })} />
         ))}
       </Section>
     </Screen>
@@ -160,7 +166,7 @@ export function ExpenseForm({ route, navigation }: any) {
       </Section>
       <Section title="Kategorie" footer={ANLAGE_V_HINT[category]}>
         <ChipField label="Kategorie" value={EXPENSE_LABEL[category]} options={EXPENSE_CATEGORIES.map((k) => EXPENSE_LABEL[k])} onChange={(v) => { if (v) { setCategory(EXPENSE_CATEGORIES.find((k) => EXPENSE_LABEL[k] === v)!); setCategoryTouched(true); } }} />
-        <ListRow icon={allocatable ? 'checkbox' : 'square-outline'} title="Auf Mieter umlagefähig" subtitle="Nur als Hinweis für die Nebenkostenabrechnung" onPress={() => setAllocatable(!allocatable)} />
+        <ListRow icon={allocatable ? 'checkbox' : 'square-outline'} title="Auf Mieter umlagefähig" subtitle="Fließt in die Betriebskosten der Nebenkostenabrechnung ein" onPress={() => setAllocatable(!allocatable)} />
       </Section>
       {err.property ? <View style={{ marginBottom: 12 }}><Badge text={err.property} tone="danger" /></View> : null}
       <Button icon="checkmark" title={busy ? 'Wird gespeichert …' : 'Speichern'} onPress={submit} disabled={busy} />

@@ -60,3 +60,19 @@ describe('Aufgaben aus der Datenprüfung', () => {
     expect(performance.now() - t0).toBeLessThan(500);
   });
 });
+
+describe('Aufgaben: Nebenkosten-Kreislauf', () => {
+  it('umlagefähige Ausgaben des Vorjahres, noch nicht übernommen', () => {
+    const { p, db } = simple({ moveIn: '2020-01-01' });
+    const e = { id: 'e', propertyId: p.id, date: '2025-05-01', amount: 100, category: 'betriebskosten' as const, vendor: '', description: 'Müllabfuhr', allocatable: true };
+    const t = computeTasks({ ...db, expenses: [{ ...e, receiptId: 'd' }] }, { now: NOW });
+    expect(t.find((x) => x.id.startsWith('nkkosten:'))).toMatchObject({ screen: 'NkKosten', params: { propertyId: p.id, year: '2025' } });
+    const done = computeTasks({ ...db, expenses: [{ ...e, receiptId: 'd' }], costs: [{ id: 'c', propertyId: p.id, year: 2025, category: 'Müllabfuhr', amount: 100, key: 'area' as const }] }, { now: NOW });
+    expect(done.some((x) => x.id.startsWith('nkkosten:'))).toBe(false);
+  });
+  it('angekündigte Vorauszahlung wird fällig', () => {
+    const { db, t } = simple({ moveIn: '2020-01-01', advanceChange: { from: '2026-11-01', amount: 150, letterDate: '2026-09-10' } });
+    expect(computeTasks(db, { now: NOW }).find((x) => x.id.startsWith('vorauszahlung:'))).toMatchObject({ screen: 'UnitDetail' });
+    expect(computeTasks({ ...db, tenants: [{ ...t, advanceChange: { ...t.advanceChange!, from: '2027-01-01' } }] }, { now: NOW }).some((x) => x.id.startsWith('vorauszahlung:'))).toBe(false);
+  });
+});

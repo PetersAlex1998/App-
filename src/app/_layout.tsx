@@ -91,6 +91,7 @@ function Shell() {
         <Stack.Screen name="briefe" options={{ title: 'Briefe und Regeln' }} />
         <Stack.Screen name="briefausgang" options={{ title: 'Briefausgang' }} />
         <Stack.Screen name="mahnlauf" options={{ title: 'Mahnlauf' }} />
+        <Stack.Screen name="nk-kosten" options={{ title: 'Kosten aus Ausgaben' }} />
         <Stack.Screen name="nk-lauf" options={{ title: 'Nebenkosten-Lauf' }} />
         <Stack.Screen name="kontoauszug" options={{ title: 'Kontoauszug' }} />
         <Stack.Screen name="zaehler-import" options={{ title: 'Zähler importieren' }} />

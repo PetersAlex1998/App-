@@ -1,6 +1,7 @@
 import { DB } from './types';
 import { addDays, today } from './calc';
 import { houseId } from './ids';
+import { suggestCosts } from './nkCosts';
 
 /**
  * Aufgaben aus der Datenprüfung: Dinge, die die App selbst bemerkt und die du nur noch antippen musst.
@@ -53,6 +54,17 @@ export function computeTasks(db: DB, opts: { dismissed?: string[]; now?: string 
     const meters = db.meters.filter((m) => m.propertyId === p.id);
     const stale = meters.filter((m) => !db.readings.some((r) => r.meterId === m.id && r.date >= cutoff));
     if (stale.length) out.push({ id: `zaehler:${p.id}:${year}`, level: 'normal', icon: 'speedometer-outline', title: `Zählerstände ${year}: ${stale.length} von ${meters.length} fehlen`, detail: `${p.name}${houseId(p) ? ` (${houseId(p)})` : ''} · für die Nebenkostenabrechnung zum 31.12.${year}`, screen: 'Ablesung', params: { propertyId: p.id } });
+  }
+
+  // 4b) Angekündigte Vorauszahlung gilt jetzt: in der Wohnung übernehmen
+  for (const t of db.tenants) {
+    if (t.advanceChange && t.advanceChange.from <= now && isActive(t, now)) out.push({ id: `vorauszahlung:${t.id}:${t.advanceChange.from}`, level: 'normal', icon: 'trending-up', title: `Neue Vorauszahlung übernehmen: ${t.name}`, detail: `${where(t.unitId)} · ab ${t.advanceChange.from.split('-').reverse().join('.')} ${t.advanceChange.amount.toLocaleString('de-DE')} €`, screen: 'UnitDetail', params: { id: t.unitId } });
+  }
+
+  // 4c) Umlagefähige Ausgaben des Vorjahres sind noch nicht (vollständig) in der Nebenkostenabrechnung
+  for (const p of db.properties) {
+    const open = suggestCosts(db, p.id, year).filter((x) => !x.existing || Math.abs(x.existing.amount - x.amount) > 0.005);
+    if (open.length) out.push({ id: `nkkosten:${p.id}:${year}`, level: 'normal', icon: 'receipt-outline', title: `Betriebskosten ${year}: ${open.length} Kostenart${open.length === 1 ? '' : 'en'} übernehmen`, detail: `${p.name} · umlagefähige Ausgaben für die Nebenkostenabrechnung`, screen: 'NkKosten', params: { propertyId: p.id, year: String(year) } });
   }
 
   // 5) Ausgaben ohne Beleg (älter als eine Woche)
