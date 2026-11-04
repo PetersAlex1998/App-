@@ -389,8 +389,8 @@ export function ChipField({ label, value, options, onChange }: { label: string; 
           const on = o === value;
           return (
             <Pressable key={o} accessibilityRole="radio" accessibilityState={{ selected: on }} onPress={() => onChange(on ? '' : o)}
-              style={{ minHeight: 38, paddingHorizontal: 14, borderRadius: 19, justifyContent: 'center', backgroundColor: on ? c.ink : c.fill }}>
-              <Text style={{ fontSize: type.subhead, fontWeight: '600', color: on ? c.onInk : c.text }}>{o}</Text>
+              style={{ minHeight: 38, paddingHorizontal: 14, paddingVertical: 6, borderRadius: 19, justifyContent: 'center', backgroundColor: on ? c.ink : c.fill, maxWidth: '100%' }}>
+              <Text style={{ fontSize: type.subhead, fontWeight: '600', color: on ? c.onInk : c.text, flexShrink: 1 }}>{o}</Text>
             </Pressable>
           );
         })}

@@ -67,7 +67,7 @@ export function addressLines(t: Tenant, prop: Property, unit: Unit): { lines: st
 
 const levelTitle = ['', 'Zahlungserinnerung', '1. Mahnung', '2. Mahnung – letzte Zahlungsaufforderung'];
 
-function frame(s: Settings, t: Tenant, prop: Property, unit: Unit, date: string, info: [string, string][], title: string, blocks: Block[]): LetterModel {
+export function frame(s: Settings, t: Tenant, prop: Property, unit: Unit, date: string, info: [string, string][], title: string, blocks: Block[]): LetterModel {
   const a = addressLines(t, prop, unit);
   const ref = unitRef(prop, unit);
   if (ref) info = [...info, ['Kennung', ref]];

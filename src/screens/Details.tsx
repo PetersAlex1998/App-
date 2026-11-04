@@ -247,6 +247,7 @@ export function TenantDetail({ route, navigation }: any) {
           {infoRows([['Anrede', t.salutation], ['Mobil', t.mobile], ['Postanschrift', t.postalAddress], ['Notfallkontakt', t.emergencyContact], ['IBAN', t.iban], ['Notizen', t.notes]])}
         </Section>
       ) : null}
+      <Section><ListRow icon="documents-outline" title="Schreiben aus Vorlage" subtitle="Bescheinigung, Kündigung, Übergabeprotokoll …" onPress={() => navigation.navigate('Vorlagen', { tenantId: t.id })} /></Section>
       <DocumentsSection ownerKind="tenant" ownerId={t.id} navigation={navigation} />
 
       <Section title="Nebenkostenabrechnung" footer="Anteilig nach Mietmonaten. Kosten und Verteilerschlüssel pflegst du im Objekt.">
@@ -321,6 +322,7 @@ export function UnitDetail({ route, navigation }: any) {
         <ActionTile icon="calculator-outline" label={`NK ${year}`} hint="Nebenkostenabrechnung erstellen" onPress={() => act.createNk(year)} disabled={!tenant} />
         <ActionTile icon="trending-up-outline" label="Miete erhöhen" onPress={() => navigation.navigate('Mieterhoehung', { unitId: u.id })} />
         <ActionTile icon="person-add-outline" label="Neuer Mieter" onPress={() => navigation.navigate('TenantForm', { unitId: u.id })} />
+        <ActionTile icon="documents-outline" label="Schreiben" hint="Dokument aus Vorlage erstellen" onPress={() => navigation.navigate('Vorlagen', { unitId: u.id, tenantId: tenant?.id })} />
         <ActionTile icon="document-attach-outline" label="Dokument" onPress={() => navigation.navigate('DocumentForm', { ownerKind: 'unit', ownerId: u.id })} />
         <ActionTile icon="add-outline" label="Zähler +" onPress={() => navigation.navigate('MeterForm', { propertyId: u.propertyId, unitId: u.id })} />
       </View>
