@@ -19,6 +19,8 @@ export interface Property {
   landRegister?: string; parcel?: string; purchaseDate?: string; purchasePrice?: string;
   // Versicherung
   insurer?: string; policyNo?: string; premium?: string;
+  // Begründung für Mieterhöhungen (§ 558a BGB): gibt es für den Ort einen Mietspiegel?
+  rentBasis?: { kind: 'eigene' | 'andere' | 'keiner'; name?: string; gemeinde?: string; stand?: string; validUntil?: string; qualified?: boolean };
   // Ansprechpartner (Hausmeister, Verwalter)
   contactName?: string; contactPhone?: string;
 }
@@ -37,6 +39,7 @@ export interface Unit {
   name: string; // z. B. "WE 3, 2. OG links"
   area: number; // m²
   rooms: number;
+  mietspiegel?: { mean: number; upper?: number; lower?: number; note?: string; date: string }; // Einordnung dieser Wohnung im Mietspiegel (€ pro m²)
   terms?: RentTerm[]; // Mietverlauf: spätere Änderungen von Miete und Vorauszahlung (aufsteigend nach Datum)
   coldRent: number; // Kaltmiete / Monat (Stand vor dem ersten Eintrag in `terms`)
   advance: number; // NK-Vorauszahlung / Monat

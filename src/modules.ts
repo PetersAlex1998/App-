@@ -20,6 +20,8 @@ export const MODULES: AppModule[] = [
   { id: 'suche', group: 'Verwalten', icon: 'search', title: 'Suche', subtitle: 'Häuser, Wohnungen, Mieter und IDs', screen: 'Search' },
 
   { id: 'vorlagen', group: 'Abläufe', icon: 'documents-outline', title: 'Dokumente erstellen', subtitle: 'Mietvertrag, Kündigung, Übergabeprotokoll, Bescheinigungen', screen: 'Vorlagen' },
+  { id: 'potenzial', group: 'Abläufe', icon: 'trending-up', title: 'Mieterhöhungs-Potenzial', subtitle: 'Wo die Miete unter dem Mietspiegel oder Vergleich liegt', screen: 'Potenzial' },
+  { id: 'mietspiegel', group: 'Einstellungen', icon: 'stats-chart-outline', title: 'Mietspiegel', subtitle: 'Pro Haus: eigener, anderer Ort oder keiner', screen: 'Mietspiegel' },
   { id: 'mahnlauf', group: 'Abläufe', icon: 'mail-unread-outline', title: 'Mahnlauf', subtitle: 'Offene Mieten mahnen', screen: 'Mahnlauf' },
   { id: 'nk', group: 'Abläufe', icon: 'calculator-outline', title: 'Nebenkosten-Lauf', subtitle: 'Abrechnungen für alle Mieter', screen: 'NkLauf' },
   { id: 'briefe', group: 'Abläufe', icon: 'mail-open-outline', title: 'Briefausgang', subtitle: 'Erstellte Briefe teilen und versenden', screen: 'Outbox' },

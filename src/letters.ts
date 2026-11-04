@@ -240,8 +240,33 @@ export const reminderHtml = (db: DB, r: Reminder, t: Tenant, unit: Unit, prop: P
 export const nkHtml = (res: NkResult, t: Tenant, unit: Unit, prop: Property, year: number, s: Settings) => modelToHtml(nkModel(res, t, unit, prop, year, s));
 export const sampleLetterHtml = (s: Settings) => modelToHtml(sampleModel(s));
 
+/** Begründung eines Mieterhöhungsverlangens (§ 558a BGB): Mietspiegel, Vergleichswohnungen oder Gutachten bzw. Mietdatenbank. */
+export interface RentBasisText {
+  kind: 'mietspiegel' | 'vergleich' | 'gutachten';
+  perSqm?: number; upper?: number; name?: string; stand?: string; note?: string; otherMunicipality?: string;
+  comps?: { address: string; position: string; area: number; rent: number; perSqm: number }[]; source?: string;
+}
+
+function basisBlocks(b: RentBasisText | undefined, legacyPerSqm: number | undefined, newPerSqm: number, unit: Unit): Block[] {
+  if (!b) return [{ t: 'p', text: legacyPerSqm ? `Begründung: Die ortsübliche Vergleichsmiete für vergleichbaren Wohnraum beträgt laut Mietspiegel ${eur(legacyPerSqm)} pro m². Die neue Miete von ${eur(newPerSqm)} pro m² liegt innerhalb dieser Grenze. Die Kappungsgrenze von 20 % bzw. 15 % innerhalb von drei Jahren ist eingehalten.` : 'Begründung: Bitte ergänzen (Mietspiegel, Sachverständigengutachten oder Vergleichswohnungen).' }];
+  const cap: Block = { t: 'p', small: true, text: 'Die Kappungsgrenze von 20 % bzw. 15 % innerhalb von drei Jahren ist eingehalten.' };
+  if (b.kind === 'mietspiegel') return [
+    { t: 'p', text: `Begründung: Wir stützen das Verlangen auf den Mietspiegel ${b.name ?? ''}${b.stand ? ` (Stand ${b.stand.split('-').reverse().join('.')})` : ''}. Ihre Wohnung (${unit.area} m²) ist dort einem Feld mit ${eur(b.perSqm ?? 0)} pro m²${b.upper ? ` (Oberwert der Spanne ${eur(b.upper)} pro m²)` : ''} zuzuordnen. Die neue Miete von ${eur(newPerSqm)} pro m² liegt innerhalb der ortsüblichen Vergleichsmiete.` },
+    ...(b.note ? [{ t: 'p' as const, text: `Einordnung: ${b.note}` }] : []),
+    ...(b.otherMunicipality ? [{ t: 'p' as const, text: `Für ${b.otherMunicipality} liegt kein eigener Mietspiegel vor. Wir ziehen den Mietspiegel einer vergleichbaren Gemeinde heran (§ 558a Abs. 4 Satz 2 BGB). Die Gemeinden sind nach Lage, Größe und Wohnungsmarkt vergleichbar.` }] : []),
+    cap,
+  ];
+  if (b.kind === 'vergleich') return [
+    { t: 'p', text: 'Begründung: Wir benennen folgende vergleichbare Wohnungen und ihre monatliche Nettokaltmiete (§ 558a Abs. 2 Nr. 4 BGB):' },
+    { t: 'table', head: ['Anschrift und Lage', 'Größe', 'Kaltmiete', 'pro m²'], align: ['l', 'r', 'r', 'r'], widths: [0.5, 0.14, 0.18, 0.18], rows: (b.comps ?? []).map((x) => ({ cells: [[x.address, x.position].filter(Boolean).join(', '), `${x.area} m²`, eur(x.rent), eur(x.perSqm)] })) },
+    { t: 'p', text: `Die neue Miete von ${eur(newPerSqm)} pro m² liegt im Rahmen der Mieten dieser Wohnungen (Durchschnitt ${eur(b.perSqm ?? 0)} pro m²).` },
+    cap,
+  ];
+  return [{ t: 'p', text: `Begründung: ${b.source ?? 'Gutachten bzw. Mietdatenbank'}. Die ortsübliche Vergleichsmiete beträgt danach ${eur(b.perSqm ?? 0)} pro m². Die neue Miete von ${eur(newPerSqm)} pro m² liegt innerhalb dieser Grenze.` }, cap];
+}
+
 /** Mieterhöhung nach § 558 BGB (Vergleichsmiete, mit Zustimmungserklärung) oder § 557b BGB (Indexmiete). */
-export function rentIncreaseModel(kind: 'vergleich' | 'index', t: Tenant, unit: Unit, prop: Property, s: Settings, c: { currentRent: number; newRent: number; effective: string; consentUntil?: string; comparePerSqm?: number; indexOld?: number; indexNew?: number; advance: number }, date = new Date().toISOString().slice(0, 10)): LetterModel {
+export function rentIncreaseModel(kind: 'vergleich' | 'index', t: Tenant, unit: Unit, prop: Property, s: Settings, c: { currentRent: number; newRent: number; effective: string; consentUntil?: string; comparePerSqm?: number; indexOld?: number; indexNew?: number; advance: number; basis?: RentBasisText }, date = new Date().toISOString().slice(0, 10)): LetterModel {
   const de = (iso: string) => iso.split('-').reverse().join('.');
   const inc = c.newRent - c.currentRent;
   const pct = c.currentRent > 0 ? Math.round((inc / c.currentRent) * 1000) / 10 : 0;
@@ -266,7 +291,7 @@ export function rentIncreaseModel(kind: 'vergleich' | 'index', t: Tenant, unit: 
     { t: 'p', text: salutationText(t) },
     { t: 'p', text: `wir bitten Sie, einer Erhöhung der monatlichen Kaltmiete auf die ortsübliche Vergleichsmiete zuzustimmen.` },
     { t: 'kv', rows },
-    { t: 'p', text: c.comparePerSqm ? `Begründung: Die ortsübliche Vergleichsmiete für vergleichbaren Wohnraum beträgt laut Mietspiegel ${eur(c.comparePerSqm)} pro m². Die neue Miete von ${eur(per)} pro m² liegt innerhalb dieser Grenze. Die Kappungsgrenze von 20 % bzw. 15 % innerhalb von drei Jahren ist eingehalten.` : 'Begründung: Bitte ergänzen (Mietspiegel, Sachverständigengutachten oder Vergleichswohnungen).' },
+    ...basisBlocks(c.basis, c.comparePerSqm, per, unit),
     { t: 'p', text: `Bitte stimmen Sie der Erhöhung bis zum **${c.consentUntil ? de(c.consentUntil) : ''}** zu. Stimmen Sie zu, schulden Sie die neue Miete ab dem ${de(c.effective)}. Stimmen Sie nicht zu, müssen wir die Zustimmung gegebenenfalls gerichtlich geltend machen.` },
     { t: 'p', small: true, text: 'Sie können das Mietverhältnis bis zum Ablauf des zweiten Monats nach Zugang dieses Schreibens zum Ablauf des übernächsten Monats kündigen (§ 561 BGB). Dann tritt die Erhöhung nicht ein.' },
     { t: 'sign', lines: signatureLines(s) },

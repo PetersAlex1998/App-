@@ -17,7 +17,8 @@ test('Mieterhöhung: prüfen, Schreiben erstellen, Zustimmung übernehmen, Mietv
 
   // zu hoch: Kappungsgrenze → nicht zulässig, Knopf gesperrt
   await page.getByLabel('Neue Kaltmiete pro Monat').fill('700');
-  await page.getByLabel(/Ortsübliche Vergleichsmiete/).fill('15');
+  await tap(page, page.getByRole('radio', { name: 'Mietspiegel' }));
+  await page.getByLabel(/Mittelwert deiner Wohnung/).fill('15');
   await expect.poll(() => body(page)).toContain('Nicht zulässig');
   expect(await body(page)).toContain('Kappungsgrenze');
   await expect(page.getByRole('button', { name: /Schreiben erstellen/ }).filter({ visible: true }).first()).toBeDisabled();

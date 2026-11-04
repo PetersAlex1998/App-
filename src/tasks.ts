@@ -67,6 +67,12 @@ export function computeTasks(db: DB, opts: { dismissed?: string[]; now?: string 
     if (rc && isActive(t, now) && (rc.from <= now || (rc.consentUntil && rc.consentUntil < now))) out.push({ id: `mieterhoehung:${t.id}:${rc.from}`, level: 'normal', icon: 'trending-up', title: `Mieterhöhung klären: ${t.name}`, detail: `${where(t.unitId)} · ${rc.coldRent.toLocaleString('de-DE')} € ab ${rc.from.split('-').reverse().join('.')}${rc.kind === 'vergleich' ? ' · Zustimmung prüfen' : ' · Miete übernehmen'}`, screen: 'UnitDetail', params: { id: t.unitId } });
   }
 
+  // 4d) Hinterlegter Mietspiegel ist abgelaufen
+  for (const p of db.properties) {
+    const v = p.rentBasis?.validUntil;
+    if (v && v < now) out.push({ id: `mietspiegel:${p.id}:${v}`, level: 'normal', icon: 'stats-chart-outline', title: `Mietspiegel abgelaufen: ${p.name}`, detail: `„${p.rentBasis?.name || 'Mietspiegel'}“ galt bis ${v.split('-').reverse().join('.')}. Neue Fassung hinterlegen.`, screen: 'Mietspiegel', params: { propertyId: p.id } });
+  }
+
   // 4c) Umlagefähige Ausgaben des Vorjahres sind noch nicht (vollständig) in der Nebenkostenabrechnung
   for (const p of db.properties) {
     const open = suggestCosts(db, p.id, year).filter((x) => !x.existing || Math.abs(x.existing.amount - x.amount) > 0.005);
