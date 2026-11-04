@@ -87,6 +87,7 @@ function Shell() {
         <Stack.Screen name="aufgaben" options={{ title: 'Aufgaben' }} />
         <Stack.Screen name="cloud" options={{ title: 'Cloud' }} />
         <Stack.Screen name="sperre" options={{ title: 'App-Sperre' }} />
+        <Stack.Screen name="unternehmen" options={{ title: 'Unternehmensdaten' }} />
         <Stack.Screen name="briefe" options={{ title: 'Briefe und Regeln' }} />
         <Stack.Screen name="briefausgang" options={{ title: 'Briefausgang' }} />
         <Stack.Screen name="mahnlauf" options={{ title: 'Mahnlauf' }} />

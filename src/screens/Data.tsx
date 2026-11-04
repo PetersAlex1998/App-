@@ -111,7 +111,8 @@ export function DataScreen({ navigation }: any) {
 
       <Section title="Briefe und Mahnwesen">
         <ListRow icon="mail-open-outline" title="Briefausgang" subtitle="Erstellte Briefe teilen und als versendet markieren" onPress={() => navigation.navigate('Outbox')} />
-        <ListRow icon="mail-outline" title="Absender und Mahnregeln" subtitle="Adresse, IBAN, Gebühren, Fristen" onPress={() => navigation.navigate('Briefe')} />
+        <ListRow icon="business-outline" title="Unternehmensdaten" subtitle="Firma, Anschrift, Steuer, Bank, Briefkopf" onPress={() => navigation.navigate('Unternehmen')} />
+        <ListRow icon="mail-outline" title="Briefe und Mahnregeln" subtitle="Fälligkeit, Fristen, Gebühren, Testbrief" onPress={() => navigation.navigate('Briefe')} />
       </Section>
 
       <Section title="Importieren">

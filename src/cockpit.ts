@@ -6,6 +6,7 @@ import { dunningPlans } from './dunning';
 import { computeTasks } from './tasks';
 import { dueStatements } from './nk';
 import { daysUntil } from './docs';
+import { completeness } from './company';
 
 /**
  * Kennzahlen und Handlungsfelder für das Cockpit (Übersicht). Reine Berechnungen, damit sie testbar bleiben.
@@ -96,6 +97,10 @@ export function actions(db: DB, cfg: Settings, now = today()): Action[] {
   }
   const tasks = computeTasks(db, { dismissed: cfg.dismissedTasks, now });
   if (tasks.length) out.push({ key: 'aufgaben', icon: 'checkmark-done-circle-outline', tone: tasks.some((t) => t.level === 'hoch') ? 'danger' : 'warn', title: `Datenprüfung (${tasks.length})`, subtitle: tasks[0].title, screen: 'Aufgaben', count: tasks.length });
+  if (db.tenants.length > 0) {
+    const need = completeness(cfg).missing.filter((m) => m.needed === 'brief' || m.needed === 'zahlung');
+    if (need.length) out.push({ key: 'unternehmen', icon: 'business-outline', tone: 'warn', title: 'Unternehmensdaten ergänzen', subtitle: `Für Briefe fehlt: ${need.map((m) => m.label).join(', ')}`, screen: 'Unternehmen' });
+  }
   const last = cfg.lastBackupAt ? Date.parse(cfg.lastBackupAt) : 0;
   const days = last ? Math.floor((Date.parse(now) - last) / 86400000) : null;
   if (cfg.backupRemindDays > 0 && db.properties.length > 0 && (days === null || days >= cfg.backupRemindDays)) {

@@ -31,8 +31,9 @@ export const MODULES: AppModule[] = [
   { id: 'bestandimport', group: 'Importieren', icon: 'albums-outline', title: 'Bestand importieren', subtitle: 'Häuser, Einheiten und Mieter aus CSV', screen: 'BestandImport' },
   { id: 'zaehlerimport', group: 'Importieren', icon: 'speedometer-outline', title: 'Zähler und Stände importieren', subtitle: 'Heizung, Wasser und Strom aus einer Tabelle', screen: 'ZaehlerImport' },
 
+  { id: 'unternehmen', group: 'Einstellungen', icon: 'business-outline', title: 'Unternehmensdaten', subtitle: 'Firma, Anschrift, Steuer, Bank, Briefkopf und Unterschrift', screen: 'Unternehmen' },
   { id: 'cloud', group: 'Einstellungen', icon: 'cloud-outline', title: 'Cloud', subtitle: 'Anmeldung und Abgleich', screen: 'Cloud' },
   { id: 'daten', group: 'Einstellungen', icon: 'shield-checkmark-outline', title: 'Daten, Sicherung und Darstellung', subtitle: 'Sicherung, Speicher, Hell/Dunkel', screen: 'Daten' },
-  { id: 'absender', group: 'Einstellungen', icon: 'mail-outline', title: 'Absender und Mahnregeln', subtitle: 'Adresse, IBAN, Gebühren, Fristen', screen: 'Briefe' },
+  { id: 'absender', group: 'Einstellungen', icon: 'mail-outline', title: 'Briefe und Mahnregeln', subtitle: 'Fälligkeit, Fristen, Gebühren, Testbrief', screen: 'Briefe' },
   { id: 'sperre', group: 'Einstellungen', icon: 'lock-closed-outline', title: 'App-Sperre', subtitle: 'Code beim Öffnen verlangen', screen: 'Sperre' },
 ];

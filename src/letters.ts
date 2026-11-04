@@ -1,3 +1,4 @@
+import { bankRows, footerLines, returnLine, senderLines, signatureLines } from './company';
 import { DB, Property, Reminder, Tenant, Unit } from './types';
 import { NkResult, dateDE, eur, monthLabel, openItems } from './calc';
 import type { Settings } from './settings';
@@ -72,20 +73,18 @@ function frame(s: Settings, t: Tenant, prop: Property, unit: Unit, date: string,
   if (ref) info = [...info, ['Kennung', ref]];
   return {
     title,
-    senderLines: [s.name || 'Hausverwaltung', s.street, `${s.zip} ${s.city}`.trim(), s.phone, s.email].filter((x) => x && x.trim()),
+    senderLines: senderLines(s),
     logo: s.logo || undefined,
-    returnLine: [s.name, s.street, `${s.zip} ${s.city}`.trim()].filter((x) => x && x.trim()).join(' · '),
+    returnLine: returnLine(s),
     address: a.lines, unitNote: a.unitNote, date, info, blocks,
-    footer: [s.footer, s.iban ? `IBAN ${s.iban}${s.bic ? ' · BIC ' + s.bic : ''}${s.bank ? ' · ' + s.bank : ''}` : ''].filter((x) => x && x.trim()).flatMap((x) => x.split('\n')),
+    footer: footerLines(s),
   };
 }
 
 function bankBlocks(s: Settings, unit: Unit, t: Tenant, purpose = 'Miete', prop?: Property): Block[] {
   if (!s.iban) return [{ t: 'p', small: true, text: 'Bitte überweisen Sie auf das Ihnen bekannte Mietkonto.' }];
   const ref = unitRef(prop, unit);
-  const rows: [string, string][] = [['Empfänger', s.name || ''], ['IBAN', s.iban]];
-  if (s.bic) rows.push(['BIC', s.bic]);
-  if (s.bank) rows.push(['Bank', s.bank]);
+  const rows: [string, string][] = bankRows(s);
   rows.push(['Verwendungszweck', ref ? `${purpose} ${ref}` : `${purpose} ${unit.name} – ${t.name}`]);
   const blocks: Block[] = [{ t: 'kv', rows }];
   if (ref) blocks.push({ t: 'p', small: true, text: `Bitte geben Sie bei jeder Zahlung die Kennung ${ref} als Verwendungszweck an, damit wir Ihre Zahlung zuordnen können.` });
@@ -112,7 +111,7 @@ export function reminderModel(db: DB, r: Reminder, t: Tenant, unit: Unit, prop: 
     { t: 'table', head: ['Monat', 'Soll', 'Gezahlt', 'Offen'], align: ['l', 'r', 'r', 'r'], widths: [0.4, 0.2, 0.2, 0.2], rows },
     { t: 'p', text: `Bitte überweisen Sie den Betrag bis spätestens **${dateDE(r.deadline)}**.` },
     ...bankBlocks(s, unit, t, 'Miete', prop),
-    { t: 'sign', lines: ['Mit freundlichen Grüßen', s.name || 'Ihre Hausverwaltung'] },
+    { t: 'sign', lines: signatureLines(s) },
   ]);
 }
 
@@ -133,7 +132,7 @@ export function nkModel(res: NkResult, t: Tenant, unit: Unit, prop: Property, ye
     { t: 'p', text: outro },
     ...(res.balance > 0 ? bankBlocks(s, unit, t, `Nebenkosten ${year}`, prop) : []),
     { t: 'p', small: true, text: 'Die Abrechnung wurde anteilig nach Mietmonaten erstellt.' },
-    { t: 'sign', lines: ['Mit freundlichen Grüßen', s.name || 'Ihre Hausverwaltung'] },
+    { t: 'sign', lines: signatureLines(s) },
   ]);
 }
 
@@ -152,7 +151,7 @@ export function testLetterModel(s: Settings, date = new Date().toISOString().sli
   const prop: Property = { id: 'p', name: 'Testbrief', street: s.street, zip: s.zip, city: s.city, yearBuilt: '', notes: '' };
   const unit: Unit = { id: 'u', propertyId: 'p', name: '', area: 0, rooms: 0, coldRent: 0, advance: 0 };
   const t: Tenant = { id: 'self', unitId: 'u', name: s.name, salutation: 'Firma', email: '', phone: '', moveIn: date, moveOut: '', deposit: 0 };
-  const bankKv: Block = { t: 'kv', rows: [['Empfänger', s.name], ['IBAN', s.iban], ...(s.bic ? ([['BIC', s.bic]] as [string, string][]) : [])] };
+  const bankKv: Block = { t: 'kv', rows: bankRows(s) };
   const check: [string, string][] = [
     ['1', 'Die Anschrift (oben links) ist vollständig im Fenster sichtbar, nichts ist abgeschnitten.'],
     ['2', 'Die kleine Rücksendezeile über der Anschrift ist lesbar.'],
@@ -170,7 +169,7 @@ export function testLetterModel(s: Settings, date = new Date().toISOString().sli
       { t: 'p', text: 'Sonderzeichen: ä ö ü Ä Ö Ü ß € – „Anführungszeichen“ · m² · m³ · 1.234,56 €' },
       { t: 'p', small: true, text: 'Die gestrichelte Linie zeigt das Sichtfenster (85 × 45 mm, 20 mm von links, 45 mm von oben). Sie erscheint nur auf diesem Testbrief, nicht auf echten Briefen.' },
       ...(s.iban ? [bankKv] : []),
-      { t: 'sign', lines: ['Mit freundlichen Grüßen', s.name || 'Ihre Hausverwaltung'] },
+      { t: 'sign', lines: signatureLines(s) },
     ]),
     guides: true,
   };
