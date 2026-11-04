@@ -23,6 +23,8 @@ export interface Property {
   contactName?: string; contactPhone?: string;
 }
 
+/** Stand von Kaltmiete und NK-Vorauszahlung ab einem Datum (Mietverlauf). Die Felder der Einheit gelten vor dem ersten Eintrag. */
+export interface RentTerm { from: string; coldRent: number; advance: number; reason?: string }
 export type UnitKind = 'wohnung' | 'gewerbe' | 'eigentum';
 
 export interface Unit {
@@ -35,7 +37,8 @@ export interface Unit {
   name: string; // z. B. "WE 3, 2. OG links"
   area: number; // m²
   rooms: number;
-  coldRent: number; // Kaltmiete / Monat
+  terms?: RentTerm[]; // Mietverlauf: spätere Änderungen von Miete und Vorauszahlung (aufsteigend nach Datum)
+  coldRent: number; // Kaltmiete / Monat (Stand vor dem ersten Eintrag in `terms`)
   advance: number; // NK-Vorauszahlung / Monat
   floor?: string; position?: string; balcony?: string; cellar?: string; parking?: string; kitchen?: string; equipment?: string; notes?: string;
 }
@@ -56,6 +59,7 @@ export interface Tenant {
   depositType?: string; depositAccount?: string; notes?: string;
   nkDone?: Record<string, string>; // Jahr -> Datum, an dem die Nebenkostenabrechnung erstellt wurde
   coldRent?: number; // Kaltmiete (netto) während der Mietzeit, für die Mieterhistorie der Wohnung
+  rentChange?: { from: string; coldRent: number; kind: 'vergleich' | 'index' | 'staffel'; letterDate: string; consentUntil?: string }; // angekündigte Mieterhöhung
   advanceChange?: { from: string; amount: number; letterDate: string }; // angekündigte neue NK-Vorauszahlung (gilt ab `from`)
   trackFrom?: string; // YYYY-MM: erst ab diesem Monat zählen Mieten als offen (ältere Monate sind außerhalb der App erledigt)
 }

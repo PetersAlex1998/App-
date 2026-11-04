@@ -1,5 +1,5 @@
 import { DB, Tenant, Unit } from './types';
-import { nkStatement, vatFactor } from './calc';
+import { nkStatement, rentNow, vatFactor } from './calc';
 
 /**
  * Anpassung der Nebenkostenvorauszahlung nach einer Abrechnung (§ 560 Abs. 4 BGB):
@@ -14,7 +14,7 @@ export function advanceProposal(db: DB, tenant: Tenant, unit: Unit, year: number
   if (r.months <= 0 || r.lines.length === 0) return null;
   const perMonthNet = r.costs / vatFactor(unit) / r.months; // Kosten pro Monat ohne USt
   const proposed = ceil5(perMonthNet * (1 + buffer / 100));
-  const current = unit.advance;
+  const current = rentNow(unit).advance;
   return { year, months: r.months, costPerMonth: Math.round(perMonthNet * 100) / 100, current, proposed, diff: proposed - current, change: Math.abs(proposed - current) >= 5 };
 }
 

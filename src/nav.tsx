@@ -18,7 +18,7 @@ const ROUTES: Record<string, string> = {
   DocumentViewer: '/dokument/[id]', DocumentForm: '/dokument/formular',
   // Abläufe und Einstellungen
   Mahnlauf: '/mahnlauf', Sperre: '/sperre', NkLauf: '/nk-lauf', NkKosten: '/nk-kosten', Outbox: '/briefausgang', Briefe: '/briefe', Daten: '/daten', Search: '/suche',
-  Unternehmen: '/unternehmen', Kalkulator: '/kalkulator', CalculatorForm: '/kalkulator/formular', Aufgaben: '/aufgaben', Cloud: '/cloud', Ausgaben: '/ausgaben', ExpenseForm: '/ausgabe/formular', AnlageV: '/anlage-v',
+  Mieterhoehung: '/mieterhoehung', Unternehmen: '/unternehmen', Kalkulator: '/kalkulator', CalculatorForm: '/kalkulator/formular', Aufgaben: '/aufgaben', Cloud: '/cloud', Ausgaben: '/ausgaben', ExpenseForm: '/ausgabe/formular', AnlageV: '/anlage-v',
   StatementImport: '/kontoauszug', ZaehlerImport: '/zaehler-import', BestandImport: '/bestand-import',
 };
 const TABS = new Set(['Tabs', 'Übersicht', 'Objekte', 'Mieter', 'Zahlungen', 'Module']);

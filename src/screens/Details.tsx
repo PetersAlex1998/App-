@@ -8,7 +8,7 @@ import { expiryState } from '../docs';
 import { defaultUnitName, houseId, unitLetter, unitRef } from '../ids';
 import { kindText, sourceLabel, sourceTone } from '../payments';
 import { Platform } from 'react-native';
-import { addDays, dateDE, dueMonths, eur, initials, kindLabel, kindOf, monthLabel, unitDue, nkStatement, openItems, reminderLabel, today, totalOpen } from '../calc';
+import { addDays, dateDE, dueMonths, eur, initials, kindLabel, kindOf, monthLabel, rentNow, unitDue, unitDueAt, nkStatement, openItems, reminderLabel, today, totalOpen } from '../calc';
 import { exportPdf, nkHtml, reminderHtml } from '../pdf';
 import { nkModel, reminderModel } from '../letters';
 import { storeLetters } from '../outbox';
@@ -18,6 +18,7 @@ import { dunningPlans, feeFor, makeReminder, overdueItems, relevantReminders } f
 import { type } from '../theme';
 import { fmtVal, meterIcon, meterTypeLabel, readingsOf } from '../meters';
 import { useTenantActions } from '../tenantActions';
+import { addTerm } from '../rent';
 import { durationText, tenancyTimeline } from '../history';
 
 
@@ -202,7 +203,7 @@ export function TenantDetail({ route, navigation }: any) {
       {(() => {
         const pays = db.payments.filter((p) => p.tenantId === t.id).sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt ?? '').localeCompare(a.createdAt ?? ''));
         const paidRent = pays.filter((p) => p.kind === 'miete').reduce((s2, p) => s2 + p.amount, 0);
-        const soll = unit ? dueMonths(t).length * unitDue(unit) : 0;
+        const soll = unit ? dueMonths(t).reduce((a, m) => a + unitDueAt(unit, m), 0) : 0;
         const shown = showAllPay ? pays : pays.slice(0, 8);
         return (
           <Section title={`Zahlungen (${pays.length})`} action={{ label: '+ Erfassen', onPress: () => navigation.navigate('PaymentForm', { tenantId: t.id }) }}
@@ -230,8 +231,8 @@ export function TenantDetail({ route, navigation }: any) {
       <Section title="Mietvertrag">
         <Row left="Wohnung" right={unit ? `${unit.area} m² · ${unit.rooms} Zi.` : '–'} />
         {unitRef(prop, unit) ? <Row left="Zahlungsreferenz" right={unitRef(prop, unit)} bold /> : null}
-        <Row left="Kaltmiete" right={unit ? eur(unit.coldRent) : '–'} />
-        <Row left="NK-Vorauszahlung" right={unit ? eur(unit.advance) : '–'} />
+        <Row left="Kaltmiete" right={unit ? eur(rentNow(unit).coldRent) : '–'} />
+        <Row left="NK-Vorauszahlung" right={unit ? eur(rentNow(unit).advance) : '–'} />
         <Row left="Einzug" right={dateDE(t.moveIn)} />
         {t.moveOut ? <Row left="Auszug" right={dateDE(t.moveOut)} /> : null}
         <Row left="Kaution" right={t.deposit ? `${eur(paidDeposit)} von ${eur(t.deposit)}` : '–'} color={t.deposit > paidDeposit ? c.warn : undefined} />
@@ -303,7 +304,7 @@ export function UnitDetail({ route, navigation }: any) {
         <Stat label="Fläche" value={`${u.area} m²`} icon="resize-outline" />
         <Stat label="Zimmer" value={String(u.rooms || '–')} icon="bed-outline" />
         <Stat label="Miete / Monat" value={eur(unitDue(u))} icon="cash-outline" />
-        <Stat label="Kaltmiete" value={eur(u.coldRent)} icon="pricetag-outline" />
+        <Stat label="Kaltmiete" value={eur(rentNow(u).coldRent)} icon="pricetag-outline" />
       </StatGrid>
 
       <Section title="Mieter">
@@ -318,6 +319,7 @@ export function UnitDetail({ route, navigation }: any) {
         <ActionTile icon="speedometer-outline" label={meters.length ? 'Ablesung' : 'Zähler anlegen'} hint={meters.length ? 'Zählerstand erfassen' : undefined} onPress={readingTarget} />
         <ActionTile icon="mail-unread-outline" label={act.plan ? act.plan.level === 1 ? 'Erinnerung' : 'Mahnung' : 'Mahnung'} onPress={act.createReminder} disabled={!tenant} badge={act.plan ? '!' : undefined} hint={act.plan ? 'Miete überfällig' : 'Keine Miete überfällig'} />
         <ActionTile icon="calculator-outline" label={`NK ${year}`} hint="Nebenkostenabrechnung erstellen" onPress={() => act.createNk(year)} disabled={!tenant} />
+        <ActionTile icon="trending-up-outline" label="Miete erhöhen" onPress={() => navigation.navigate('Mieterhoehung', { unitId: u.id })} />
         <ActionTile icon="person-add-outline" label="Neuer Mieter" onPress={() => navigation.navigate('TenantForm', { unitId: u.id })} />
         <ActionTile icon="document-attach-outline" label="Dokument" onPress={() => navigation.navigate('DocumentForm', { ownerKind: 'unit', ownerId: u.id })} />
         <ActionTile icon="add-outline" label="Zähler +" onPress={() => navigation.navigate('MeterForm', { propertyId: u.propertyId, unitId: u.id })} />
@@ -348,10 +350,19 @@ export function UnitDetail({ route, navigation }: any) {
         </Section>
       )}
 
+      {tenant?.rentChange && (
+        <Section title="Angekündigte Mieterhöhung" footer={tenant.rentChange.kind === 'vergleich' ? `Der Mieter muss zustimmen${tenant.rentChange.consentUntil ? ` (bis ${dateDE(tenant.rentChange.consentUntil)})` : ''}. Übernimm die Miete erst, wenn die Zustimmung vorliegt.` : 'Bei Indexmiete ist keine Zustimmung nötig. Übernimm die Miete, sobald sie gilt.'}>
+          <ListRow icon="trending-up" iconTone={tenant.rentChange.from <= today() ? 'warn' : undefined} title={`Kaltmiete ab ${dateDE(tenant.rentChange.from)}: ${eur(tenant.rentChange.coldRent)}`} subtitle={`bisher ${eur(rentNow(u).coldRent)} · Schreiben vom ${dateDE(tenant.rentChange.letterDate)}`}
+            right={tenant.rentChange.kind === 'vergleich' ? 'Zustimmung erhalten' : 'Übernehmen'}
+            onPress={() => { const rc = tenant.rentChange!; save('units', addTerm(u, rc.from, { coldRent: rc.coldRent, reason: rc.kind === 'index' ? 'Indexmiete' : 'Vergleichsmiete' })); save('tenants', { ...tenant, rentChange: undefined }); }} />
+          <ListRow icon="close-circle-outline" title="Zurückziehen oder abgelehnt" subtitle="Die Erhöhung wird nicht übernommen" onPress={() => save('tenants', { ...tenant, rentChange: undefined })} />
+        </Section>
+      )}
+
       {tenant?.advanceChange && (
         <Section title="Angekündigte Änderung" footer="Die neue Vorauszahlung ist dem Mieter mitgeteilt. Übernimm sie in der Wohnung, sobald sie gilt, damit das Soll stimmt.">
-          <ListRow icon="trending-up" iconTone={tenant.advanceChange.from <= today() ? 'warn' : undefined} title={`Vorauszahlung ab ${dateDE(tenant.advanceChange.from)}: ${eur(tenant.advanceChange.amount)}`} subtitle={`bisher ${eur(u.advance)} · Mitteilung vom ${dateDE(tenant.advanceChange.letterDate)}`}
-            right={tenant.advanceChange.from <= today() ? 'Übernehmen' : 'Jetzt übernehmen'} onPress={() => { save('units', { ...u, advance: tenant.advanceChange!.amount }); save('tenants', { ...tenant, advanceChange: undefined }); }} />
+          <ListRow icon="trending-up" iconTone={tenant.advanceChange.from <= today() ? 'warn' : undefined} title={`Vorauszahlung ab ${dateDE(tenant.advanceChange.from)}: ${eur(tenant.advanceChange.amount)}`} subtitle={`bisher ${eur(rentNow(u).advance)} · Mitteilung vom ${dateDE(tenant.advanceChange.letterDate)}`}
+            right={tenant.advanceChange.from <= today() ? 'Übernehmen' : 'Jetzt übernehmen'} onPress={() => { save('units', addTerm(u, tenant.advanceChange!.from, { advance: tenant.advanceChange!.amount, reason: 'Vorauszahlung angepasst' })); save('tenants', { ...tenant, advanceChange: undefined }); }} />
         </Section>
       )}
 
@@ -364,6 +375,15 @@ export function UnitDetail({ route, navigation }: any) {
           <ListRow icon="calculator-outline" title={`Nebenkostenabrechnung ${year} erstellen`}
             subtitle={nk && nk.lines.length > 0 ? `${nk.balance > 0 ? 'Nachzahlung' : 'Guthaben'} ${eur(Math.abs(nk.balance))}${tenant.nkDone?.[String(year)] ? ` · erstellt am ${dateDE(tenant.nkDone[String(year)])}` : ''}` : `Für ${year} sind keine Betriebskosten erfasst`}
             onPress={() => act.createNk(year)} />
+        </Section>
+      )}
+
+      {(u.terms?.length ?? 0) > 0 && (
+        <Section title="Mietverlauf" footer="Jede Änderung gilt ab dem genannten Datum. Offene Posten und Abrechnungen rechnen jeden Monat mit der damals geltenden Miete.">
+          {[...(u.terms ?? [])].reverse().map((t) => (
+            <ListRow key={t.from} icon="trending-up-outline" title={`Ab ${dateDE(t.from)}: ${eur(t.coldRent)} Kaltmiete`} subtitle={`Vorauszahlung ${eur(t.advance)}${t.reason ? ` · ${t.reason}` : ''}`} right={eur(t.coldRent + t.advance)} chevron={false} />
+          ))}
+          <ListRow icon="time-outline" title={`Vorher: ${eur(u.coldRent)} Kaltmiete`} subtitle={`Vorauszahlung ${eur(u.advance)}`} chevron={false} />
         </Section>
       )}
 

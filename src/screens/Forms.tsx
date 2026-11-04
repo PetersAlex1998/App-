@@ -169,6 +169,7 @@ export function UnitForm({ route, navigation }: any) {
         <Segmented value={vat} onChange={setVat} options={[{ label: 'Ohne USt', value: 0 }, { label: '7 % USt', value: 7 }, { label: '19 % USt', value: 19 }]} />
       )}
       <Section title="Miete (netto)" footer={total > 0 ? `Gesamt pro Monat${kind === 'gewerbe' && vat ? ` inkl. ${vat} % USt` : ''}: ${eur(total)}` : undefined}>
+        {(old?.terms?.length ?? 0) > 0 ? <Note>Diese Wohnung hat einen Mietverlauf. Die Werte hier gelten vor dem ersten Eintrag. Neue Erhöhungen trägst du über „Miete erhöhen“ ein.</Note> : null}
         <Field label="Kaltmiete pro Monat" value={f.coldRent} onChangeText={set('coldRent')} keyboard="numeric" suffix="€" error={err.coldRent} />
         <Field label="Nebenkosten-Vorauszahlung pro Monat" value={f.advance} onChangeText={set('advance')} keyboard="numeric" suffix="€" />
       </Section>

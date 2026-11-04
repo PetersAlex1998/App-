@@ -5,7 +5,7 @@ import { useStore } from '../store';
 import { useSettings } from '../settings';
 import { useOnline } from '../pwa';
 import { ActionTile, Badge, Button, EmptyState, Gap, LargeHeader, ListRow, Screen, Section, Stat, StatGrid, useColors } from '../ui';
-import { dateDE, eur, initials, monthLabel, monthLong, openItems, today } from '../calc';
+import { dateDE, eur, initials, monthLabel, monthLong, openItems, today, unitDue } from '../calc';
 import { type } from '../theme';
 import { actions, cockpit, deadlines } from '../cockpit';
 
@@ -176,7 +176,7 @@ export function Cockpit({ navigation }: any) {
         <Section title={`Leerstand (${k.vacantUnits.length})`}>
           {k.vacantUnits.slice(0, LIMIT).map((u) => (
             <ListRow key={u.id} icon="key-outline" iconTone="warn" title={u.name} subtitle={db.properties.find((p) => p.id === u.propertyId)?.name}
-              right={eur(u.coldRent + u.advance)} rightSub="Soll / Monat" onPress={() => navigation.navigate('TenantForm', { unitId: u.id })} />
+              right={eur(unitDue(u))} rightSub="Soll / Monat" onPress={() => navigation.navigate('TenantForm', { unitId: u.id })} />
           ))}
           {k.vacantUnits.length > LIMIT && <ListRow icon="list" title={`Weitere ${k.vacantUnits.length - LIMIT} Leerstände`} onPress={() => navigation.navigate('Objekte')} />}
         </Section>

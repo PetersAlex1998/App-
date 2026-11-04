@@ -46,6 +46,7 @@ test('Nebenkosten-Kreislauf: Ausgaben → Kostenpositionen → Abrechnung → Vo
   await page.goto('/wohnung/u1');
   await expect.poll(() => body(page)).toContain('ANGEKÜNDIGTE ÄNDERUNG');
   await tap(page, btn(page, /Vorauszahlung ab/));
-  await expect.poll(async () => (await readDb(page)).units[0].advance).toBe(135);
+  await expect.poll(async () => (await readDb(page)).units[0].terms?.[0]?.advance).toBe(135);
+  expect((await readDb(page)).units[0].advance).toBe(100); // frühere Monate bleiben bei 100 €, der Verlauf hält 135 € ab dem Stichtag
   expect((await readDb(page)).tenants[0].advanceChange).toBeUndefined();
 });

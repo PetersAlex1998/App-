@@ -1,5 +1,5 @@
 import { DB } from './types';
-import { addDays, today } from './calc';
+import { addDays, rentNow, today } from './calc';
 import { houseId } from './ids';
 import { suggestCosts } from './nkCosts';
 
@@ -38,7 +38,7 @@ export function computeTasks(db: DB, opts: { dismissed?: string[]; now?: string 
     if (!isActive(t, now)) continue;
     if (!t.moveIn) out.push({ id: `einzug:${t.id}`, level: 'normal', icon: 'calendar-outline', title: `Einzugsdatum fehlt: ${t.name}`, detail: where(t.unitId), screen: 'TenantForm', params: { id: t.id } });
     const u = db.units.find((x) => x.id === t.unitId);
-    if (u && (!(u.area > 0) || !(u.coldRent > 0))) out.push({ id: `einheit:${u.id}`, level: 'normal', icon: 'resize-outline', title: `${u.name}: ${!(u.area > 0) ? 'Fläche' : 'Kaltmiete'} fehlt`, detail: `${where(u.id)} ist vermietet, aber nicht vollständig erfasst.`, screen: 'UnitForm', params: { id: u.id } });
+    if (u && (!(u.area > 0) || !(rentNow(u).coldRent > 0))) out.push({ id: `einheit:${u.id}`, level: 'normal', icon: 'resize-outline', title: `${u.name}: ${!(u.area > 0) ? 'Fläche' : 'Kaltmiete'} fehlt`, detail: `${where(u.id)} ist vermietet, aber nicht vollständig erfasst.`, screen: 'UnitForm', params: { id: u.id } });
   }
 
   // 3) Eigene Vermerke „bitte prüfen / ergänzen“ (z. B. aus dem Import)
@@ -59,6 +59,12 @@ export function computeTasks(db: DB, opts: { dismissed?: string[]; now?: string 
   // 4b) Angekündigte Vorauszahlung gilt jetzt: in der Wohnung übernehmen
   for (const t of db.tenants) {
     if (t.advanceChange && t.advanceChange.from <= now && isActive(t, now)) out.push({ id: `vorauszahlung:${t.id}:${t.advanceChange.from}`, level: 'normal', icon: 'trending-up', title: `Neue Vorauszahlung übernehmen: ${t.name}`, detail: `${where(t.unitId)} · ab ${t.advanceChange.from.split('-').reverse().join('.')} ${t.advanceChange.amount.toLocaleString('de-DE')} €`, screen: 'UnitDetail', params: { id: t.unitId } });
+  }
+
+  // 4a) Angekündigte Mieterhöhung gilt jetzt: Zustimmung klären und übernehmen
+  for (const t of db.tenants) {
+    const rc = t.rentChange;
+    if (rc && isActive(t, now) && (rc.from <= now || (rc.consentUntil && rc.consentUntil < now))) out.push({ id: `mieterhoehung:${t.id}:${rc.from}`, level: 'normal', icon: 'trending-up', title: `Mieterhöhung klären: ${t.name}`, detail: `${where(t.unitId)} · ${rc.coldRent.toLocaleString('de-DE')} € ab ${rc.from.split('-').reverse().join('.')}${rc.kind === 'vergleich' ? ' · Zustimmung prüfen' : ' · Miete übernehmen'}`, screen: 'UnitDetail', params: { id: t.unitId } });
   }
 
   // 4c) Umlagefähige Ausgaben des Vorjahres sind noch nicht (vollständig) in der Nebenkostenabrechnung

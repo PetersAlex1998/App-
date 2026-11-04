@@ -239,3 +239,39 @@ ${m.footer.length ? `<div class="foot">${m.footer.map(esc).join('<br>')}</div>` 
 export const reminderHtml = (db: DB, r: Reminder, t: Tenant, unit: Unit, prop: Property, s: Settings) => modelToHtml(reminderModel(db, r, t, unit, prop, s));
 export const nkHtml = (res: NkResult, t: Tenant, unit: Unit, prop: Property, year: number, s: Settings) => modelToHtml(nkModel(res, t, unit, prop, year, s));
 export const sampleLetterHtml = (s: Settings) => modelToHtml(sampleModel(s));
+
+/** Mieterhöhung nach § 558 BGB (Vergleichsmiete, mit Zustimmungserklärung) oder § 557b BGB (Indexmiete). */
+export function rentIncreaseModel(kind: 'vergleich' | 'index', t: Tenant, unit: Unit, prop: Property, s: Settings, c: { currentRent: number; newRent: number; effective: string; consentUntil?: string; comparePerSqm?: number; indexOld?: number; indexNew?: number; advance: number }, date = new Date().toISOString().slice(0, 10)): LetterModel {
+  const de = (iso: string) => iso.split('-').reverse().join('.');
+  const inc = c.newRent - c.currentRent;
+  const pct = c.currentRent > 0 ? Math.round((inc / c.currentRent) * 1000) / 10 : 0;
+  const per = unit.area > 0 ? Math.round((c.newRent / unit.area) * 100) / 100 : 0;
+  const rows: [string, string][] = [['Bisherige Kaltmiete', eur(c.currentRent)], ['Neue Kaltmiete', eur(c.newRent)], ['Erhöhung', `${eur(inc)} (${pct.toLocaleString('de-DE')} %)`]];
+  if (unit.area > 0) rows.push(['Neue Kaltmiete pro m²', `${eur(per)} bei ${unit.area} m²`]);
+  rows.push(['Nebenkosten-Vorauszahlung (unverändert)', eur(c.advance)], ['Neue Gesamtmiete', eur(c.newRent + c.advance)], ['Gilt ab', de(c.effective)]);
+  const info: [string, string][] = [['Objekt', prop.name], ['Einheit', `${unit.name} (${unit.area} m²)`]];
+  if (kind === 'index') {
+    const idxPct = c.indexOld && c.indexNew ? Math.round(((c.indexNew - c.indexOld) / c.indexOld) * 1000) / 10 : 0;
+    return frame(s, t, prop, unit, date, info, `Mieterhöhung (Indexmiete) – ${t.name}`, [
+      { t: 'h1', text: 'Mieterhöhung nach § 557b BGB (Indexmiete)' },
+      { t: 'p', text: salutationText(t) },
+      { t: 'p', text: `die im Mietvertrag vereinbarte Indexmiete verändert sich entsprechend der Entwicklung des Verbraucherpreisindex für Deutschland. Daraus ergibt sich die folgende Erhöhung der Kaltmiete.` },
+      { t: 'kv', rows: [['Index bei der letzten Mietfestsetzung', String(c.indexOld ?? '')], ['Aktueller Index', String(c.indexNew ?? '')], ['Veränderung', `${idxPct.toLocaleString('de-DE')} %`], ...rows] },
+      { t: 'p', text: `Berechnung: ${eur(c.currentRent)} × ${c.indexNew} ÷ ${c.indexOld} = ${eur(c.newRent)}. Die neue Miete ist ab dem ${de(c.effective)} zu zahlen. Eine Zustimmung ist nicht erforderlich.` },
+      { t: 'sign', lines: signatureLines(s) },
+    ]);
+  }
+  return frame(s, t, prop, unit, date, info, `Mieterhöhungsverlangen – ${t.name}`, [
+    { t: 'h1', text: 'Mieterhöhungsverlangen nach § 558 BGB' },
+    { t: 'p', text: salutationText(t) },
+    { t: 'p', text: `wir bitten Sie, einer Erhöhung der monatlichen Kaltmiete auf die ortsübliche Vergleichsmiete zuzustimmen.` },
+    { t: 'kv', rows },
+    { t: 'p', text: c.comparePerSqm ? `Begründung: Die ortsübliche Vergleichsmiete für vergleichbaren Wohnraum beträgt laut Mietspiegel ${eur(c.comparePerSqm)} pro m². Die neue Miete von ${eur(per)} pro m² liegt innerhalb dieser Grenze. Die Kappungsgrenze von 20 % bzw. 15 % innerhalb von drei Jahren ist eingehalten.` : 'Begründung: Bitte ergänzen (Mietspiegel, Sachverständigengutachten oder Vergleichswohnungen).' },
+    { t: 'p', text: `Bitte stimmen Sie der Erhöhung bis zum **${c.consentUntil ? de(c.consentUntil) : ''}** zu. Stimmen Sie zu, schulden Sie die neue Miete ab dem ${de(c.effective)}. Stimmen Sie nicht zu, müssen wir die Zustimmung gegebenenfalls gerichtlich geltend machen.` },
+    { t: 'p', small: true, text: 'Sie können das Mietverhältnis bis zum Ablauf des zweiten Monats nach Zugang dieses Schreibens zum Ablauf des übernächsten Monats kündigen (§ 561 BGB). Dann tritt die Erhöhung nicht ein.' },
+    { t: 'sign', lines: signatureLines(s) },
+    { t: 'h1', text: 'Zustimmungserklärung' },
+    { t: 'p', text: `Ich stimme der Erhöhung der Kaltmiete für ${unit.name} (${prop.name}) auf ${eur(c.newRent)} ab dem ${de(c.effective)} zu.` },
+    { t: 'p', text: 'Ort, Datum: ______________________    Unterschrift Mieter: ______________________' },
+  ]);
+}

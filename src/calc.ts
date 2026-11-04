@@ -56,9 +56,9 @@ function paidIndex(db: DB): Map<string, number> {
 export function oldestOpenMonth(db: DB, t: Tenant, extra?: Map<string, number>): string | undefined {
   const unit = db.units.find((u) => u.id === t.unitId);
   if (!unit) return undefined;
-  const due = unitDue(unit);
   const idx = paidIndex(db);
   for (const month of dueMonths(t)) {
+    const due = unitDueAt(unit, month);
     const key = `${t.id}|${month}`;
     const paid = (idx.get(key) ?? 0) + (extra?.get(key) ?? 0);
     if (Math.round((due - paid) * 100) / 100 > 0.005) return month;
@@ -69,10 +69,10 @@ export function oldestOpenMonth(db: DB, t: Tenant, extra?: Map<string, number>):
 export function openItems(db: DB, t: Tenant): OpenItem[] {
   const unit = db.units.find((u) => u.id === t.unitId);
   if (!unit) return [];
-  const due = unitDue(unit);
   const idx = paidIndex(db);
   return dueMonths(t)
     .map((month) => {
+      const due = unitDueAt(unit, month);
       const paid = idx.get(`${t.id}|${month}`) ?? 0;
       return { month, due, paid, open: Math.round((due - paid) * 100) / 100 };
     })
@@ -139,7 +139,9 @@ export function nkStatement(db: DB, tenant: Tenant, unit: Unit, year: number): N
     return { category: c.category, total: c.amount, key: c.key === 'area' ? 'nach m²' : 'je Einheit', share: Math.round(c.amount * base * f * v * 100) / 100 };
   });
   const costSum = lines.reduce((s, l) => s + l.share, 0);
-  const advances = unit.advance * vatFactor(unit) * months;
+  let advances = 0;
+  for (let m = start; m < start + months; m++) advances += termsOn(unit, `${year}-${String(m).padStart(2, '0')}-01`).advance * vatFactor(unit);
+  advances = Math.round(advances * 100) / 100;
   return { lines, costs: costSum, advances, balance: Math.round((costSum - advances) * 100) / 100, months, warnings };
 }
 
@@ -165,4 +167,15 @@ export const kindLabel = (k: UnitKind) => ({ wohnung: 'Wohnung', gewerbe: 'Gewer
 /** Faktor für Umsatzsteuer (Gewerbe mit USt-Option), sonst 1. */
 export const vatFactor = (u?: Unit) => 1 + (kindOf(u) === 'gewerbe' ? u?.vat ?? 0 : 0) / 100;
 /** Monatlich fällige Gesamtmiete (inkl. USt, falls Gewerbe mit USt). */
-export const unitDue = (u?: Unit) => (u ? Math.round((u.coldRent + u.advance) * vatFactor(u) * 100) / 100 : 0);
+/** Kaltmiete und Vorauszahlung, die an einem Datum gelten (berücksichtigt den Mietverlauf). */
+export function termsOn(u: Unit, iso: string): { coldRent: number; advance: number } {
+  let cur = { coldRent: u.coldRent, advance: u.advance };
+  for (const t of u.terms ?? []) if (t.from <= iso) cur = { coldRent: t.coldRent, advance: t.advance };
+  return cur;
+}
+/** Aktuell geltende Kaltmiete und Vorauszahlung. */
+export const rentNow = (u: Unit, now = today()) => termsOn(u, now);
+/** Gesamtmiete (inkl. USt bei Gewerbe) für einen Monat „YYYY-MM“. */
+export const unitDueAt = (u: Unit | undefined, month: string) => { if (!u) return 0; const r = termsOn(u, `${month}-01`); return Math.round((r.coldRent + r.advance) * vatFactor(u) * 100) / 100; };
+/** Monatlich fällige Gesamtmiete heute (inkl. USt, falls Gewerbe mit USt). */
+export const unitDue = (u?: Unit) => (u ? unitDueAt(u, today().slice(0, 7)) : 0);

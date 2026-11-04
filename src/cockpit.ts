@@ -1,6 +1,6 @@
 import { DB, Tenant, Unit } from './types';
 import { Settings } from './settingsDefaults';
-import { dueMonths, today, totalOpen, unitDue } from './calc';
+import { dueMonths, today, totalOpen, unitDue, unitDueAt } from './calc';
 import { anlageV, AnlageV } from './expenses';
 import { dunningPlans } from './dunning';
 import { computeTasks } from './tasks';
@@ -47,10 +47,9 @@ export function cockpit(db: DB, now = today()): Cockpit {
   }
   const soll = new Map(months.map((m) => [m, 0]));
   for (const t of db.tenants) {
-    const due = unitDue(unitOf.get(t.unitId));
-    if (!due) continue;
+    const unit = unitOf.get(t.unitId);
     const set = new Set(dueMonths(t));
-    for (const m of months) if (set.has(m)) soll.set(m, soll.get(m)! + due);
+    for (const m of months) if (set.has(m)) soll.set(m, soll.get(m)! + unitDueAt(unit, m));
   }
   const ist = new Map(months.map((m) => [m, 0]));
   for (const p of db.payments) if (p.kind === 'miete' && ist.has(p.month)) ist.set(p.month, ist.get(p.month)! + p.amount);
