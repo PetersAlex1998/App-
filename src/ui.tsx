@@ -414,3 +414,19 @@ function InfoRow({ k, v }: { k: string; v: string }) {
     </View>
   );
 }
+
+
+/** Kachel für eine Schnellaktion (Symbol + Beschriftung). Ausgegraut, wenn die Aktion gerade nicht möglich ist. */
+export function ActionTile({ icon, label, onPress, disabled, badge, hint }: { icon: IconName; label: string; onPress: () => void; disabled?: boolean; badge?: string; hint?: string }) {
+  const c = useColors();
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel={hint ? `${label}. ${hint}` : label} disabled={!!disabled} accessibilityState={{ disabled: !!disabled }} onPress={onPress}
+      style={{ flexGrow: 1, flexBasis: '22%', minWidth: 76, minHeight: 80, borderRadius: 20, backgroundColor: c.card, borderWidth: 1, borderColor: c.glassBorder, alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 6, opacity: disabled ? 0.45 : 1, ...(cardShadow as object) }}>
+      <View>
+        <Ionicons name={icon} size={24} color={c.primary} />
+        {badge ? <View style={{ position: 'absolute', top: -6, right: -12, minWidth: 18, height: 18, borderRadius: 9, backgroundColor: c.danger, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 }}><Text style={{ color: '#fff', fontSize: 11, fontWeight: '800' }}>{badge}</Text></View> : null}
+      </View>
+      <Text numberOfLines={2} style={{ color: c.text, fontSize: type.caption, fontWeight: '600', textAlign: 'center' }}>{label}</Text>
+    </Pressable>
+  );
+}

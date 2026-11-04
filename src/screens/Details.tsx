@@ -1,7 +1,8 @@
 import React, { useLayoutEffect, useState } from 'react';
 import { Linking, Pressable, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useStore, uid } from '../store';
-import { Avatar, Badge, Button, EmptyState, Gap, ListRow, Note, Row, Screen, Section, Segmented, Stat, StatGrid, confirm, infoRows, notify, useColors } from '../ui';
+import { ActionTile, Avatar, Badge, Button, EmptyState, Gap, ListRow, Note, Row, Screen, Section, Segmented, Stat, StatGrid, confirm, infoRows, notify, useColors } from '../ui';
 import { CoverEmpty, CoverHero, DocumentsSection } from './Documents';
 import { expiryState } from '../docs';
 import { defaultUnitName, houseId, unitLetter, unitRef } from '../ids';
@@ -16,6 +17,8 @@ import { useSettings } from '../settings';
 import { dunningPlans, feeFor, makeReminder, overdueItems, relevantReminders } from '../dunning';
 import { type } from '../theme';
 import { fmtVal, meterIcon, meterTypeLabel, readingsOf } from '../meters';
+import { useTenantActions } from '../tenantActions';
+import { durationText, tenancyTimeline } from '../history';
 
 
 function useHeaderAction(navigation: any, label: string, onPress: () => void) {
@@ -151,6 +154,7 @@ export function TenantDetail({ route, navigation }: any) {
   const { s: cfg } = useSettings();
   const t = db.tenants.find((x) => x.id === route.params.id);
   const [year, setYear] = useState(new Date().getFullYear() - 1);
+  const act = useTenantActions(t, navigation); // vor jedem frühen Return (Regeln der Hooks)
   useHeaderAction(navigation, 'Bearbeiten', () => t && navigation.navigate('TenantForm', { id: t.id }));
   if (!t) return <Screen><EmptyState icon="help-circle" title="Mieter nicht gefunden" text="Er wurde vermutlich gelöscht." /></Screen>;
 
@@ -167,34 +171,8 @@ export function TenantDetail({ route, navigation }: any) {
   const years = [0, 1, 2, 3].map((o) => new Date().getFullYear() - o);
 
   const link = (url: string) => Linking.openURL(url).catch(() => notify('Das konnte nicht geöffnet werden.'));
-  const createReminder = () => {
-    if (!unit || !prop) return;
-    const plan = dunningPlans(db, cfg).find((p) => p.tenant.id === t.id);
-    if (!plan) return notify('Aktuell ist keine Miete überfällig. Die Miete des laufenden Monats gilt erst nach Fälligkeit und Karenz als überfällig.');
-    confirm(`${reminderLabel(plan.level)} erstellen?`, async () => {
-      const r = makeReminder(uid(), plan, cfg);
-      save('reminders', r);
-      if (filesSupported()) {
-        const [doc] = await storeLetters([{ model: reminderModel(db, r, t, unit, prop, cfg), tenant: t, note: `Mahnung Stufe ${r.level}` }]);
-        save('documents', doc);
-        navigation.navigate('Outbox');
-        return;
-      }
-      await exportPdf(reminderHtml(db, r, t, unit, prop, cfg));
-    }, 'Erstellen', `Überfällig: ${eur(plan.open)}${plan.fee ? ` · Mahngebühr ${eur(plan.fee)}` : ''}. Frist: ${cfg.deadlineDays} Tage. Der Brief liegt danach als PDF im Briefausgang.`);
-  };
-  const createNk = async () => {
-    if (!unit || !prop || !nk) return;
-    if (nk.lines.length === 0) return notify(`Für ${year} sind noch keine Betriebskosten erfasst. Trage sie im Objekt ein.`);
-    save('tenants', { ...t, nkDone: { ...(t.nkDone ?? {}), [String(year)]: today() } });
-    if (filesSupported()) {
-      const [doc] = await storeLetters([{ model: nkModel(nk, t, unit, prop, year, cfg), tenant: t, note: `Nebenkosten ${year}` }]);
-      save('documents', doc);
-      navigation.navigate('Outbox');
-      return;
-    }
-    await exportPdf(nkHtml(nk, t, unit, prop, year, cfg));
-  };
+  const createReminder = act.createReminder;
+  const createNk = () => act.createNk(year);
 
   return (
     <Screen>
@@ -295,12 +273,26 @@ export function TenantDetail({ route, navigation }: any) {
 export function UnitDetail({ route, navigation }: any) {
   const { db } = useStore();
   const c = useColors();
+  const { s: cfg } = useSettings();
   const u = db.units.find((x) => x.id === route.params.id);
+  const tenant = db.tenants.find((t) => t.unitId === route.params.id && (!t.moveOut || t.moveOut >= today()));
+  const act = useTenantActions(tenant, navigation); // vor jedem frühen Return (Regeln der Hooks)
+  const [year, setYear] = useState(new Date().getFullYear() - 1);
+  const [showHistory, setShowHistory] = useState(false);
   useHeaderAction(navigation, 'Bearbeiten', () => u && navigation.navigate('UnitForm', { id: u.id }));
   if (!u) return <Screen><EmptyState icon="help-circle" title="Einheit nicht gefunden" text="Sie wurde vermutlich gelöscht." /></Screen>;
   const prop = db.properties.find((p) => p.id === u.propertyId);
-  const tenant = db.tenants.find((t) => t.unitId === u.id && (!t.moveOut || t.moveOut >= today()));
   const meters = db.meters.filter((m) => m.unitId === u.id);
+  const open = tenant ? totalOpen(db, tenant) : 0;
+  const pays = tenant ? db.payments.filter((p) => p.tenantId === tenant.id).sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt ?? '').localeCompare(a.createdAt ?? '')) : [];
+  const nk = tenant ? nkStatement(db, tenant, u, year) : null;
+  const years = [0, 1, 2, 3].map((o) => new Date().getFullYear() - o);
+  const timeline = tenancyTimeline(db, u.id);
+  const tenantCount = timeline.filter((e) => e.kind === 'tenant').length;
+  const readingTarget = () => (meters.length === 0 ? navigation.navigate('MeterForm', { propertyId: u.propertyId, unitId: u.id })
+    : meters.length === 1 ? navigation.navigate('ReadingForm', { meterId: meters[0].id }) : navigation.navigate('Ablesung', { propertyId: u.propertyId, unitId: u.id }));
+  const noTenant = () => notify('Diese Einheit ist leer. Lege zuerst einen Mieter an.');
+
   return (
     <Screen>
       <View style={{ marginBottom: 16, marginTop: 4 }}>
@@ -313,6 +305,24 @@ export function UnitDetail({ route, navigation }: any) {
         <Stat label="Miete / Monat" value={eur(unitDue(u))} icon="cash-outline" />
         <Stat label="Kaltmiete" value={eur(u.coldRent)} icon="pricetag-outline" />
       </StatGrid>
+
+      <Section title="Mieter">
+        {tenant ? <ListRow avatar={initials(tenant.name)} title={tenant.name} subtitle={`seit ${tenant.moveIn ? dateDE(tenant.moveIn) : 'unbekannt'}`}
+          badge={open > 0 ? { text: `${eur(open)} offen`, tone: 'danger' } : { text: 'Alles bezahlt', tone: 'ok' }} onPress={() => navigation.navigate('TenantDetail', { id: tenant.id })} />
+          : <ListRow icon="key-outline" iconTone="warn" title="Leerstand" subtitle="Mieter hinzufügen" onPress={() => navigation.navigate('TenantForm', { unitId: u.id })} />}
+      </Section>
+
+      <Text accessibilityRole="header" style={{ fontSize: type.footnote, fontWeight: '600', color: c.muted, letterSpacing: 0.4, textTransform: 'uppercase', marginBottom: 8, paddingHorizontal: 4 }}>Schnellaktionen</Text>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 22 }}>
+        <ActionTile icon="add-circle-outline" label="Zahlung" onPress={() => (tenant ? navigation.navigate('PaymentForm', { tenantId: tenant.id }) : noTenant())} disabled={!tenant} />
+        <ActionTile icon="speedometer-outline" label={meters.length ? 'Ablesung' : 'Zähler anlegen'} hint={meters.length ? 'Zählerstand erfassen' : undefined} onPress={readingTarget} />
+        <ActionTile icon="mail-unread-outline" label={act.plan ? act.plan.level === 1 ? 'Erinnerung' : 'Mahnung' : 'Mahnung'} onPress={act.createReminder} disabled={!tenant} badge={act.plan ? '!' : undefined} hint={act.plan ? 'Miete überfällig' : 'Keine Miete überfällig'} />
+        <ActionTile icon="calculator-outline" label={`NK ${year}`} hint="Nebenkostenabrechnung erstellen" onPress={() => act.createNk(year)} disabled={!tenant} />
+        <ActionTile icon="person-add-outline" label="Neuer Mieter" onPress={() => navigation.navigate('TenantForm', { unitId: u.id })} />
+        <ActionTile icon="document-attach-outline" label="Dokument" onPress={() => navigation.navigate('DocumentForm', { ownerKind: 'unit', ownerId: u.id })} />
+        <ActionTile icon="add-outline" label="Zähler +" onPress={() => navigation.navigate('MeterForm', { propertyId: u.propertyId, unitId: u.id })} />
+      </View>
+
       {(() => {
         const ref = unitRef(prop, u);
         const copy = () => {
@@ -325,41 +335,73 @@ export function UnitDetail({ route, navigation }: any) {
           </Section>
         ) : null;
       })()}
-      <Section title="Mieter">
-        {tenant ? <ListRow avatar={initials(tenant.name)} title={tenant.name} subtitle={`seit ${dateDE(tenant.moveIn)}`} onPress={() => navigation.navigate('TenantDetail', { id: tenant.id })} />
-          : <ListRow icon="key-outline" iconTone="warn" title="Leerstand" subtitle="Mieter hinzufügen" onPress={() => navigation.navigate('TenantForm', { unitId: u.id })} />}
-      </Section>
-      {(() => {
-        const past = db.tenants.filter((t) => t.unitId === u.id && t.id !== tenant?.id).sort((a, b) => (b.moveIn || b.moveOut).localeCompare(a.moveIn || a.moveOut));
-        if (!past.length) return null;
-        return (
-          <Section title={`Mieterhistorie (${past.length})`} footer="Frühere Mieter dieser Wohnung, der neueste zuerst. Offene Posten zählen für sie nicht mehr.">
-            {past.map((t) => (
-              <ListRow key={t.id} avatar={initials(t.name)} title={t.name}
-                subtitle={`${t.moveIn ? dateDE(t.moveIn) : 'Einzug unbekannt'} – ${t.moveOut ? dateDE(t.moveOut) : 'heute'}${t.coldRent ? ` · Kaltmiete ${eur(t.coldRent)}` : ''}`}
-                onPress={() => navigation.navigate('TenantDetail', { id: t.id })} />
-            ))}
-          </Section>
-        );
-      })()}
+
+      {tenant && (
+        <Section title={`Zahlungen (${pays.length})`} action={{ label: '+ Erfassen', onPress: () => navigation.navigate('PaymentForm', { tenantId: tenant.id }) }}
+          footer={pays.length > 5 ? 'Alle Zahlungen siehst du beim Mieter.' : undefined}>
+          {pays.length === 0 && <Note>Noch keine Zahlungen erfasst.</Note>}
+          {pays.slice(0, 5).map((p) => (
+            <ListRow key={p.id} icon="arrow-down" iconTone="ok" title={kindText(p.kind) + (p.kind === 'miete' ? ` ${monthLabel(p.month)}` : '')} subtitle={`${dateDE(p.date)}${p.note ? ` · ${p.note}` : ''}`}
+              right={`+ ${eur(p.amount)}`} rightColor={c.ok} badge={{ text: sourceLabel(p), tone: sourceTone(p) }} onPress={() => navigation.navigate('PaymentForm', { id: p.id })} />
+          ))}
+          {pays.length > 5 && <ListRow icon="list" title={`Alle ${pays.length} Zahlungen ansehen`} onPress={() => navigation.navigate('TenantDetail', { id: tenant.id })} />}
+        </Section>
+      )}
+
+      {tenant && (
+        <Section title="Mahnung und Abrechnung">
+          <ListRow icon="mail-unread-outline" iconTone={act.plan ? 'danger' : 'ok'} title={act.plan ? `${reminderLabel(act.plan.level)} erstellen` : 'Keine Mahnung nötig'}
+            subtitle={act.plan ? `${eur(act.plan.open)} überfällig${act.plan.fee ? ` · Gebühr ${eur(act.plan.fee)}` : ''}` : open > 0 ? 'Die Miete ist noch nicht überfällig.' : 'Alle Mieten sind ausgeglichen.'}
+            onPress={act.plan ? act.createReminder : undefined} chevron={!!act.plan} />
+          <View style={{ padding: 12 }}><Segmented value={year} onChange={setYear} options={years.map((y) => ({ label: String(y), value: y }))} /></View>
+          <ListRow icon="calculator-outline" title={`Nebenkostenabrechnung ${year} erstellen`}
+            subtitle={nk && nk.lines.length > 0 ? `${nk.balance > 0 ? 'Nachzahlung' : 'Guthaben'} ${eur(Math.abs(nk.balance))}${tenant.nkDone?.[String(year)] ? ` · erstellt am ${dateDE(tenant.nkDone[String(year)])}` : ''}` : `Für ${year} sind keine Betriebskosten erfasst`}
+            onPress={() => act.createNk(year)} />
+        </Section>
+      )}
+
+      {tenantCount > 0 && (
+        <View style={{ marginBottom: showHistory ? 8 : 22 }}>
+          <Pressable accessibilityRole="button" accessibilityState={{ expanded: showHistory }} accessibilityLabel={`Mieterhistorie ${showHistory ? 'ausblenden' : 'anzeigen'}, ${tenantCount} Mieter`} onPress={() => setShowHistory(!showHistory)}
+            style={{ backgroundColor: c.card, borderRadius: 22, borderWidth: 1, borderColor: c.glassBorder, paddingHorizontal: 16, minHeight: 56, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: type.body, fontWeight: '600', color: c.text }}>{showHistory ? 'Mieterhistorie ausblenden' : 'Mieterhistorie anzeigen'}</Text>
+              <Text style={{ fontSize: type.footnote, color: c.muted }}>{tenantCount} {tenantCount === 1 ? 'Mieter' : 'Mieter'} seit {(() => { const first = [...timeline].reverse().find((e) => e.kind === 'tenant') as any; return first?.from ? dateDE(first.from) : 'unbekannt'; })()}</Text>
+            </View>
+            <Ionicons name={showHistory ? 'chevron-up' : 'chevron-down'} size={20} color={c.muted} />
+          </Pressable>
+        </View>
+      )}
+      {showHistory && (
+        <Section footer="Alle Mieter dieser Wohnung, der neueste zuerst, mit Mietdauer und Leerständen. Offene Posten zählen nur für den aktuellen Mieter.">
+          {timeline.map((e, i) => e.kind === 'vacancy' ? (
+            <ListRow key={`v${i}`} icon="key-outline" iconTone="warn" title={`Leerstand · ${durationText(e.months)}`} subtitle={`${dateDE(e.from)} – ${dateDE(e.to)}`} chevron={false} />
+          ) : (
+            <ListRow key={e.tenant.id} avatar={initials(e.tenant.name)} title={e.tenant.name}
+              subtitle={`${e.from ? dateDE(e.from) : 'Einzug unbekannt'} – ${e.current ? 'heute' : e.tenant.moveOut ? dateDE(e.tenant.moveOut) : 'unbekannt'}${e.months ? ` · ${durationText(e.months)}` : ''}${e.tenant.coldRent ? ` · Kaltmiete ${eur(e.tenant.coldRent)}` : ''}${e.tenant.deposit ? ` · Kaution ${eur(e.tenant.deposit)}` : ''}`}
+              badge={e.current ? { text: 'Aktuell', tone: 'ok' } : undefined} onPress={() => navigation.navigate('TenantDetail', { id: e.tenant.id })} />
+          ))}
+        </Section>
+      )}
+
       {(() => {
         const rows = infoRows([['Etage', u.floor], ['Lage', u.position], ['Balkon / Terrasse', u.balcony], ['Keller', u.cellar], ['Stellplatz', u.parking], ['Küche', u.kitchen], ['Ausstattung', u.equipment], ['Notizen', u.notes]]);
         return rows.length ? <Section title="Lage und Ausstattung">{rows}</Section> : null;
       })()}
-      {meters.length > 0 && (
-        <Section title="Zähler" footer="Tippe auf einen Zähler, um alle Ablesungen zu sehen oder einen neuen Stand einzutragen.">
-          {meters.map((m) => {
-            const list = readingsOf(db, m.id);
-            const last = list[list.length - 1], prev = list[list.length - 2];
-            const used = last && prev ? Math.round((last.value - prev.value) * 1000) / 1000 : null;
-            return (
-              <ListRow key={m.id} icon={meterIcon(m.type)} title={meterTypeLabel(m.type)}
-                subtitle={`Nr. ${m.number}${last ? ` · Stand ${fmtVal(last.value)} (${dateDE(last.date)})` : ' · noch kein Stand'}${used !== null ? ` · ${used >= 0 ? '+' : ''}${fmtVal(used)} seit ${dateDE(prev.date)}` : ''}`}
-                onPress={() => navigation.navigate('MeterDetail', { id: m.id })} />
-            );
-          })}
-        </Section>
-      )}
+      <Section title={`Zähler${meters.length ? ` (${meters.length})` : ''}`} action={{ label: '+ Zähler', onPress: () => navigation.navigate('MeterForm', { propertyId: u.propertyId, unitId: u.id }) }}
+        footer={meters.length ? 'Tippe auf einen Zähler, um alle Ablesungen zu sehen. „Zählerstand“ oben trägt neue Stände ein.' : undefined}>
+        {meters.length === 0 && <Note>Noch keine Zähler. Lege Heiz-, Wasser- oder Stromzähler dieser Wohnung an.</Note>}
+        {meters.map((m) => {
+          const list = readingsOf(db, m.id);
+          const last = list[list.length - 1], prev = list[list.length - 2];
+          const used = last && prev ? Math.round((last.value - prev.value) * 1000) / 1000 : null;
+          return (
+            <ListRow key={m.id} icon={meterIcon(m.type)} title={meterTypeLabel(m.type)}
+              subtitle={`Nr. ${m.number}${last ? ` · Stand ${fmtVal(last.value)} (${dateDE(last.date)})` : ' · noch kein Stand'}${used !== null ? ` · ${used >= 0 ? '+' : ''}${fmtVal(used)} seit ${dateDE(prev.date)}` : ''}`}
+              onPress={() => navigation.navigate('MeterDetail', { id: m.id })} />
+          );
+        })}
+      </Section>
       <DocumentsSection ownerKind="unit" ownerId={u.id} navigation={navigation} />
     </Screen>
   );

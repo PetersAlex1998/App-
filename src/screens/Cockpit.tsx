@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../store';
 import { useSettings } from '../settings';
 import { useOnline } from '../pwa';
-import { Badge, Button, EmptyState, Gap, LargeHeader, ListRow, Screen, Section, Stat, StatGrid, useColors } from '../ui';
+import { ActionTile, Badge, Button, EmptyState, Gap, LargeHeader, ListRow, Screen, Section, Stat, StatGrid, useColors } from '../ui';
 import { dateDE, eur, initials, monthLabel, monthLong, openItems, today } from '../calc';
 import { type } from '../theme';
 import { actions, cockpit, deadlines } from '../cockpit';
@@ -84,17 +84,6 @@ function HouseRow({ h, onPress }: { h: { name: string; units: number; vacant: nu
       </View>
       <Progress value={h.occupancy} tone={h.occupancy >= 95 ? 'ok' : h.occupancy >= 80 ? 'primary' : 'warn'} />
       <Text style={{ color: c.muted, fontSize: type.footnote }}>{h.occupancy} % vermietet · {h.units} {h.units === 1 ? 'Einheit' : 'Einheiten'}{h.vacant ? ` · ${h.vacant} frei` : ''}</Text>
-    </Pressable>
-  );
-}
-
-function QuickAction({ icon, label, onPress }: { icon: React.ComponentProps<typeof Ionicons>['name']; label: string; onPress: () => void }) {
-  const c = useColors();
-  return (
-    <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress}
-      style={{ flex: 1, minWidth: 76, minHeight: 78, borderRadius: 20, backgroundColor: c.card, borderWidth: 1, borderColor: c.glassBorder, alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 6, ...shadow }}>
-      <Ionicons name={icon} size={24} color={c.primary} />
-      <Text numberOfLines={2} style={{ color: c.text, fontSize: type.caption, fontWeight: '600', textAlign: 'center' }}>{label}</Text>
     </Pressable>
   );
 }
@@ -211,10 +200,10 @@ export function Cockpit({ navigation }: any) {
 
       <Text accessibilityRole="header" style={{ fontSize: type.footnote, fontWeight: '600', color: c.muted, letterSpacing: 0.4, textTransform: 'uppercase', marginBottom: 8, paddingHorizontal: 4 }}>Schnellzugriff</Text>
       <View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap', marginBottom: 22 }}>
-        <QuickAction icon="add-circle-outline" label="Zahlung" onPress={() => navigation.navigate('PaymentForm', {})} />
-        <QuickAction icon="camera-outline" label="Beleg" onPress={() => navigation.navigate('ExpenseForm', { propertyId: db.properties[0]?.id })} />
-        <QuickAction icon="speedometer-outline" label="Zähler" onPress={() => navigation.navigate('Ablesung', { propertyId: db.properties[0]?.id })} />
-        <QuickAction icon="person-add-outline" label="Mieter" onPress={() => navigation.navigate('TenantForm', {})} />
+        <ActionTile icon="add-circle-outline" label="Zahlung" onPress={() => navigation.navigate('PaymentForm', {})} />
+        <ActionTile icon="camera-outline" label="Beleg" onPress={() => navigation.navigate('ExpenseForm', { propertyId: db.properties[0]?.id })} />
+        <ActionTile icon="speedometer-outline" label="Zähler" onPress={() => navigation.navigate('Ablesung', { propertyId: db.properties[0]?.id })} />
+        <ActionTile icon="person-add-outline" label="Mieter" onPress={() => navigation.navigate('TenantForm', {})} />
       </View>
       <Gap h={4} />
     </Screen>

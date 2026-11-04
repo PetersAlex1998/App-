@@ -143,7 +143,8 @@ export function Ablesung({ route, navigation }: any) {
   const { db, save } = useStore();
   const c = useColors();
   const propertyId: string = route.params.propertyId;
-  const meters = db.meters.filter((m) => m.propertyId === propertyId).sort((a, b) => (a.unitId === b.unitId ? a.type.localeCompare(b.type) : (db.units.find((x) => x.id === a.unitId)?.name ?? '').localeCompare(db.units.find((x) => x.id === b.unitId)?.name ?? '', 'de', { numeric: true })));
+  const onlyUnit: string | undefined = route.params.unitId; // optional: nur die Zähler einer Wohnung
+  const meters = db.meters.filter((m) => m.propertyId === propertyId && (!onlyUnit || m.unitId === onlyUnit)).sort((a, b) => (a.unitId === b.unitId ? a.type.localeCompare(b.type) : (db.units.find((x) => x.id === a.unitId)?.name ?? '').localeCompare(db.units.find((x) => x.id === b.unitId)?.name ?? '', 'de', { numeric: true })));
   const [date, setDate] = useState(today());
   const [vals, setVals] = useState<Record<string, string>>({});
   const [err, setErr] = useState<Errors>({});
