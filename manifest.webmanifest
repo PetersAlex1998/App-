@@ -1,0 +1,23 @@
+{
+  "name": "Immo Verwaltung",
+  "short_name": "Immo",
+  "lang": "de",
+  "display": "standalone",
+  "start_url": "/App-/",
+  "scope": "/App-/",
+  "background_color": "#E9EAEE",
+  "theme_color": "#15171A",
+  "icons": [
+    {
+      "src": "/App-/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/App-/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

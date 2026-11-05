@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Immo Verwaltung</title>
+    <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
+    <style id="expo-reset">
+      /* These styles make the body full-height */
+      html,
+      body {
+        height: 100%;
+      }
+      /* These styles disable body scrolling if you are using <ScrollView> */
+      body {
+        overflow: hidden;
+      }
+      /* These styles make the root element full-height */
+      #root {
+        display: flex;
+        height: 100%;
+        flex: 1;
+      }
+    </style>
+  <meta name="theme-color" content="#E9EAEE">
+<link rel="icon" href="/App-/favicon.ico"/>
+<link rel="manifest" href="/App-/manifest.webmanifest" />
+<link rel="apple-touch-icon" href="/App-/icon-192.png" />
+<meta name="theme-color" content="#15171A" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="Immo" />
+<style>html,body{background:#E9EAEE}body{overscroll-behavior-y:none}</style>
+<script>window.__immoBase='/App-';</script>
+<script>
+/* Offline-Modus: Service Worker anmelden und über Updates informieren */
+(function(){
+  if(!('serviceWorker' in navigator)) return;
+  var BASE='/App-';
+  window.addEventListener('load',function(){
+    navigator.serviceWorker.register(BASE+'/sw.js',{scope:BASE+'/'}).then(function(reg){
+      function announce(){ if(reg.waiting && navigator.serviceWorker.controller){ window.__immoSwWaiting=reg.waiting; window.dispatchEvent(new Event('immo-sw-waiting')); } }
+      announce();
+      reg.addEventListener('updatefound',function(){ var w=reg.installing; if(!w) return; w.addEventListener('statechange',function(){ if(w.state==='installed') announce(); }); });
+      document.addEventListener('visibilitychange',function(){ if(document.visibilityState==='visible') reg.update().catch(function(){}); });
+      setInterval(function(){ reg.update().catch(function(){}); }, 3600000);
+    }).catch(function(){});
+    var reloaded=false;
+    navigator.serviceWorker.addEventListener('controllerchange',function(){ if(reloaded||!window.__immoSwUpdating) return; reloaded=true; location.reload(); });
+  });
+})();
+</script>
+</head>
+
+  <body>
+    <!-- Use static rendering with Expo Router to support running without JavaScript. -->
+    <noscript> You need to enable JavaScript to run this app. </noscript>
+    <!-- The root element for your Expo app. -->
+    <div id="root"></div>
+  <script src="/App-/_expo/static/js/web/__expo-metro-runtime-8c088df87a31e4e6accd81c554ec290d.js" defer></script><script src="/App-/_expo/static/js/web/__common-9aef7e0b43940fd6244da9b10f9b8e2c.js" defer></script><script src="/App-/_expo/static/js/web/entry-501882bd7c3b3448c622c08df4aa8877.js" defer></script>
+</body>
+</html>
