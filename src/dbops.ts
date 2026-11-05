@@ -35,6 +35,7 @@ export function removeItem(d: DB, kind: Kind, id: string): { db: DB; goneDocs: D
     n.units = d.units.filter((u) => u.propertyId !== id);
     n.costs = d.costs.filter((c) => c.propertyId !== id);
     n.expenses = d.expenses.filter((e) => e.propertyId !== id);
+    n.loans = d.loans.filter((l) => l.propertyId !== id);
     const mIds = d.meters.filter((m) => m.propertyId === id).map((m) => m.id);
     n.meters = d.meters.filter((m) => m.propertyId !== id);
     n.readings = d.readings.filter((r) => !mIds.includes(r.meterId));

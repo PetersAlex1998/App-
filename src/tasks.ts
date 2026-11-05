@@ -3,6 +3,7 @@ import { addDays, rentNow, today } from './calc';
 import { houseId } from './ids';
 import { suggestCosts } from './nkCosts';
 import { wechsel } from './moveOut';
+import { balanceAt, balanceAtFixedEnd, isPaidOff, monthsToFixedEnd } from './loans';
 import { depositRow, RETURN_USUAL_DAYS } from './deposit';
 
 /**
@@ -84,6 +85,14 @@ export function computeTasks(db: DB, opts: { dismissed?: string[]; now?: string 
     if (r.status === 'rueckzahlung' && r.daysSinceMoveOut >= 60) out.push({ id: k('kaution-zurueck'), level: r.daysSinceMoveOut >= RETURN_USUAL_DAYS ? 'hoch' : 'normal', icon: 'wallet-outline', title: `Kaution zurückzahlen: ${t.name}`, detail: `${where(t.unitId)} · ausgezogen vor ${r.daysSinceMoveOut} Tagen, üblich sind bis zu ${RETURN_USUAL_DAYS / 30} Monate`, screen: 'Kaution', params: { tenantId: t.id } });
     if (r.notPlaced) out.push({ id: k('kaution-anlage'), level: 'hinweis', icon: 'wallet-outline', title: `Kaution anlegen: ${t.name}`, detail: `${where(t.unitId)} · getrennt vom Vermögen anlegen und vermerken (§ 551 BGB)`, screen: 'Kaution', params: { tenantId: t.id } });
     if (r.tooHigh) out.push({ id: k('kaution-hoch'), level: 'hinweis', icon: 'warning-outline', title: `Kaution über drei Kaltmieten: ${t.name}`, detail: `${where(t.unitId)} · höchstens ${r.maxAllowed.toLocaleString('de-DE')} € zulässig`, screen: 'Kaution', params: { tenantId: t.id } });
+  }
+
+  // 4g) Zinsbindung läuft aus: Anschlussfinanzierung rechtzeitig klären
+  for (const l of db.loans) {
+    const m = monthsToFixedEnd(l, now);
+    if (m === null || m > 15 || isPaidOff(l, now) || !l.fixedUntil) continue;
+    const bal = balanceAtFixedEnd(l) ?? balanceAt(l, now);
+    out.push({ id: `zinsbindung:${l.id}:${l.fixedUntil}`, level: m <= 6 ? 'hoch' : 'normal', icon: 'cash-outline', title: `Zinsbindung endet: ${l.name || 'Darlehen'}`, detail: `${m < 0 ? 'Abgelaufen' : `In ${m} Monat${m === 1 ? '' : 'en'}`} (${l.fixedUntil.split('-').reverse().join('.')}) · Restschuld dann ca. ${Math.round(bal).toLocaleString('de-DE')} € · Anschlussfinanzierung klären`, screen: 'LoanDetail', params: { id: l.id } });
   }
 
   // 4d) Hinterlegter Mietspiegel ist abgelaufen

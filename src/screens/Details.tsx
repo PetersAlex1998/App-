@@ -111,6 +111,7 @@ export function PropertyDetail({ route, navigation }: any) {
       {years.length > 0 && <><Button kind="secondary" icon="calculator-outline" title="Nebenkostenabrechnung für alle Mieter" onPress={() => navigation.navigate('NkLauf', { propertyId: p.id })} /><Gap h={22} /></>}
 
       <Section title="Ausgaben und Belege">
+        <ListRow icon="cash-outline" title="Darlehen" subtitle={db.loans.some((l) => l.propertyId === p.id) ? `${db.loans.filter((l) => l.propertyId === p.id).length} erfasst` : 'Zinsen, Restschuld, Zinsbindung'} onPress={() => navigation.navigate('Darlehen', { propertyId: p.id })} />
         <ListRow icon="receipt-outline" title="Ausgaben dieses Objekts" subtitle={`${db.expenses.filter((x) => x.propertyId === p.id).length} erfasst`} onPress={() => navigation.navigate('Ausgaben', { propertyId: p.id })} />
       </Section>
 

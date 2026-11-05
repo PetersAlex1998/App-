@@ -195,6 +195,7 @@ export function AnlageVScreen({ route, navigation }: any) {
         {a.byCategory.length === 0 && <Note>Keine Ausgaben erfasst.</Note>}
         {a.byCategory.map((x) => <Row key={x.category} left={EXPENSE_LABEL[x.category]} right={eur(x.amount)} />)}
         {a.byCategory.length > 0 && <Row bold left="Summe" right={eur(a.expenses)} />}
+        {a.fromLoans > 0 && <Note>Die Schuldzinsen ({eur(a.fromLoans)}) sind aus deinen Darlehen berechnet. Maßgeblich ist die Zinsbescheinigung der Bank. Trägst du Schuldzinsen als Ausgabe ein, ersetzen sie die Berechnung für dieses Haus.</Note>}
       </Section>
       <Section title="Ergebnis" footer="Überschuss vor Abschreibung auf neue Anschaffungen und Sonderfälle. Zur Orientierung, ersetzt keine Steuerberatung.">
         <Row bold left={a.surplus >= 0 ? 'Überschuss' : 'Verlust'} right={eur(a.surplus)} color={a.surplus < 0 ? c.danger : undefined} />

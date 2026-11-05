@@ -122,6 +122,23 @@ export interface Reading {
   value: number;
 }
 
+/** Darlehen zu einem Haus: Grundlage für Zinsen (Anlage V), Restschuld und Zinsbindung. */
+export interface Loan {
+  id: ID;
+  updatedAt?: string;
+  propertyId: ID;
+  name: string; // Bank oder Bezeichnung
+  amount: number; // ursprünglicher Darlehensbetrag
+  start: string; // YYYY-MM-DD: Datum der ersten Rate
+  rate: number; // Sollzins in % pro Jahr
+  repayment?: number; // anfängliche Tilgung in % pro Jahr (wenn keine feste Rate)
+  payment?: number; // feste Rate pro Monat in € (hat Vorrang)
+  fixedUntil?: string; // YYYY-MM-DD: Ende der Zinsbindung
+  anchor?: { date: string; balance: number }; // Restschuld laut Bank an einem Stichtag (genauer als der Plan ab Start)
+  specials?: { date: string; amount: number }[]; // Sondertilgungen
+  notes?: string;
+}
+
 export interface Cost {
   id: ID;
   updatedAt?: string; // letzte Änderung (Grundlage für den späteren Cloud-Abgleich)
@@ -185,6 +202,7 @@ export interface DB {
   reminders: Reminder[];
   costs: Cost[];
   expenses: Expense[];
+  loans: Loan[];
   calculations: Calculation[];
   meters: Meter[];
   readings: Reading[];
@@ -200,6 +218,7 @@ export const emptyDB: DB = {
   reminders: [],
   costs: [],
   expenses: [],
+  loans: [],
   calculations: [],
   meters: [],
   readings: [],

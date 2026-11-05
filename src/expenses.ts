@@ -1,4 +1,5 @@
 import { DB, Expense, ExpenseCategory } from './types';
+import { loanInterest } from './loans';
 
 export const EXPENSE_CATEGORIES: ExpenseCategory[] = ['instandhaltung', 'betriebskosten', 'hausmeister', 'verwaltung', 'versicherung', 'grundsteuer', 'schuldzinsen', 'afa', 'fahrtkosten', 'sonstiges'];
 
@@ -29,6 +30,7 @@ export interface AnlageV {
   expenses: number;
   surplus: number; // Einnahmen minus Werbungskosten
   noReceipt: number; // Anzahl Ausgaben ohne Beleg
+  fromLoans: number; // darin enthaltene, aus Darlehen berechnete Schuldzinsen
 }
 
 const round = (n: number) => Math.round(n * 100) / 100;
@@ -39,9 +41,11 @@ export function anlageV(db: DB, year: number, propertyId?: string): AnlageV {
   const tenantIds = new Set(db.tenants.filter((t) => unitIds.has(t.unitId)).map((t) => t.id));
   const income = db.payments.filter((p) => tenantIds.has(p.tenantId) && p.kind !== 'kaution' && inYear(p.date, year)).reduce((s, p) => s + p.amount, 0);
   const list = expensesOf(db, { propertyId, year });
-  const byCategory = EXPENSE_CATEGORIES.map((category) => ({ category, amount: round(list.filter((e) => e.category === category).reduce((s, e) => s + e.amount, 0)) })).filter((x) => x.amount !== 0);
+  // Schuldzinsen aus Darlehen: nur für Häuser, für die in dem Jahr keine Schuldzinsen als Ausgabe erfasst wurden (keine doppelte Zählung)
+  const fromLoans = round(db.properties.filter((p) => (!propertyId || p.id === propertyId) && !list.some((e) => e.propertyId === p.id && e.category === 'schuldzinsen')).reduce((s, p) => s + loanInterest(db, year, p.id), 0));
+  const byCategory = EXPENSE_CATEGORIES.map((category) => ({ category, amount: round(list.filter((e) => e.category === category).reduce((s, e) => s + e.amount, 0) + (category === 'schuldzinsen' ? fromLoans : 0)) })).filter((x) => x.amount !== 0);
   const expenses = round(byCategory.reduce((s, x) => s + x.amount, 0));
-  return { year, income: round(income), byCategory, expenses, surplus: round(income - expenses), noReceipt: list.filter((e) => !e.receiptId).length };
+  return { year, income: round(income), byCategory, expenses, surplus: round(income - expenses), noReceipt: list.filter((e) => !e.receiptId).length, fromLoans };
 }
 
 const q = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
