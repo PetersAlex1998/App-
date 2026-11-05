@@ -1,3 +1,4 @@
+import { BIG_MONEY, MAX_AREA, tooBig } from '../inputs';
 import { paidDeposit } from '../deposit';
 import React, { useState } from 'react';
 
@@ -142,7 +143,9 @@ export function UnitForm({ route, navigation }: any) {
     const e: Errors = {};
     if (!f.name.trim()) e.name = 'Bitte eine Bezeichnung eingeben, z. B. „WE 2, 1. OG links“.';
     if (num(f.area) <= 0) e.area = 'Die Wohnfläche wird für die Nebenkostenabrechnung gebraucht.';
+    else if (tooBig(num(f.area), MAX_AREA)) e.area = 'Die Fläche ist unglaubwürdig groß. Bitte in m² angeben.';
     if (num(f.coldRent) <= 0) e.coldRent = 'Bitte die Kaltmiete eingeben.';
+    else if (tooBig(num(f.coldRent))) e.coldRent = BIG_MONEY;
     const n = Math.round(num(no));
     if (!(n >= 1 && n <= 999)) e.no = 'Bitte eine Nummer von 1 bis 999 eingeben.';
     else {
@@ -285,6 +288,7 @@ export function PaymentForm({ route, navigation }: any) {
     const e: Errors = {};
     if (!f.tenantId) e.tenantId = 'Bitte einen Mieter auswählen.';
     if (num(f.amount) <= 0) e.amount = 'Bitte einen Betrag größer als 0 eingeben.';
+    else if (tooBig(num(f.amount))) e.amount = BIG_MONEY;
     if (!isDate(f.date)) e.date = 'Bitte ein gültiges Datum wählen.';
     if (f.kind === 'miete' && !isMonth(f.month)) e.month = 'Bitte den Monat wählen, für den gezahlt wurde.';
     setErr(e);
@@ -350,6 +354,7 @@ export function CostForm({ route, navigation }: any) {
     const e: Errors = {};
     if (!f.category.trim()) e.category = 'Bitte eine Kostenart eingeben, z. B. „Müllabfuhr“.';
     if (num(f.amount) <= 0) e.amount = 'Bitte den Gesamtbetrag eingeben.';
+    else if (tooBig(num(f.amount))) e.amount = BIG_MONEY;
     if (!/^\d{4}$/.test(f.year)) e.year = 'Bitte ein Jahr wie 2025 eingeben.';
     setErr(e);
     if (Object.keys(e).length) return false;

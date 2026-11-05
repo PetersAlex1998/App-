@@ -1,3 +1,4 @@
+import { MAX_MULTILINE, MAX_NUMBER_CHARS, MAX_TEXT, cleanNumeric } from './inputs';
 import React from 'react';
 import { Alert, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -259,7 +260,7 @@ export function Field({ label, value, onChangeText, keyboard, multiline, placeho
   return (
     <FieldShell label={label} error={error} hint={hint}>
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-        <TextInput accessibilityLabel={label} value={value} onChangeText={onChangeText}
+        <TextInput accessibilityLabel={label} value={value} onChangeText={keyboard === 'numeric' ? (v: string) => onChangeText(cleanNumeric(v)) : onChangeText} maxLength={keyboard === 'numeric' ? MAX_NUMBER_CHARS : multiline ? MAX_MULTILINE : MAX_TEXT}
           keyboardType={keyboard === 'numeric' ? 'decimal-pad' : keyboard} autoCapitalize={keyboard === 'email-address' ? 'none' : 'sentences'}
           multiline={multiline} placeholder={placeholder} placeholderTextColor={c.muted} secureTextEntry={secure} autoCorrect={secure ? false : undefined}
           style={[{ flex: 1, color: c.text, fontSize: type.body, paddingVertical: 6, minHeight: multiline ? 80 : 36 }, Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null]} />

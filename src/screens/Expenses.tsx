@@ -1,3 +1,4 @@
+import { BIG_MONEY, MAX_AREA, tooBig } from '../inputs';
 import React, { useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
 import { useStore, uid } from '../store';
@@ -124,6 +125,7 @@ export function ExpenseForm({ route, navigation }: any) {
     if (!propertyId) e.property = 'Bitte ein Objekt wählen.';
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || isNaN(Date.parse(date))) e.date = 'Bitte ein Datum wählen.';
     if (!(num(amount) > 0)) e.amount = 'Bitte den Betrag eingeben (positiv).';
+    else if (tooBig(num(amount))) e.amount = BIG_MONEY;
     setErr(e);
     if (Object.keys(e).length) return;
     setBusy(true);

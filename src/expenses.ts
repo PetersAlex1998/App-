@@ -1,5 +1,6 @@
 import { DB, Expense, ExpenseCategory } from './types';
 import { loanInterest } from './loans';
+import { csvText } from './csvSafe';
 
 export const EXPENSE_CATEGORIES: ExpenseCategory[] = ['instandhaltung', 'betriebskosten', 'hausmeister', 'verwaltung', 'versicherung', 'grundsteuer', 'schuldzinsen', 'afa', 'fahrtkosten', 'sonstiges'];
 
@@ -48,7 +49,7 @@ export function anlageV(db: DB, year: number, propertyId?: string): AnlageV {
   return { year, income: round(income), byCategory, expenses, surplus: round(income - expenses), noReceipt: list.filter((e) => !e.receiptId).length, fromLoans };
 }
 
-const q = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
+const q = csvText;
 /** CSV für den Steuerberater (Semikolon, deutsche Zahlen). */
 export function expensesCsv(db: DB, year: number, propertyId?: string): string {
   const head = ['Datum', 'Haus', 'Kategorie', 'Lieferant', 'Beschreibung', 'Betrag', 'Umlagefähig', 'Beleg'];

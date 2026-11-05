@@ -1,3 +1,4 @@
+import { BIG_MONEY, MAX_AREA, tooBig } from '../inputs';
 import React, { useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
 import { useStore, uid } from '../store';
@@ -130,6 +131,7 @@ export function LoanForm({ route, navigation }: any) {
     const e: Record<string, string> = {};
     if (!propertyId) e.property = 'Bitte ein Haus wählen.';
     if (!(num(amount) > 0)) e.amount = 'Bitte den Darlehensbetrag eingeben.';
+    else if (tooBig(num(amount))) e.amount = BIG_MONEY;
     if (!(num(rate) >= 0) || rate.trim() === '') e.rate = 'Bitte den Sollzins eingeben (z. B. 3,5).';
     else if (num(rate) > 25) e.rate = 'Der Zins wirkt zu hoch. Bitte in Prozent pro Jahr angeben.';
     if (mode === 'tilgung' && !(num(repay) > 0)) e.repay = 'Bitte die anfängliche Tilgung in Prozent eingeben.';
