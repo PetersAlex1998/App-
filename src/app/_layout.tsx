@@ -90,6 +90,7 @@ function Shell() {
         <Stack.Screen name="vorlagen/index" options={{ title: 'Dokumente erstellen' }} />
         <Stack.Screen name="vorlagen/formular" options={{ title: 'Dokument' }} />
         <Stack.Screen name="mieterhoehung" options={{ title: 'Miete erhöhen' }} />
+        <Stack.Screen name="haus-einrichten" options={{ title: 'Haus einrichten' }} />
         <Stack.Screen name="expose" options={{ title: 'Exposé' }} />
         <Stack.Screen name="portfolio" options={{ title: 'Portfolio' }} />
         <Stack.Screen name="wartung/index" options={{ title: 'Prüfungen und Wartung' }} />

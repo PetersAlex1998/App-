@@ -1,3 +1,4 @@
+import { houseSetup } from '../setup';
 import { counts } from '../checks';
 import React, { useLayoutEffect, useState } from 'react';
 import { Linking, Pressable, Text, View } from 'react-native';
@@ -59,6 +60,10 @@ export function PropertyDetail({ route, navigation }: any) {
         {houseId(p) ? <Text style={{ fontSize: type.subhead, color: c.primary, fontWeight: '700', marginTop: 4 }}>Haus-ID {houseId(p)}</Text> : null}
         {p.notes ? <Text style={{ fontSize: type.subhead, color: c.muted, marginTop: 6 }}>{p.notes}</Text> : null}
       </View>
+      {(() => {
+        const st = houseSetup(db, p);
+        return st.open.length > 0 ? <Section><ListRow icon="checkbox-outline" iconTone={st.coreOpen ? 'warn' : 'primary'} title={`Haus einrichten: ${st.done} von ${st.total} erledigt`} subtitle={`Offen: ${st.open.slice(0, 3).map((i) => i.title).join(', ')}${st.open.length > 3 ? ' …' : ''}`} onPress={() => navigation.navigate('HouseSetup', { propertyId: p.id })} /></Section> : null;
+      })()}
       {filesSupported() && (() => {
         const cover = p.coverId ? db.documents.find((d) => d.id === p.coverId) : undefined;
         const pick = () => navigation.navigate('DocumentForm', { ownerKind: 'property', ownerId: p.id, cover: '1' });

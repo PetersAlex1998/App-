@@ -3,6 +3,7 @@ import { addDays, rentNow, today } from './calc';
 import { houseId } from './ids';
 import { suggestCosts } from './nkCosts';
 import { wechsel } from './moveOut';
+import { houseSetup } from './setup';
 import { checkState } from './checks';
 import { ageDays, isOpen } from './issues';
 import { balanceAt, balanceAtFixedEnd, isPaidOff, monthsToFixedEnd } from './loans';
@@ -117,6 +118,13 @@ export function computeTasks(db: DB, opts: { dismissed?: string[]; now?: string 
     if (st.status === 'ueberfaellig') out.push({ id: `wartung:${x.id}:${st.due}`, level: (st.days ?? 0) <= -30 ? 'hoch' : 'normal', ...base, title: `Überfällig: ${x.title}`, detail: `${prop} · fällig seit ${st.due!.split('-').reverse().join('.')}` });
     else if (st.status === 'bald' && (st.days ?? 99) <= 30) out.push({ id: `wartung:${x.id}:${st.due}`, level: 'hinweis', ...base, title: `Bald fällig: ${x.title}`, detail: `${prop} · ${st.due!.split('-').reverse().join('.')}` });
     else if (st.status === 'unbekannt') out.push({ id: `wartung-datum:${x.id}`, level: 'hinweis', ...base, title: `Datum eintragen: ${x.title}`, detail: `${prop} · wann war die letzte Prüfung?` });
+  }
+
+  // 4j) Pflichtangaben eines Hauses fehlen (Adresse, Einheiten, Flächen): eine Sammelaufgabe je Haus. Die übrigen Schritte zeigt die Hausseite, ohne die Liste zu füllen.
+  for (const p of db.properties) {
+    const st = houseSetup(db, p, now);
+    if (st.coreOpen === 0) continue;
+    out.push({ id: `einrichten:${p.id}`, level: 'normal', icon: 'checkbox-outline', title: `Haus einrichten: ${p.name}`, detail: `Es fehlt: ${st.open.filter((i) => i.core).map((i) => i.title).join(', ')}`, screen: 'HouseSetup', params: { propertyId: p.id } });
   }
 
   // 4d) Hinterlegter Mietspiegel ist abgelaufen
