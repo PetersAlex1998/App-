@@ -45,7 +45,7 @@ export function Mieterwechsel({ route, navigation }: any) {
       case 'protokoll': return () => out && doc('uebergabeprotokoll', out.id, 'Art=Auszug');
       case 'zaehler': return () => (out?.moveOut ? navigation.navigate('Ablesung', { propertyId: unit.propertyId, unitId: unit.id, date: out.moveOut }) : notify('Lege zuerst den Auszugstermin fest.'));
       case 'nk': return () => (out?.moveOut ? act.createNk(Number(out.moveOut.slice(0, 4))) : notify('Lege zuerst den Auszugstermin fest.'));
-      case 'kaution': return () => out && doc('kautionsabrechnung', out.id);
+      case 'kaution': return () => out && navigation.navigate('Kaution', { tenantId: out.id });
       case 'neu': return () => navigation.navigate('TenantForm', { unitId: unit.id });
       case 'vertrag': return () => inc && doc('mietvertrag', inc.id);
       case 'geber': return () => inc && doc('wohnungsgeber', inc.id);

@@ -253,7 +253,7 @@ export const TEMPLATES: Template[] = [
       { key: 'Nachzahlung', label: 'Nachzahlung Nebenkosten / Rückbehalt', kind: 'money', optional: true, hint: 'Noch nicht abgerechnete Nebenkosten dürfen mit einem angemessenen Betrag zurückbehalten werden.', default: (c) => String(depositSettlement(c.db, c.tenant, c.unit).nkClaim || '').replace('.', ',') },
       { key: 'Schaden', label: 'Forderung für Schäden / Renovierung', kind: 'money', optional: true },
       { key: 'SchadenText', label: 'Wofür?', kind: 'text', optional: true, hint: 'z. B. Reparatur Wandschaden Wohnzimmer laut Rechnung vom …' },
-      { key: 'Zinsen', label: 'Zinsen auf die Kaution', kind: 'money', optional: true },
+      { key: 'Zinsen', label: 'Zinsen auf die Kaution', kind: 'money', optional: true, default: (c) => String(c.tenant.depositInterest || '').replace('.', ',') },
       { key: 'IBAN', label: 'Rückzahlung auf IBAN', kind: 'text', optional: true, default: (c) => c.tenant.iban ?? '' },
     ],
     build: (c, { p, h, kv, sign }) => {

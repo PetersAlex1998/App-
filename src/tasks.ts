@@ -3,6 +3,7 @@ import { addDays, rentNow, today } from './calc';
 import { houseId } from './ids';
 import { suggestCosts } from './nkCosts';
 import { wechsel } from './moveOut';
+import { depositRow, RETURN_USUAL_DAYS } from './deposit';
 
 /**
  * Aufgaben aus der Datenprüfung: Dinge, die die App selbst bemerkt und die du nur noch antippen musst.
@@ -73,6 +74,16 @@ export function computeTasks(db: DB, opts: { dismissed?: string[]; now?: string 
     if (!t.moveOut || t.moveOut > addDays(now, 30) || t.moveOut < addDays(now, -120)) continue;
     const w = wechsel(db, t.unitId, now);
     if (w && w.outgoing?.id === t.id && w.open > 0) out.push({ id: `mieterwechsel:${t.id}:${t.moveOut}`, level: t.moveOut < now ? 'normal' : 'hinweis', icon: 'swap-horizontal-outline', title: `Mieterwechsel: ${w.open} Schritt${w.open === 1 ? '' : 'e'} offen`, detail: `${where(t.unitId)} · Auszug ${t.moveOut.split('-').reverse().join('.')} (${t.name})`, screen: 'Mieterwechsel', params: { unitId: t.unitId } });
+  }
+
+  // 4f) Kautionen: Rückzahlung fällig, Anlage fehlt, Zahlung fehlt
+  for (const t of db.tenants) {
+    const r = depositRow(db, t, now);
+    if (!r) continue;
+    const k = (id: string) => `${id}:${t.id}`;
+    if (r.status === 'rueckzahlung' && r.daysSinceMoveOut >= 60) out.push({ id: k('kaution-zurueck'), level: r.daysSinceMoveOut >= RETURN_USUAL_DAYS ? 'hoch' : 'normal', icon: 'wallet-outline', title: `Kaution zurückzahlen: ${t.name}`, detail: `${where(t.unitId)} · ausgezogen vor ${r.daysSinceMoveOut} Tagen, üblich sind bis zu ${RETURN_USUAL_DAYS / 30} Monate`, screen: 'Kaution', params: { tenantId: t.id } });
+    if (r.notPlaced) out.push({ id: k('kaution-anlage'), level: 'hinweis', icon: 'wallet-outline', title: `Kaution anlegen: ${t.name}`, detail: `${where(t.unitId)} · getrennt vom Vermögen anlegen und vermerken (§ 551 BGB)`, screen: 'Kaution', params: { tenantId: t.id } });
+    if (r.tooHigh) out.push({ id: k('kaution-hoch'), level: 'hinweis', icon: 'warning-outline', title: `Kaution über drei Kaltmieten: ${t.name}`, detail: `${where(t.unitId)} · höchstens ${r.maxAllowed.toLocaleString('de-DE')} € zulässig`, screen: 'Kaution', params: { tenantId: t.id } });
   }
 
   // 4d) Hinterlegter Mietspiegel ist abgelaufen

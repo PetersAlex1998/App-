@@ -42,9 +42,10 @@ export function depositSettlement(db: DB, t: Tenant, unit: Unit) {
   const nkKnown = nk.lines.length > 0;
   const nkClaim = nkKnown && nk.balance > 0 ? r2(nk.balance) : 0;
   const nkCredit = nkKnown && nk.balance < 0 ? r2(-nk.balance) : 0;
-  const refund = r2(Math.max(0, paid - openRent - nkClaim));
-  const shortfall = r2(Math.max(0, openRent + nkClaim - paid));
-  return { paid, agreed: t.deposit || 0, openRent, nkKnown, nkClaim, nkCredit, year, refund, shortfall };
+  const interest = t.depositInterest || 0;
+  const refund = r2(Math.max(0, paid + interest - openRent - nkClaim));
+  const shortfall = r2(Math.max(0, openRent + nkClaim - paid - interest));
+  return { interest, paid, agreed: t.deposit || 0, openRent, nkKnown, nkClaim, nkCredit, year, refund, shortfall };
 }
 
 export function wechsel(db: DB, unitId: string, now = today()): Wechsel | null {
@@ -76,9 +77,9 @@ export function wechsel(db: DB, unitId: string, now = today()): Wechsel | null {
 
     const d = depositSettlement(db, t, unit);
     const kautionDetail = d.paid || d.agreed
-      ? `Kaution ${eur(d.paid)} gezahlt · offene Mieten ${eur(d.openRent)}${d.nkKnown ? ` · Nachzahlung Nebenkosten ${eur(d.nkClaim)}` : ''} → rückzahlbar ${eur(d.refund)}${d.shortfall ? `, Rest offen ${eur(d.shortfall)}` : ''}.`
+      ? `Kaution ${eur(d.paid)} gezahlt${d.interest ? ` + Zinsen ${eur(d.interest)}` : ''} · offene Mieten ${eur(d.openRent)}${d.nkKnown ? ` · Nachzahlung Nebenkosten ${eur(d.nkClaim)}` : ''} → rückzahlbar ${eur(d.refund)}${d.shortfall ? `, Rest offen ${eur(d.shortfall)}` : ''}.`
       : 'Es ist keine Kaution erfasst.';
-    steps.push({ id: 'kaution', title: 'Kaution abrechnen und zurückzahlen', detail: kautionDetail, status: !d.paid && !d.agreed ? 'skip' : mark('kaution') ? 'done' : 'open', manual: true });
+    steps.push({ id: 'kaution', title: 'Kaution abrechnen und zurückzahlen', detail: t.depositReturned ? `Zurückgezahlt am ${t.depositReturned.date.split('-').reverse().join('.')}: ${eur(t.depositReturned.amount)}.` : kautionDetail, status: !d.paid && !d.agreed ? 'skip' : t.depositReturned || mark('kaution') ? 'done' : 'open', manual: true });
   }
 
   const newest = incoming;

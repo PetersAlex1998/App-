@@ -1,3 +1,4 @@
+import { paidDeposit } from '../deposit';
 import React, { useState } from 'react';
 
 import { useStore, uid } from '../store';
@@ -270,7 +271,7 @@ export function PaymentForm({ route, navigation }: any) {
     if (old) return { tenantId: old.tenantId, date: old.date, month: old.month, amount: String(old.amount), kind: old.kind as Payment['kind'], note: old.note };
     const t = db.tenants.find((x) => x.id === pre.tenantId);
     const sug = t ? suggestPayment(db, t) : null;
-    return { tenantId: pre.tenantId ?? '', date: today(), month: pre.month ?? sug?.month ?? today().slice(0, 7), amount: pre.amount ? String(pre.amount) : sug ? String(sug.amount) : '', kind: 'miete' as Payment['kind'], note: '' };
+    return { tenantId: pre.tenantId ?? '', date: today(), month: pre.month ?? sug?.month ?? today().slice(0, 7), amount: pre.amount ? String(pre.amount) : pre.kind === 'kaution' && t ? String(Math.max(0, Math.round(((t.deposit || 0) - paidDeposit(db, t)) * 100) / 100) || '') : sug ? String(sug.amount) : '', kind: (pre.kind === 'kaution' ? 'kaution' : 'miete') as Payment['kind'], note: '' };
   });
   const [err, setErr] = useState<Errors>({});
   const set = (k: keyof typeof f) => (v: string) => setF({ ...f, [k]: v });

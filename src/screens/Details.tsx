@@ -241,6 +241,7 @@ export function TenantDetail({ route, navigation }: any) {
           ['Mietanpassung', [t.rentAdjust, t.nextAdjust && `nächste am ${dateDE(t.nextAdjust)}`].filter(Boolean).join(' · ')],
           ['Kautionsart', [t.depositType, t.depositAccount].filter(Boolean).join(' · ')],
         ])}
+        <ListRow icon="wallet-outline" title="Kaution verwalten" subtitle="Zahlung, Anlage, Zinsen, Rückzahlung" onPress={() => navigation.navigate('Kaution', { tenantId: t.id })} />
       </Section>
       {(t.salutation || t.mobile || t.postalAddress || t.emergencyContact || t.notes || t.iban) ? (
         <Section title="Persönliches">

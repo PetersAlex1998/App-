@@ -64,6 +64,9 @@ export interface Tenant {
   coldRent?: number; // Kaltmiete (netto) während der Mietzeit, für die Mieterhistorie der Wohnung
   rentChange?: { from: string; coldRent: number; kind: 'vergleich' | 'index' | 'staffel'; letterDate: string; consentUntil?: string }; // angekündigte Mieterhöhung
   advanceChange?: { from: string; amount: number; letterDate: string }; // angekündigte neue NK-Vorauszahlung (gilt ab `from`)
+  depositInterest?: number; // aufgelaufene Zinsen auf die Kaution (gehören dem Mieter)
+  depositPlaced?: string; // YYYY-MM-DD: getrennt vom Vermögen angelegt (§ 551 Abs. 3 BGB)
+  depositReturned?: { date: string; amount: number; note?: string }; // Kaution zurückgezahlt
   moveSteps?: Record<string, string>; // Mieterwechsel: Schritt -> Datum, an dem er von Hand als erledigt markiert wurde
   trackFrom?: string; // YYYY-MM: erst ab diesem Monat zählen Mieten als offen (ältere Monate sind außerhalb der App erledigt)
 }

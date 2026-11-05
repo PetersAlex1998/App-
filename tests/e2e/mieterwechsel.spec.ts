@@ -29,10 +29,9 @@ test('Mieterwechsel: Auszug festhalten, Schritte abhaken, Kaution im Überblick,
   await expect.poll(async () => Object.keys((await readDb(page)).tenants[0].moveSteps ?? {})).toContain('protokoll');
   await expect.poll(() => body(page)).toContain('Wieder öffnen');
 
-  // Kaution abrechnen öffnet die Vorlage mit dem gezahlten Betrag
+  // Kaution abrechnen öffnet die Kautionsseite
   await tap(page, btn(page, /^[^A-Za-z]*Kaution abrechnen/));
-  await expect.poll(() => body(page)).toContain('Kautionsabrechnung');
-  await expect(page.getByLabel('Gezahlte Kaution').filter({ visible: true }).first()).toHaveValue('1500');
+  await expect.poll(() => body(page)).toContain('Kautionsabrechnung erstellen');
 });
 
 test('Mieterwechsel: Nachmieter erkannt, Aufgabe in der Datenprüfung', async ({ page }) => {

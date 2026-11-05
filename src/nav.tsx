@@ -18,7 +18,7 @@ const ROUTES: Record<string, string> = {
   DocumentViewer: '/dokument/[id]', DocumentForm: '/dokument/formular',
   // Abläufe und Einstellungen
   Mahnlauf: '/mahnlauf', Sperre: '/sperre', NkLauf: '/nk-lauf', NkKosten: '/nk-kosten', Outbox: '/briefausgang', Briefe: '/briefe', Daten: '/daten', Search: '/suche',
-  Vorlagen: '/vorlagen', VorlageForm: '/vorlagen/formular', Mieterhoehung: '/mieterhoehung', Mietspiegel: '/mietspiegel', Mieterwechsel: '/mieterwechsel', Potenzial: '/mieterhoehung-potenzial', Unternehmen: '/unternehmen', Kalkulator: '/kalkulator', CalculatorForm: '/kalkulator/formular', Aufgaben: '/aufgaben', Cloud: '/cloud', Ausgaben: '/ausgaben', ExpenseForm: '/ausgabe/formular', AnlageV: '/anlage-v',
+  Vorlagen: '/vorlagen', VorlageForm: '/vorlagen/formular', Mieterhoehung: '/mieterhoehung', Mietspiegel: '/mietspiegel', Mieterwechsel: '/mieterwechsel', Kaution: '/kaution', Kautionen: '/kautionen', Potenzial: '/mieterhoehung-potenzial', Unternehmen: '/unternehmen', Kalkulator: '/kalkulator', CalculatorForm: '/kalkulator/formular', Aufgaben: '/aufgaben', Cloud: '/cloud', Ausgaben: '/ausgaben', ExpenseForm: '/ausgabe/formular', AnlageV: '/anlage-v',
   StatementImport: '/kontoauszug', ZaehlerImport: '/zaehler-import', BestandImport: '/bestand-import',
 };
 const TABS = new Set(['Tabs', 'Übersicht', 'Objekte', 'Mieter', 'Zahlungen', 'Module']);
