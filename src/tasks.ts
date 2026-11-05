@@ -3,6 +3,7 @@ import { addDays, rentNow, today } from './calc';
 import { houseId } from './ids';
 import { suggestCosts } from './nkCosts';
 import { wechsel } from './moveOut';
+import { checkState } from './checks';
 import { ageDays, isOpen } from './issues';
 import { balanceAt, balanceAtFixedEnd, isPaidOff, monthsToFixedEnd } from './loans';
 import { depositRow, RETURN_USUAL_DAYS } from './deposit';
@@ -106,6 +107,16 @@ export function computeTasks(db: DB, opts: { dismissed?: string[]; now?: string 
     if (i.status === 'offen' && i.urgent && age >= 1) out.push({ id: `schaden:${i.id}:dringend`, level: 'hoch', ...base, title: `Dringend: ${i.title}`, detail: `${place} · seit ${age} Tag${age === 1 ? '' : 'en'} nicht beauftragt` });
     else if (i.status === 'offen' && age >= 7) out.push({ id: `schaden:${i.id}:offen`, level: 'normal', ...base, title: `Schaden offen: ${i.title}`, detail: `${place} · seit ${age} Tagen gemeldet, noch nicht beauftragt` });
     else if (i.status === 'beauftragt' && i.ordered && ageDaysFrom(i.ordered, now) >= 30) out.push({ id: `schaden:${i.id}:auftrag`, level: 'hinweis', ...base, title: `Auftrag nachfassen: ${i.title}`, detail: `${place} · seit ${ageDaysFrom(i.ordered, now)} Tagen beauftragt, noch nicht erledigt` });
+  }
+
+  // 4i) Prüfungen und Wartung
+  for (const x of db.checks) {
+    const st = checkState(x, now);
+    const prop = db.properties.find((p) => p.id === x.propertyId)?.name ?? '';
+    const base = { icon: 'calendar-outline', screen: 'CheckDetail', params: { id: x.id } };
+    if (st.status === 'ueberfaellig') out.push({ id: `wartung:${x.id}:${st.due}`, level: (st.days ?? 0) <= -30 ? 'hoch' : 'normal', ...base, title: `Überfällig: ${x.title}`, detail: `${prop} · fällig seit ${st.due!.split('-').reverse().join('.')}` });
+    else if (st.status === 'bald' && (st.days ?? 99) <= 30) out.push({ id: `wartung:${x.id}:${st.due}`, level: 'hinweis', ...base, title: `Bald fällig: ${x.title}`, detail: `${prop} · ${st.due!.split('-').reverse().join('.')}` });
+    else if (st.status === 'unbekannt') out.push({ id: `wartung-datum:${x.id}`, level: 'hinweis', ...base, title: `Datum eintragen: ${x.title}`, detail: `${prop} · wann war die letzte Prüfung?` });
   }
 
   // 4d) Hinterlegter Mietspiegel ist abgelaufen

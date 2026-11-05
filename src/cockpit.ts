@@ -1,3 +1,4 @@
+import { checkState } from './checks';
 import { DB, Tenant, Unit } from './types';
 import { Settings } from './settingsDefaults';
 import { dueMonths, today, totalOpen, unitDue, unitDueAt } from './calc';
@@ -125,6 +126,10 @@ export function deadlines(db: DB, now = today(), horizon = 90): Deadline[] {
     if (!isActive(t, now)) continue;
     if (within(t.contractEnd)) out.push({ key: 'ce' + t.id, icon: 'calendar', tone: tone(t.contractEnd), title: `Befristung endet: ${t.name}`, subtitle: rel(t.contractEnd), date: t.contractEnd, screen: 'TenantDetail', params: { id: t.id } });
     if (within(t.nextAdjust, 60)) out.push({ key: 'na' + t.id, icon: 'trending-up', tone: tone(t.nextAdjust), title: `Mietanpassung: ${t.name}`, subtitle: `${t.rentAdjust ?? 'Anpassung'} ${rel(t.nextAdjust)}`, date: t.nextAdjust, screen: 'TenantDetail', params: { id: t.id } });
+  }
+  for (const x of db.checks) {
+    const st = checkState(x, now);
+    if (st.due && st.days !== null && st.days <= 60) out.push({ key: 'chk' + x.id, icon: 'calendar-outline', tone: st.days < 0 ? 'danger' : 'warn', title: x.title, subtitle: `${db.properties.find((p) => p.id === x.propertyId)?.name ?? ''} · ${rel(st.due)}`, date: st.due, screen: 'CheckDetail', params: { id: x.id } });
   }
   return out.sort((a, b) => a.date.localeCompare(b.date));
 }

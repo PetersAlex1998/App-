@@ -1,3 +1,4 @@
+import { counts } from '../checks';
 import React, { useLayoutEffect, useState } from 'react';
 import { Linking, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -111,6 +112,7 @@ export function PropertyDetail({ route, navigation }: any) {
       {years.length > 0 && <><Button kind="secondary" icon="calculator-outline" title="Nebenkostenabrechnung für alle Mieter" onPress={() => navigation.navigate('NkLauf', { propertyId: p.id })} /><Gap h={22} /></>}
 
       <Section title="Ausgaben und Belege">
+        <ListRow icon="calendar-outline" title="Prüfungen und Wartung" subtitle={db.checks.some((c) => c.propertyId === p.id) ? `${counts(db, today(), p.id).overdue} überfällig · ${counts(db, today(), p.id).soon} bald fällig` : 'Heizung, Rauchmelder, Schornsteinfeger'} onPress={() => navigation.navigate('Wartung', { propertyId: p.id })} />
         <ListRow icon="construct-outline" title="Schäden" subtitle={db.issues.some((i) => i.propertyId === p.id) ? `${db.issues.filter((i) => i.propertyId === p.id && i.status !== 'erledigt').length} offen von ${db.issues.filter((i) => i.propertyId === p.id).length}` : 'Meldungen und Aufträge'} onPress={() => navigation.navigate('Schaeden', { propertyId: p.id })} />
         <ListRow icon="cash-outline" title="Darlehen" subtitle={db.loans.some((l) => l.propertyId === p.id) ? `${db.loans.filter((l) => l.propertyId === p.id).length} erfasst` : 'Zinsen, Restschuld, Zinsbindung'} onPress={() => navigation.navigate('Darlehen', { propertyId: p.id })} />
         <ListRow icon="receipt-outline" title="Ausgaben dieses Objekts" subtitle={`${db.expenses.filter((x) => x.propertyId === p.id).length} erfasst`} onPress={() => navigation.navigate('Ausgaben', { propertyId: p.id })} />

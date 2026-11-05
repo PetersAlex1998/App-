@@ -196,6 +196,21 @@ export interface Issue {
   done?: string; // Datum der Erledigung
 }
 
+/** Wiederkehrende Prüfung oder Wartung an einem Haus (Heizung, Rauchmelder, Schornsteinfeger, Legionellen …). */
+export interface Check {
+  id: ID;
+  updatedAt?: string;
+  propertyId: ID;
+  title: string;
+  preset?: string; // Schlüssel der Vorlage
+  intervalMonths: number;
+  last?: string; // YYYY-MM-DD: zuletzt erledigt
+  due?: string; // YYYY-MM-DD: nächster Termin, wenn abweichend oder noch nie erledigt
+  history?: string[]; // frühere Erledigungen
+  contractorId?: ID;
+  notes?: string;
+}
+
 export interface Calculation {
   id: ID;
   updatedAt?: string;
@@ -235,6 +250,7 @@ export interface DB {
   loans: Loan[];
   issues: Issue[];
   contractors: Contractor[];
+  checks: Check[];
   calculations: Calculation[];
   meters: Meter[];
   readings: Reading[];
@@ -253,6 +269,7 @@ export const emptyDB: DB = {
   loans: [],
   issues: [],
   contractors: [],
+  checks: [],
   calculations: [],
   meters: [],
   readings: [],

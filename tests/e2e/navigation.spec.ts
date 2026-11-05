@@ -38,7 +38,7 @@ test('Jedes Modul in „Alle Module“ lässt sich öffnen', async ({ page }) =>
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('dialog', (d) => d.dismiss());
   await seedDb(page);
-  const titles = ['Mieter', 'Aufgaben', 'Schäden', 'Handwerker', 'Suche', 'Mahnlauf', 'Nebenkosten-Lauf', 'Briefausgang', 'Ausgaben und Belege', 'Auswertung für die Steuer', 'Immokalkulator', 'Mieterhöhungs-Potenzial', 'Kautionen', 'Darlehen', 'Mietspiegel', 'Kontoauszug importieren', 'Bestand importieren', 'Zähler und Stände importieren', 'Cloud', 'Daten, Sicherung und Darstellung', 'Unternehmensdaten', 'Briefe und Mahnregeln', 'App-Sperre'];
+  const titles = ['Mieter', 'Aufgaben', 'Prüfungen und Wartung', 'Schäden', 'Handwerker', 'Suche', 'Mahnlauf', 'Nebenkosten-Lauf', 'Briefausgang', 'Ausgaben und Belege', 'Auswertung für die Steuer', 'Immokalkulator', 'Mieterhöhungs-Potenzial', 'Kautionen', 'Darlehen', 'Mietspiegel', 'Kontoauszug importieren', 'Bestand importieren', 'Zähler und Stände importieren', 'Cloud', 'Daten, Sicherung und Darstellung', 'Unternehmensdaten', 'Briefe und Mahnregeln', 'App-Sperre'];
   for (const title of titles) {
     await page.goto('/module');
     await expect.poll(() => body(page)).toContain('Alle Module');
