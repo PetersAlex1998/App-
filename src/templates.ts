@@ -6,6 +6,7 @@ import { placeholders, signatureLines } from './company';
 import { unitRef } from './ids';
 import { latestReading, meterLabel } from './meters';
 import { monthEnd } from './rent';
+import { depositSettlement } from './moveOut';
 
 /**
  * Dokumentvorlagen (Mietvertrag, Kündigung, Übergabeprotokoll …). Jede Vorlage ist reiner Text mit {{Platzhaltern}},
@@ -41,7 +42,7 @@ export function contextPlaceholders(c: Ctx): Record<string, string> {
     Kaltmiete: eur(now.coldRent), Vorauszahlung: eur(now.advance), Gesamtmiete: eur(unitDue(u)),
     Einzug: de(t.moveIn), Auszug: de(t.moveOut), Kaution: t.deposit ? eur(t.deposit) : '', 'Kaution gezahlt': paidDeposit ? eur(paidDeposit) : '',
     Fälligkeitstag: String(s.rentDueDay), Heute: de(c.date),
-    ...Object.fromEntries(Object.entries(c.f).map(([k, v]) => [k, v])),
+    ...Object.fromEntries(Object.entries(c.f).map(([k, v]) => [k, /^\d{4}-\d{2}-\d{2}$/.test(v) ? dateDE(v) : v])),
   };
 }
 
@@ -240,6 +241,45 @@ export const TEMPLATES: Template[] = [
         sign(),
       ];
       return { title: `Übergabeprotokoll ${c.f.Art ?? ''} – ${c.tenant.name}`, blocks };
+    },
+  },
+  {
+    id: 'kautionsabrechnung', name: 'Kautionsabrechnung', group: 'Übergabe und Bescheinigungen', icon: 'wallet-outline', notice: noteDoc,
+    desc: 'Rechnet die Mietsicherheit nach dem Auszug ab: Forderungen abziehen, Rest zurückzahlen.',
+    fields: [
+      { key: 'Mietende', label: 'Mietverhältnis endete am', kind: 'date', default: (c) => c.tenant.moveOut || c.date },
+      { key: 'Gezahlt', label: 'Gezahlte Kaution', kind: 'money', default: (c) => String(depositSettlement(c.db, c.tenant, c.unit).paid || '').replace('.', ',') },
+      { key: 'OffeneMiete', label: 'Offene Mieten', kind: 'money', optional: true, default: (c) => String(depositSettlement(c.db, c.tenant, c.unit).openRent || '').replace('.', ',') },
+      { key: 'Nachzahlung', label: 'Nachzahlung Nebenkosten / Rückbehalt', kind: 'money', optional: true, hint: 'Noch nicht abgerechnete Nebenkosten dürfen mit einem angemessenen Betrag zurückbehalten werden.', default: (c) => String(depositSettlement(c.db, c.tenant, c.unit).nkClaim || '').replace('.', ',') },
+      { key: 'Schaden', label: 'Forderung für Schäden / Renovierung', kind: 'money', optional: true },
+      { key: 'SchadenText', label: 'Wofür?', kind: 'text', optional: true, hint: 'z. B. Reparatur Wandschaden Wohnzimmer laut Rechnung vom …' },
+      { key: 'Zinsen', label: 'Zinsen auf die Kaution', kind: 'money', optional: true },
+      { key: 'IBAN', label: 'Rückzahlung auf IBAN', kind: 'text', optional: true, default: (c) => c.tenant.iban ?? '' },
+    ],
+    build: (c, { p, h, kv, sign }) => {
+      const gezahlt = money(c.f.Gezahlt ?? ''), miete = money(c.f.OffeneMiete ?? ''), nk = money(c.f.Nachzahlung ?? ''), schaden = money(c.f.Schaden ?? ''), zinsen = money(c.f.Zinsen ?? '');
+      const guthaben = gezahlt + zinsen;
+      const forderungen = miete + nk + schaden;
+      const rest = Math.round((guthaben - forderungen) * 100) / 100;
+      const rows: [string, string][] = [['Kaution', eur(gezahlt)]];
+      if (zinsen) rows.push(['Zinsen', eur(zinsen)]);
+      if (miete) rows.push(['abzüglich offene Mieten', `- ${eur(miete)}`]);
+      if (nk) rows.push(['abzüglich Nebenkosten / Rückbehalt', `- ${eur(nk)}`]);
+      if (schaden) rows.push([`abzüglich ${c.f.SchadenText?.trim() || 'Schäden'}`, `- ${eur(schaden)}`]);
+      rows.push([rest >= 0 ? 'Rückzahlung' : 'Noch offen', eur(Math.abs(rest))]);
+      return {
+        title: `Kautionsabrechnung – ${c.tenant.name}`,
+        warnings: [...(rest < 0 ? ['Die Forderungen übersteigen die Kaution. Der Rest ist von dem Mieter nachzufordern.'] : []), ...(nk ? ['Ein Rückbehalt für noch nicht abgerechnete Nebenkosten muss angemessen sein. Rechne die Nebenkosten danach ab und zahle den Rest aus.'] : [])],
+        blocks: [
+          h('Abrechnung der Mietsicherheit'),
+          p('Das Mietverhältnis über die Wohnung {{Wohnung}}, {{Objektadresse}}, endete am {{Mietende}}. Wir rechnen die von Ihnen geleistete Mietsicherheit wie folgt ab:'),
+          kv(rows),
+          ...(rest > 0 ? [p(`Den Betrag von **${eur(rest)}** überweisen wir ${c.f.IBAN?.trim() ? 'auf das Konto {{IBAN}}' : 'auf das Ihnen bekannte Konto'}. Bitte teilen Sie uns Ihre neue Anschrift und Ihre Bankverbindung mit, falls sich diese geändert hat.`)] : []),
+          ...(rest < 0 ? [p(`Der Restbetrag von **${eur(-rest)}** ist offen. Bitte überweisen Sie ihn umgehend auf das Konto des Vermieters.`)] : []),
+          ...(nk ? [p('Die Nebenkosten für das Jahr der Beendigung werden nach Vorliegen der Abrechnung gesondert abgerechnet. Ein darüber hinausgehender Rückbehalt wird dann ausgezahlt.')] : []),
+          sign(),
+        ],
+      };
     },
   },
   {

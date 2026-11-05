@@ -321,6 +321,7 @@ export function UnitDetail({ route, navigation }: any) {
         <ActionTile icon="mail-unread-outline" label={act.plan ? act.plan.level === 1 ? 'Erinnerung' : 'Mahnung' : 'Mahnung'} onPress={act.createReminder} disabled={!tenant} badge={act.plan ? '!' : undefined} hint={act.plan ? 'Miete überfällig' : 'Keine Miete überfällig'} />
         <ActionTile icon="calculator-outline" label={`NK ${year}`} hint="Nebenkostenabrechnung erstellen" onPress={() => act.createNk(year)} disabled={!tenant} />
         <ActionTile icon="trending-up-outline" label="Miete erhöhen" onPress={() => navigation.navigate('Mieterhoehung', { unitId: u.id })} />
+        <ActionTile icon="swap-horizontal-outline" label="Mieterwechsel" hint="Auszug bis Neuvermietung" onPress={() => navigation.navigate('Mieterwechsel', { unitId: u.id })} />
         <ActionTile icon="person-add-outline" label="Neuer Mieter" onPress={() => navigation.navigate('TenantForm', { unitId: u.id })} />
         <ActionTile icon="documents-outline" label="Schreiben" hint="Dokument aus Vorlage erstellen" onPress={() => navigation.navigate('Vorlagen', { unitId: u.id, tenantId: tenant?.id })} />
         <ActionTile icon="document-attach-outline" label="Dokument" onPress={() => navigation.navigate('DocumentForm', { ownerKind: 'unit', ownerId: u.id })} />

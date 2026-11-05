@@ -2,6 +2,7 @@ import { DB } from './types';
 import { addDays, rentNow, today } from './calc';
 import { houseId } from './ids';
 import { suggestCosts } from './nkCosts';
+import { wechsel } from './moveOut';
 
 /**
  * Aufgaben aus der Datenprüfung: Dinge, die die App selbst bemerkt und die du nur noch antippen musst.
@@ -65,6 +66,13 @@ export function computeTasks(db: DB, opts: { dismissed?: string[]; now?: string 
   for (const t of db.tenants) {
     const rc = t.rentChange;
     if (rc && isActive(t, now) && (rc.from <= now || (rc.consentUntil && rc.consentUntil < now))) out.push({ id: `mieterhoehung:${t.id}:${rc.from}`, level: 'normal', icon: 'trending-up', title: `Mieterhöhung klären: ${t.name}`, detail: `${where(t.unitId)} · ${rc.coldRent.toLocaleString('de-DE')} € ab ${rc.from.split('-').reverse().join('.')}${rc.kind === 'vergleich' ? ' · Zustimmung prüfen' : ' · Miete übernehmen'}`, screen: 'UnitDetail', params: { id: t.unitId } });
+  }
+
+  // 4e) Mieterwechsel läuft: Auszug in den nächsten 30 Tagen oder vor höchstens 120 Tagen, mit offenen Schritten
+  for (const t of db.tenants) {
+    if (!t.moveOut || t.moveOut > addDays(now, 30) || t.moveOut < addDays(now, -120)) continue;
+    const w = wechsel(db, t.unitId, now);
+    if (w && w.outgoing?.id === t.id && w.open > 0) out.push({ id: `mieterwechsel:${t.id}:${t.moveOut}`, level: t.moveOut < now ? 'normal' : 'hinweis', icon: 'swap-horizontal-outline', title: `Mieterwechsel: ${w.open} Schritt${w.open === 1 ? '' : 'e'} offen`, detail: `${where(t.unitId)} · Auszug ${t.moveOut.split('-').reverse().join('.')} (${t.name})`, screen: 'Mieterwechsel', params: { unitId: t.unitId } });
   }
 
   // 4d) Hinterlegter Mietspiegel ist abgelaufen

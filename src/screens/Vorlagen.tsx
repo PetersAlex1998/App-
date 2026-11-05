@@ -11,6 +11,9 @@ import { filesSupported } from '../files';
 import { completeness } from '../company';
 import { type } from '../theme';
 
+/** Vorbelegung aus dem Aufruf: „Art=Auszug;Schlüsselzahl=3“. */
+const presetOf = (v?: string): Record<string, string> => Object.fromEntries(String(v ?? '').split(';').map((x) => x.split('=')).filter((x) => x.length === 2 && x[0]));
+
 /** Auswahl der Vorlage. Mit `unitId` oder `tenantId` ist der Mieter schon gewählt. */
 export function Vorlagen({ route, navigation }: any) {
   const { unitId, tenantId } = route.params ?? {};
@@ -56,7 +59,7 @@ export function VorlageForm({ route, navigation }: any) {
 
   // Felder mit Vorbelegung füllen, sobald der Mieter feststeht (einmal je Mieter)
   const [filledFor, setFilledFor] = useState('');
-  if (tpl && ctx && filledFor !== tenant!.id) { setFilledFor(tenant!.id); setF(defaultFields(tpl, { s: cfg, db, tenant: tenant!, unit: unit!, prop: prop!, date })); }
+  if (tpl && ctx && filledFor !== tenant!.id) { setFilledFor(tenant!.id); setF({ ...defaultFields(tpl, { s: cfg, db, tenant: tenant!, unit: unit!, prop: prop!, date }), ...presetOf(route.params?.preset) }); }
 
   const rendered = useMemo(() => (tpl && ctx ? renderTemplate(tpl, ctx) : null), [tpl, ctx?.tenant.id, ctx?.date, JSON.stringify(f), cfg, db]);
 
