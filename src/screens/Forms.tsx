@@ -86,11 +86,12 @@ export function PropertyForm({ route, navigation }: any) {
         <DateField label="Ausgestellt am" value={f.eaIssued ?? ''} onChange={setIssued} optional />
         <DateField label="Gültig bis (10 Jahre)" value={f.eaValidUntil ?? ''} onChange={set('eaValidUntil')} optional />
       </Disclosure>
-      <Disclosure title="Grundbuch und Kauf" filled={filled(f.landRegister, f.parcel, f.purchaseDate, f.purchasePrice)} hint="Grundbuch, Flurstück, Kaufpreis">
+      <Disclosure title="Grundbuch und Kauf" filled={filled(f.landRegister, f.parcel, f.purchaseDate, f.purchasePrice, f.marketValue)} hint="Grundbuch, Flurstück, Kaufpreis">
         <Field label="Grundbuch (Amtsgericht, Blatt)" value={f.landRegister ?? ''} onChangeText={set('landRegister')} />
         <Field label="Flurstück" value={f.parcel ?? ''} onChangeText={set('parcel')} />
         <DateField label="Kaufdatum" value={f.purchaseDate ?? ''} onChange={set('purchaseDate')} optional />
         <Field label="Kaufpreis" value={f.purchasePrice ?? ''} onChangeText={set('purchasePrice')} keyboard="numeric" suffix="€" />
+        <Field label="Aktueller Marktwert (Schätzung)" value={f.marketValue ?? ''} onChangeText={set('marketValue')} keyboard="numeric" suffix="€" hint="Für Beleihung und Vermögen im Portfolio. Eine Schätzung genügt." />
       </Disclosure>
       <Disclosure title="Versicherung" filled={filled(f.insurer, f.policyNo, f.premium)} hint="Gebäudeversicherung">
         <Field label="Versicherer" value={f.insurer ?? ''} onChangeText={set('insurer')} />

@@ -1,5 +1,6 @@
 import { PDFDocument, PDFFont, PDFImage, PDFPage, StandardFonts, rgb } from 'pdf-lib';
 import type { Block, LetterModel } from './letters';
+import type { ExposeModel } from './expose';
 import { dateDE } from './calc';
 
 /** Echte PDF-Datei (A4, DIN 5008 Form B) aus dem Brief-Modell. Läuft komplett im Gerät. */
@@ -295,4 +296,75 @@ export async function mergePdfs(parts: Uint8Array[]): Promise<Uint8Array> {
   }
   out.setProducer('Immo Verwaltung');
   return out.save();
+}
+
+
+/* ───────── Exposé ───────── */
+
+const isPng = (b: Uint8Array) => b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47;
+
+/** Exposé als PDF: Titel, Foto, Eckdaten, Beschreibung, Energieangaben, weitere Fotos, Kontakt. Ohne Anschriftfeld, ohne Mieterdaten. */
+export async function exposeToPdf(m: ExposeModel): Promise<Uint8Array> {
+  const doc = await PDFDocument.create();
+  doc.setTitle(m.title);
+  doc.setProducer('Immo Verwaltung');
+  doc.setCreator('Immo Verwaltung');
+  doc.setCreationDate(new Date(m.date + 'T12:00:00'));
+  const w = new Writer(doc, await doc.embedFont(StandardFonts.Helvetica), await doc.embedFont(StandardFonts.HelveticaBold));
+  w.newPage();
+
+  const image = async (bytes: Uint8Array) => (isPng(bytes) ? doc.embedPng(bytes) : doc.embedJpg(bytes));
+  const place = async (bytes: Uint8Array, x: number, maxW: number, maxH: number) => {
+    const img = await image(bytes);
+    const k = Math.min(maxW / img.width, maxH / img.height);
+    const iw = img.width * k, ih = img.height * k;
+    w.ensure(ih + mm(4));
+    w.page.drawImage(img, { x, y: PH - w.y - ih, width: iw, height: ih });
+    return { iw, ih };
+  };
+
+  // Kopf: Logo links, Titel, Adresse
+  let top = mm(14);
+  if (m.logo) {
+    try {
+      const { bytes } = dataUrlBytes(m.logo);
+      const img = await image(bytes);
+      const k = Math.min(mm(50) / img.width, mm(16) / img.height);
+      w.page.drawImage(img, { x: TEXT_L, y: PH - mm(10) - img.height * k, width: img.width * k, height: img.height * k });
+      top = mm(10) + img.height * k + mm(6);
+    } catch { /* Logo ignorieren */ }
+  }
+  w.y = top;
+  for (const l of w.wrap(m.title, TEXT_W, 20)) { w.drawTokens(TEXT_L, w.y, 26, l, 20, INK, true); w.y += 26; }
+  w.put(TEXT_L, w.y, 16, m.address, 11, false, GRAY);
+  w.y += 16 + mm(3);
+  w.put(TEXT_L, w.y, 18, m.headline, 13, true);
+  w.y += 18 + mm(4);
+
+  if (m.hero) { try { const { ih } = await place(m.hero, TEXT_L, TEXT_W, mm(85)); w.y += ih + mm(5); } catch { /* defektes Bild ignorieren */ } }
+
+  drawBlock(w, { t: 'kv', rows: m.facts });
+  for (const b of m.blocks) drawBlock(w, b);
+  if (m.energy.length) { drawBlock(w, { t: 'h1', text: 'Energieausweis' }); drawBlock(w, { t: 'kv', rows: m.energy }); }
+
+  // weitere Fotos, zwei nebeneinander
+  const gap = mm(4);
+  const cw = (TEXT_W - gap) / 2;
+  for (let i = 0; i < m.gallery.length; i += 2) {
+    const row = m.gallery.slice(i, i + 2);
+    try {
+      const sizes = await Promise.all(row.map(async (b) => { const img = await image(b); const k = Math.min(cw / img.width, mm(55) / img.height); return { img, iw: img.width * k, ih: img.height * k }; }));
+      const h = Math.max(...sizes.map((x) => x.ih));
+      w.ensure(h + mm(4));
+      sizes.forEach((x, j) => w.page.drawImage(x.img, { x: TEXT_L + j * (cw + gap), y: PH - w.y - x.ih, width: x.iw, height: x.ih }));
+      w.y += h + mm(4);
+    } catch { /* defektes Bild ignorieren */ }
+  }
+
+  if (m.contact.length) {
+    drawBlock(w, { t: 'h1', text: 'Kontakt' });
+    for (const l of m.contact) drawBlock(w, { t: 'p', text: l });
+  }
+  drawBlock(w, { t: 'p', text: `Alle Angaben ohne Gewähr. Stand: ${dateDE(m.date)}.`, small: true });
+  return doc.save();
 }

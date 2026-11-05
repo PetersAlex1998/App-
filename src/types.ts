@@ -16,7 +16,7 @@ export interface Property {
   // Energieausweis
   eaType?: string; eaValue?: string; eaClass?: string; eaIssued?: string; eaValidUntil?: string;
   // Grundbuch und Kauf
-  landRegister?: string; parcel?: string; purchaseDate?: string; purchasePrice?: string;
+  landRegister?: string; parcel?: string; purchaseDate?: string; purchasePrice?: string; marketValue?: string;
   // Versicherung
   insurer?: string; policyNo?: string; premium?: string;
   // Begründung für Mieterhöhungen (§ 558a BGB): gibt es für den Ort einen Mietspiegel?

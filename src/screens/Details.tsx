@@ -326,6 +326,7 @@ export function UnitDetail({ route, navigation }: any) {
         <ActionTile icon="mail-unread-outline" label={act.plan ? act.plan.level === 1 ? 'Erinnerung' : 'Mahnung' : 'Mahnung'} onPress={act.createReminder} disabled={!tenant} badge={act.plan ? '!' : undefined} hint={act.plan ? 'Miete überfällig' : 'Keine Miete überfällig'} />
         <ActionTile icon="calculator-outline" label={`NK ${year}`} hint="Nebenkostenabrechnung erstellen" onPress={() => act.createNk(year)} disabled={!tenant} />
         <ActionTile icon="trending-up-outline" label="Miete erhöhen" onPress={() => navigation.navigate('Mieterhoehung', { unitId: u.id })} />
+        <ActionTile icon="megaphone-outline" label="Exposé" hint={tenant ? undefined : 'Wohnung ist frei'} onPress={() => navigation.navigate('Expose', { unitId: u.id })} />
         <ActionTile icon="construct-outline" label="Schaden melden" hint={db.issues.filter((i) => i.unitId === u.id && i.status !== 'erledigt').length ? `${db.issues.filter((i) => i.unitId === u.id && i.status !== 'erledigt').length} offen` : undefined} onPress={() => navigation.navigate('IssueForm', { propertyId: u.propertyId, unitId: u.id })} />
         <ActionTile icon="swap-horizontal-outline" label="Mieterwechsel" hint="Auszug bis Neuvermietung" onPress={() => navigation.navigate('Mieterwechsel', { unitId: u.id })} />
         <ActionTile icon="person-add-outline" label="Neuer Mieter" onPress={() => navigation.navigate('TenantForm', { unitId: u.id })} />
