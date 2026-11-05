@@ -9,7 +9,7 @@ export interface AppModule {
   title: string;
   subtitle: string;
   screen: string; // Name für navigation.navigate
-  badge?: 'aufgaben'; // dynamische Zahl, z. B. offene Aufgaben
+  badge?: 'aufgaben' | 'schaeden'; // dynamische Zahl, z. B. offene Aufgaben
 }
 
 export const MODULE_GROUPS = ['Verwalten', 'Abläufe', 'Finanzen', 'Importieren', 'Einstellungen'] as const;
@@ -17,6 +17,8 @@ export const MODULE_GROUPS = ['Verwalten', 'Abläufe', 'Finanzen', 'Importieren'
 export const MODULES: AppModule[] = [
   { id: 'mieter', group: 'Verwalten', icon: 'people', title: 'Mieter', subtitle: 'Aktuelle und ehemalige Mieter', screen: 'Mieter' },
   { id: 'aufgaben', group: 'Verwalten', icon: 'checkmark-done-circle-outline', title: 'Aufgaben', subtitle: 'Was die Datenprüfung bemerkt hat', screen: 'Aufgaben', badge: 'aufgaben' },
+  { id: 'schaeden', group: 'Verwalten', icon: 'construct-outline', title: 'Schäden', subtitle: 'Meldungen, Aufträge und Kosten', screen: 'Schaeden', badge: 'schaeden' },
+  { id: 'handwerker', group: 'Verwalten', icon: 'hammer-outline', title: 'Handwerker', subtitle: 'Betriebe mit Kontakt und Kosten', screen: 'Handwerker' },
   { id: 'suche', group: 'Verwalten', icon: 'search', title: 'Suche', subtitle: 'Häuser, Wohnungen, Mieter und IDs', screen: 'Search' },
 
   { id: 'vorlagen', group: 'Abläufe', icon: 'documents-outline', title: 'Dokumente erstellen', subtitle: 'Mietvertrag, Kündigung, Übergabeprotokoll, Bescheinigungen', screen: 'Vorlagen' },

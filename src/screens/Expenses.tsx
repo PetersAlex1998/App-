@@ -88,8 +88,8 @@ export function ExpenseForm({ route, navigation }: any) {
   const [date, setDate] = useState(old?.date ?? today());
   const [amount, setAmount] = useState(old ? String(old.amount).replace('.', ',') : '');
   const [category, setCategory] = useState<ExpenseCategory>(old?.category ?? 'instandhaltung');
-  const [vendor, setVendor] = useState(old?.vendor ?? '');
-  const [description, setDescription] = useState(old?.description ?? '');
+  const [vendor, setVendor] = useState(old?.vendor ?? route.params?.vendor ?? '');
+  const [description, setDescription] = useState(old?.description ?? route.params?.description ?? '');
   const [allocatable, setAllocatable] = useState(old?.allocatable ?? false);
   const cloud = useCloud();
   const [picked, setPicked] = useState<File | null>(null);
@@ -137,7 +137,7 @@ export function ExpenseForm({ route, navigation }: any) {
         receiptId = id;
       }
       if ((picked || dropReceipt) && old?.receiptId) { remove('documents', old.receiptId); deleteBlob(old.receiptId).catch(() => {}); }
-      save('expenses', { id: old?.id ?? uid(), propertyId, date, amount: Math.round(num(amount) * 100) / 100, category, vendor: vendor.trim(), description: description.trim(), receiptId, allocatable: allocatable || undefined });
+      save('expenses', { id: old?.id ?? uid(), propertyId, date, amount: Math.round(num(amount) * 100) / 100, category, vendor: vendor.trim(), description: description.trim(), receiptId, allocatable: allocatable || undefined, issueId: old?.issueId ?? route.params?.issueId });
       navigation.goBack();
     } catch (x: any) {
       setBusy(false);

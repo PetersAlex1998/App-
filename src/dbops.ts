@@ -36,6 +36,7 @@ export function removeItem(d: DB, kind: Kind, id: string): { db: DB; goneDocs: D
     n.costs = d.costs.filter((c) => c.propertyId !== id);
     n.expenses = d.expenses.filter((e) => e.propertyId !== id);
     n.loans = d.loans.filter((l) => l.propertyId !== id);
+    n.issues = d.issues.filter((i) => i.propertyId !== id);
     const mIds = d.meters.filter((m) => m.propertyId === id).map((m) => m.id);
     n.meters = d.meters.filter((m) => m.propertyId !== id);
     n.readings = d.readings.filter((r) => !mIds.includes(r.meterId));
@@ -51,6 +52,7 @@ export function removeItem(d: DB, kind: Kind, id: string): { db: DB; goneDocs: D
     n.readings = d.readings.filter((r) => !mIds.includes(r.meterId));
     const tIds = d.tenants.filter((t) => t.unitId === id).map((t) => t.id);
     n.tenants = d.tenants.filter((t) => t.unitId !== id);
+    n.issues = d.issues.filter((i) => i.unitId !== id);
     n.payments = d.payments.filter((p) => !tIds.includes(p.tenantId));
     n.reminders = d.reminders.filter((r) => !tIds.includes(r.tenantId));
   } else if (kind === 'tenants') {

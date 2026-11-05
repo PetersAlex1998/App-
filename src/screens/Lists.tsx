@@ -160,7 +160,7 @@ export function Modules({ navigation }: any) {
         <Section key={g} title={g}>
           {MODULES.filter((m) => m.group === g).map((m) => (
             <ListRow key={m.id} icon={m.icon as 'leaf'} title={m.title} subtitle={m.subtitle}
-              badge={m.badge === 'aufgaben' && tasks > 0 ? { text: String(tasks), tone: 'warn' } : undefined}
+              badge={m.badge === 'aufgaben' && tasks > 0 ? { text: String(tasks), tone: 'warn' } : m.badge === 'schaeden' && db.issues.some((i) => i.status !== 'erledigt') ? { text: `${db.issues.filter((i) => i.status !== 'erledigt').length} offen`, tone: 'warn' } : undefined}
               onPress={() => navigation.navigate(m.screen)} />
           ))}
         </Section>

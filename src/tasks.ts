@@ -3,6 +3,7 @@ import { addDays, rentNow, today } from './calc';
 import { houseId } from './ids';
 import { suggestCosts } from './nkCosts';
 import { wechsel } from './moveOut';
+import { ageDays, isOpen } from './issues';
 import { balanceAt, balanceAtFixedEnd, isPaidOff, monthsToFixedEnd } from './loans';
 import { depositRow, RETURN_USUAL_DAYS } from './deposit';
 
@@ -28,6 +29,7 @@ export function computeTasks(db: DB, opts: { dismissed?: string[]; now?: string 
   const out: Task[] = [];
   const unitName = (id: string) => db.units.find((u) => u.id === id)?.name ?? '';
   const propOfUnit = (id: string) => db.properties.find((p) => p.id === db.units.find((u) => u.id === id)?.propertyId);
+  const ageDaysFrom = (a: string, b: string) => Math.round((new Date(`${b}T12:00:00Z`).getTime() - new Date(`${a}T12:00:00Z`).getTime()) / 86400000);
   const where = (unitId: string) => { const p = propOfUnit(unitId); return `${p?.name ?? ''} · ${unitName(unitId)}`.replace(/^ · /, ''); };
 
   // 1) Mehrere aktive Mieter in einer Einheit
@@ -93,6 +95,17 @@ export function computeTasks(db: DB, opts: { dismissed?: string[]; now?: string 
     if (m === null || m > 15 || isPaidOff(l, now) || !l.fixedUntil) continue;
     const bal = balanceAtFixedEnd(l) ?? balanceAt(l, now);
     out.push({ id: `zinsbindung:${l.id}:${l.fixedUntil}`, level: m <= 6 ? 'hoch' : 'normal', icon: 'cash-outline', title: `Zinsbindung endet: ${l.name || 'Darlehen'}`, detail: `${m < 0 ? 'Abgelaufen' : `In ${m} Monat${m === 1 ? '' : 'en'}`} (${l.fixedUntil.split('-').reverse().join('.')}) · Restschuld dann ca. ${Math.round(bal).toLocaleString('de-DE')} € · Anschlussfinanzierung klären`, screen: 'LoanDetail', params: { id: l.id } });
+  }
+
+  // 4h) Schäden: dringend offen, lange offen, lange beauftragt
+  for (const i of db.issues) {
+    if (!isOpen(i)) continue;
+    const age = ageDays(i, now);
+    const base = { icon: 'construct-outline', screen: 'IssueDetail', params: { id: i.id } };
+    const place = `${where(i.unitId ?? '') || (db.properties.find((p) => p.id === i.propertyId)?.name ?? '')}`;
+    if (i.status === 'offen' && i.urgent && age >= 1) out.push({ id: `schaden:${i.id}:dringend`, level: 'hoch', ...base, title: `Dringend: ${i.title}`, detail: `${place} · seit ${age} Tag${age === 1 ? '' : 'en'} nicht beauftragt` });
+    else if (i.status === 'offen' && age >= 7) out.push({ id: `schaden:${i.id}:offen`, level: 'normal', ...base, title: `Schaden offen: ${i.title}`, detail: `${place} · seit ${age} Tagen gemeldet, noch nicht beauftragt` });
+    else if (i.status === 'beauftragt' && i.ordered && ageDaysFrom(i.ordered, now) >= 30) out.push({ id: `schaden:${i.id}:auftrag`, level: 'hinweis', ...base, title: `Auftrag nachfassen: ${i.title}`, detail: `${place} · seit ${ageDaysFrom(i.ordered, now)} Tagen beauftragt, noch nicht erledigt` });
   }
 
   // 4d) Hinterlegter Mietspiegel ist abgelaufen

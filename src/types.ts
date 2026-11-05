@@ -164,6 +164,36 @@ export interface Expense {
   description: string;
   receiptId?: ID; // Dokument-ID des Belegs
   allocatable?: boolean; // umlagefähig auf Mieter (Hinweis für die Nebenkosten)
+  issueId?: ID; // gehört zu einer Schadensmeldung
+}
+
+/** Handwerker und Dienstleister. */
+export interface Contractor {
+  id: ID;
+  updatedAt?: string;
+  name: string;
+  trade: string; // Gewerk, z. B. Sanitär, Elektro
+  phone: string;
+  email: string;
+  notes?: string;
+}
+
+export type IssueStatus = 'offen' | 'beauftragt' | 'erledigt';
+/** Schadensmeldung oder Auftrag an einem Haus oder einer Wohnung. */
+export interface Issue {
+  id: ID;
+  updatedAt?: string;
+  propertyId: ID;
+  unitId?: ID; // fehlt = Haus allgemein (Treppenhaus, Dach, Heizung …)
+  tenantId?: ID; // gemeldet von
+  title: string;
+  description?: string;
+  reported: string; // YYYY-MM-DD
+  urgent?: boolean;
+  status: IssueStatus;
+  contractorId?: ID;
+  ordered?: string; // Datum der Beauftragung
+  done?: string; // Datum der Erledigung
 }
 
 export interface Calculation {
@@ -203,6 +233,8 @@ export interface DB {
   costs: Cost[];
   expenses: Expense[];
   loans: Loan[];
+  issues: Issue[];
+  contractors: Contractor[];
   calculations: Calculation[];
   meters: Meter[];
   readings: Reading[];
@@ -219,6 +251,8 @@ export const emptyDB: DB = {
   costs: [],
   expenses: [],
   loans: [],
+  issues: [],
+  contractors: [],
   calculations: [],
   meters: [],
   readings: [],
