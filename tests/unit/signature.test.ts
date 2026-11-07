@@ -75,6 +75,14 @@ describe('Gespeicherte Unterschrift und Schriftform', () => {
       expect(m.noAutoSign, id).toBe(true);
     }
   });
+  it('Mietvertrag und Kündigung: nur mit der Einstellung „auch bei Mietvertrag und Kündigung“', () => {
+    const s = { signature: PNG, autoSign: true, autoSignFormal: true };
+    for (const id of ['mietvertrag', 'kuendigung-zahlungsverzug']) {
+      const m = render(id, s, { Mietbeginn: '2026-12-01' });
+      expect(m.signatures, id).toEqual({ vermieter: PNG });
+      expect(m.noAutoSign, id).toBeUndefined();
+    }
+  });
   it('abgeschaltet: nie automatisch', () => {
     expect(render('uebergabeprotokoll', { signature: PNG, autoSign: false }, { Art: 'Einzug' }).signatures).toBeUndefined();
     expect(render('uebergabeprotokoll', { signature: '', autoSign: true }, { Art: 'Einzug' }).signatures).toBeUndefined();

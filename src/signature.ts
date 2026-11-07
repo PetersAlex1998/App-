@@ -21,7 +21,7 @@ export function signFields(m: Pick<LetterModel, 'blocks'>): SigField[] {
   return out;
 }
 
-export const FORM_HINT = 'Hinweis zur Form: Für Kündigungen und für Mietverträge, die länger als ein Jahr laufen oder befristet sind, verlangt das Gesetz die Schriftform, also die eigenhändige Unterschrift auf Papier (§§ 126, 550, 568 BGB). Eine am Handy gezeichnete Unterschrift ersetzt das nicht. Nutze sie dann nur als Entwurf oder zur Ablage und lass das Original auf Papier unterschreiben. Bei Zweifeln frage eine Rechtsberatung.';
+export const FORM_HINT = 'Zur Form: Bei Mietverträgen über ein Jahr (oder befristet) und bei Kündigungen verlangt das Gesetz die Schriftform, also die eigenhändige Unterschrift auf Papier (§§ 126, 550, 568 BGB). Die Handy-Unterschrift gilt dort als Nachweis, nicht als Schriftform. Bei Zweifeln frage eine Rechtsberatung.';
 
 const two = (n: number) => String(n).padStart(2, '0');
 export const stamp = (d: Date) => `${two(d.getDate())}.${two(d.getMonth() + 1)}.${d.getFullYear()} um ${two(d.getHours())}:${two(d.getMinutes())} Uhr`;

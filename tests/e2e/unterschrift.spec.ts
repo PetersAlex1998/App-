@@ -7,7 +7,7 @@ function data() {
   d.tenants = [{ id: 't1', unitId: 'u1', name: 'Anna Schmidt', salutation: 'Frau', email: '', phone: '', moveIn: '2025-01-01', moveOut: '', deposit: 1500, trackFrom: '2026-10' }];
   return d;
 }
-const company = { name: 'Mustermann Immobilien', legalForm: 'GmbH', street: 'Hauptstraße 1', zip: '33098', city: 'Paderborn', email: 'info@muster.de', signerName: 'Max Mustermann' };
+const company = { name: 'Mustermann Immobilien', legalForm: 'GmbH', street: 'Hauptstraße 1', zip: '33098', city: 'Paderborn', email: 'info@muster.de', signerName: 'Max Mustermann', iban: 'DE89370400440532013000' };
 const readSettings = (page: Page) => page.evaluate(() => JSON.parse(localStorage.getItem('immo-settings-v1') || '{}'));
 
 /** Mit der Maus (wie mit dem Finger) eine Unterschrift in das n-te sichtbare Feld zeichnen. */
@@ -84,11 +84,44 @@ test('Briefausgang: später am Handy unterschreiben (Mieter vor Ort)', async ({ 
   await expect.poll(() => body(page)).toContain('Neu unterschreiben');
 });
 
-test('Mietvertrag: Hinweis zur Schriftform wird gezeigt', async ({ page }) => {
+test('Mietvertrag erstellen und trotzdem am Handy unterschreiben (mit Hinweis zur Form)', async ({ page }) => {
+  page.on('dialog', (d) => d.accept());
   await seedDb(page, data());
-  await page.evaluate((c) => localStorage.setItem('immo-settings-v1', JSON.stringify({ ...c, signature: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==' })), company);
+  const SIG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+  await page.evaluate((c) => localStorage.setItem('immo-settings-v1', JSON.stringify(c)), { ...company, signature: SIG });
   await page.reload();
   await page.goto('/vorlagen/formular?templateId=mietvertrag&tenantId=t1&unitId=u1');
   await expect.poll(() => body(page)).toContain('UNTERSCHRIFT');
-  expect(await body(page)).toMatch(/Schriftform, also die eigenhändige Unterschrift auf Papier/);
+  expect(await body(page)).toMatch(/Bei Mietverträgen über ein Jahr/);
+  await tap(page, btn(page, /Jetzt am Handy unterschreiben/));
+  await expect.poll(() => body(page)).toContain('Gib das Handy der unterschreibenden Person');
+  expect(await body(page)).toMatch(/Die Handy-Unterschrift gilt dort als Nachweis/);
+  // Vermieter: gespeicherte Unterschrift ist vorbelegt, der Mieter zeichnet
+  expect(await page.getByTestId('signature-pad').filter({ visible: true }).count()).toBe(1);
+  await sign(page, 0);
+  await tap(page, btn(page, /^[^A-Za-z]*Fertig/));
+  await expect.poll(() => body(page)).toContain('Unterschrieben. Neu unterschreiben');
+  await tap(page, btn(page, /Im Briefausgang ablegen/));
+  await expect.poll(async () => (await readDb(page)).documents.filter((d: any) => d.category === 'brief').length, { timeout: 20_000 }).toBe(1);
+  const doc = (await readDb(page)).documents[0];
+  expect(doc.note).toBe('Mietvertrag Wohnraum');
+  expect(doc.signed).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+});
+
+test('Mietvertrag: ohne Handy-Unterschrift bleibt das Schreiben nachträglich unterschreibbar', async ({ page }) => {
+  page.on('dialog', (d) => d.accept());
+  await seedDb(page, data());
+  await page.evaluate((c) => localStorage.setItem('immo-settings-v1', JSON.stringify(c)), company);
+  await page.reload();
+  await page.goto('/vorlagen/formular?templateId=mietvertrag&tenantId=t1&unitId=u1');
+  await tap(page, btn(page, /Im Briefausgang ablegen/));
+  await expect.poll(async () => (await readDb(page)).documents.length, { timeout: 20_000 }).toBe(1);
+  await page.goto('/briefausgang');
+  await tap(page, btn(page, /: unterschreiben/));
+  await expect.poll(() => body(page)).toContain('Gib das Handy der unterschreibenden Person');
+  expect(await page.getByTestId('signature-pad').filter({ visible: true }).count()).toBe(2);
+  await sign(page, 0);
+  await sign(page, 1);
+  await tap(page, btn(page, /^[^A-Za-z]*Fertig/));
+  await expect.poll(async () => (await readDb(page)).documents[0].signed, { timeout: 20_000 }).toBeTruthy();
 });

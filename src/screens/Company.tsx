@@ -93,7 +93,7 @@ export function CompanyScreen() {
         <Field label="Funktion" value={s.signerRole} onChangeText={t('signerRole')} placeholder="z. B. Geschäftsführer" />
       </Section>
 
-      <Section title="Meine Unterschrift" footer="Einmal mit dem Finger zeichnen. Sie wird dann in Schreiben und Verträgen automatisch in das Feld gesetzt. Bei Kündigungen und Mietverträgen wird sie nicht eingesetzt, weil dort die Unterschrift auf Papier nötig ist.">
+      <Section title="Meine Unterschrift" footer="Einmal mit dem Finger zeichnen. Sie wird dann in Schreiben und Verträgen automatisch in das Feld gesetzt. Bei Mietvertrag und Kündigung setzt du sie beim Unterschreiben selbst ein, oder schaltest unten die Automatik ein.">
         {s.signature ? (
           <View style={{ padding: 14, gap: 8 }}>
             <View style={{ backgroundColor: '#fff', borderRadius: 14, borderWidth: 1, borderColor: c.glassBorder, padding: 10, height: 100, alignItems: 'center', justifyContent: 'center' }}>
@@ -108,6 +108,7 @@ export function CompanyScreen() {
           </View>
         ) : <Note>Die Unterschrift zeichnest du in der Web-App.</Note>}
         {s.signature ? <ListRow icon={s.autoSign ? 'checkbox' : 'square-outline'} title="Automatisch in Schreiben einsetzen" subtitle="Mahnungen, Abrechnungen, Bescheinigungen und weitere" onPress={() => update({ autoSign: !s.autoSign })} /> : null}
+        {s.signature ? <ListRow icon={s.autoSignFormal ? 'checkbox' : 'square-outline'} title="Auch bei Mietvertrag und Kündigung einsetzen" subtitle="Dort verlangt das Gesetz meist die Unterschrift auf Papier. Beim Erstellen kannst du trotzdem am Handy unterschreiben." onPress={() => update({ autoSignFormal: !s.autoSignFormal })} /> : null}
         {s.signature ? <ListRow icon="trash-outline" iconTone="danger" title="Unterschrift löschen" onPress={() => update({ signature: '' })} /> : null}
       </Section>
 

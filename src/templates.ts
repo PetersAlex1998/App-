@@ -67,7 +67,7 @@ export function renderTemplate(tpl: Template, c: Ctx): Rendered {
   };
   const out = tpl.build(c, h);
   const model = frame(c.s, c.tenant, c.prop, c.unit, c.date, out.info ?? [['Objekt', c.prop.name], ['Einheit', `${c.unit.name}`]], out.title, out.blocks);
-  if (tpl.form === 'schriftform') { delete model.signatures; model.noAutoSign = true; }
+  if (tpl.form === 'schriftform' && !c.s.autoSignFormal) { delete model.signatures; model.noAutoSign = true; }
   const optional = new Set(tpl.fields.filter((f) => f.optional).map((f) => f.key));
   return { model, missing: [...missing].filter((k) => !optional.has(k)), warnings: out.warnings ?? [] };
 }
