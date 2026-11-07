@@ -10,7 +10,7 @@ import { pdfBlob, storeLetters } from '../outbox';
 import { filesSupported } from '../files';
 import { completeness } from '../company';
 import { SignSheet } from '../SignSheet';
-import { FORM_HINT, signFields, withSignatures } from '../signature';
+import { FORM_HINT, sigPlaceDate, signFields, withSignatures } from '../signature';
 import { type } from '../theme';
 
 /** Vorbelegung aus dem Aufruf: „Art=Auszug;Schlüsselzahl=3“. */
@@ -54,7 +54,7 @@ export function VorlageForm({ route, navigation }: any) {
   const [house, setHouse] = useState<string>('');
   const [busy, setBusy] = useState(false);
   const [signOpen, setSignOpen] = useState(false);
-  const [signed, setSigned] = useState<{ sigs: Record<string, string>; audit: string[]; hash: string } | null>(null);
+  const [signed, setSigned] = useState<{ sigs: Record<string, string>; audit: string[]; hash: string; place: string; date: string } | null>(null);
 
   const tenant = db.tenants.find((t) => t.id === tenantId);
   const unit = tenant ? db.units.find((u) => u.id === tenant.unitId) : undefined;
@@ -71,7 +71,7 @@ export function VorlageForm({ route, navigation }: any) {
   const fields = rendered ? signFields(rendered.model) : [];
   const hash = rendered ? JSON.stringify(rendered.model.blocks) : '';
   const validSig = signed && signed.hash === hash ? signed : null;
-  const finalModel = rendered ? (validSig ? withSignatures(rendered.model, cfg, validSig.sigs, validSig.audit) : rendered.model) : null;
+  const finalModel = rendered ? (validSig ? withSignatures(rendered.model, cfg, validSig.sigs, validSig.audit, validSig.place, validSig.date) : rendered.model) : null;
 
   if (!tpl) return <Screen><EmptyState icon="help-circle" title="Vorlage nicht gefunden" text="Wähle eine Vorlage in der Liste." /></Screen>;
 
@@ -166,7 +166,7 @@ export function VorlageForm({ route, navigation }: any) {
           <Note>Änderungen am Text nimmst du in der Vorlage vor, nicht im PDF. Bei Fragen zur Wirksamkeit hilft eine rechtliche Prüfung.</Note>
         </>
       )}
-      <SignSheet visible={signOpen} fields={fields} saved={cfg.signature || undefined} schriftform={tpl.form === 'schriftform'} onClose={() => setSignOpen(false)} onDone={(sigs, audit) => { setSigned({ sigs, audit, hash }); setSignOpen(false); }} />
+      <SignSheet visible={signOpen} fields={fields} saved={cfg.signature || undefined} schriftform={tpl.form === 'schriftform'} onClose={() => setSignOpen(false)} place={sigPlaceDate(finalModel ?? { blocks: [] }).place} date={sigPlaceDate(rendered?.model ?? { blocks: [] }).date} onDone={(sigs, audit, place, date) => { setSigned({ sigs, audit, hash, place, date }); setSignOpen(false); }} />
     </Screen>
   );
 }

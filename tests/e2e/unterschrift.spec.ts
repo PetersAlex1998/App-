@@ -46,6 +46,10 @@ test('Übergabeprotokoll: Vermieter und Mieter unterschreiben am Handy, PDF und 
   await tap(page, btn(page, /Jetzt am Handy unterschreiben/));
   await expect.poll(() => body(page)).toContain('Gib das Handy der unterschreibenden Person');
   expect(await page.getByTestId('signature-pad').filter({ visible: true }).count()).toBe(2);
+  // Ort des Hauses und heutiges Datum sind vorbelegt
+  await expect(page.getByLabel('Ort', { exact: true }).filter({ visible: true }).first()).toHaveValue('Köln');
+  expect(await page.getByLabel('Datum', { exact: true }).filter({ visible: true }).first().inputValue()).toBe(new Date().toISOString().slice(0, 10));
+  await page.getByLabel('Ort', { exact: true }).filter({ visible: true }).first().fill('Paderborn');
   // ohne Unterschrift ist „Fertig“ gesperrt
   await expect(page.getByRole('button', { name: /Fertig/ }).filter({ visible: true }).first()).toBeDisabled();
   await sign(page, 0);
@@ -80,6 +84,8 @@ test('Briefausgang: später am Handy unterschreiben (Mieter vor Ort)', async ({ 
   await tap(page, btn(page, /^[^A-Za-z]*Fertig/));
   await expect.poll(async () => (await readDb(page)).documents[0].signed, { timeout: 20_000 }).toBeTruthy();
   expect((await readDb(page)).documents[0].size).toBeGreaterThan(sizeBefore);
+  // Ort des Hauses (Köln) wurde im Dokument vorbelegt und beim Unterschreiben gespeichert
+  expect((await readDb(page)).documents[0].letter.blocks.find((b: any) => b.t === 'sigs').place).toBe('Köln');
   await expect.poll(() => body(page)).toContain('Unterschrieben am');
   await expect.poll(() => body(page)).toContain('Neu unterschreiben');
 });

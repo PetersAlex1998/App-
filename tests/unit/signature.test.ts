@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { PDFDocument, PDFName, PDFRawStream } from 'pdf-lib';
-import { FORM_HINT, auditLines, bboxOfAlpha, signFields, stamp, stripForStorage, withSignatures } from '../../src/signature';
+import { FORM_HINT, auditLines, bboxOfAlpha, sigPlaceDate, signFields, stamp, stripForStorage, withSignatures } from '../../src/signature';
 import { modelToPdf } from '../../src/pdfgen';
 import { renderTemplate, templateById } from '../../src/templates';
 import { defaultSettings } from '../../src/settingsDefaults';
@@ -127,5 +127,34 @@ describe('PDF mit Unterschriften', () => {
     expect(await imageCount(await modelToPdf(m))).toBe(1);
     const bad = await modelToPdf({ ...m, signatures: { vermieter: 'data:image/png;base64,AAAA' } });
     expect((await PDFDocument.load(bad)).getPageCount()).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe('Ort und Datum bei der Unterschrift', () => {
+  it('Vorbelegung: Ort des Hauses und das Datum des Dokuments, kein Strich-Absatz mehr', () => {
+    for (const id of ['mietvertrag', 'uebergabeprotokoll', 'wohnungsgeber']) {
+      const m = render(id, {}, { Art: 'Einzug', Mietbeginn: '2026-12-01' });
+      expect(sigPlaceDate(m), id).toEqual({ place: 'Bad Lippspringe', date: '2026-11-15' });
+      expect(JSON.stringify(m.blocks), id).not.toContain('Ort, Datum: ____');
+    }
+  });
+  it('Zustimmung zur Mieterhöhung: Ort vorbelegt, Datum bleibt für den Unterschriftstag offen', () => {
+    const { p, u, t, settings } = setup();
+    const m = rentIncreaseModel('vergleich', t, u, p, settings, { currentRent: 650, newRent: 700, effective: '2027-03-01', consentUntil: '2027-01-31', comparePerSqm: 13, advance: 160 } as never, '2026-11-15');
+    expect(sigPlaceDate(m)).toEqual({ place: 'Bad Lippspringe', date: '' });
+  });
+  it('Beim Unterschreiben lassen sich Ort und Datum setzen; der Nachweis nennt den Ort', () => {
+    const m = render('uebergabeprotokoll', {}, { Art: 'Einzug' });
+    const w = withSignatures(m, { logo: '' }, { mieter: PNG }, ['x'], 'Paderborn', '2026-12-01');
+    expect(sigPlaceDate(w)).toEqual({ place: 'Paderborn', date: '2026-12-01' });
+    expect(sigPlaceDate(m).place).toBe('Bad Lippspringe'); // Original unverändert
+    expect(withSignatures(m, { logo: '' }, {}, []).blocks).toBe(m.blocks); // ohne Angabe: nichts ändern
+    expect(auditLines([{ label: 'Mieter', name: 'Anna' }], new Date(2026, 11, 1, 9, 0), 'Paderborn')[0]).toContain('Mieter Anna in Paderborn am 01.12.2026 um 09:00 Uhr');
+  });
+  it('PDF mit Ort und Datum wird erzeugt, auch ohne beides', async () => {
+    const m = render('uebergabeprotokoll', {}, { Art: 'Einzug' });
+    expect((await PDFDocument.load(await modelToPdf(m))).getPageCount()).toBeGreaterThanOrEqual(1);
+    const blank = { ...m, blocks: m.blocks.map((b) => (b.t === 'sigs' ? { ...b, place: '', date: '' } : b)) };
+    expect((await PDFDocument.load(await modelToPdf(blank))).getPageCount()).toBeGreaterThanOrEqual(1);
   });
 });

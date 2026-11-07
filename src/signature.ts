@@ -21,15 +21,21 @@ export function signFields(m: Pick<LetterModel, 'blocks'>): SigField[] {
   return out;
 }
 
+/** Ort und Datum des ersten Unterschriftsblocks (Vorbelegung beim Unterschreiben). */
+export function sigPlaceDate(m: Pick<LetterModel, 'blocks'>): { place: string; date: string } {
+  for (const b of m.blocks) if (b.t === 'sigs') return { place: b.place ?? '', date: b.date ?? '' };
+  return { place: '', date: '' };
+}
+
 export const FORM_HINT = 'Zur Form: Bei Mietverträgen über ein Jahr (oder befristet) und bei Kündigungen verlangt das Gesetz die Schriftform, also die eigenhändige Unterschrift auf Papier (§§ 126, 550, 568 BGB). Die Handy-Unterschrift gilt dort als Nachweis, nicht als Schriftform. Bei Zweifeln frage eine Rechtsberatung.';
 
 const two = (n: number) => String(n).padStart(2, '0');
 export const stamp = (d: Date) => `${two(d.getDate())}.${two(d.getMonth() + 1)}.${d.getFullYear()} um ${two(d.getHours())}:${two(d.getMinutes())} Uhr`;
 
 /** Nachweis unter dem Schreiben: wer wann am Gerät unterschrieben hat. */
-export function auditLines(signed: { label: string; name?: string }[], at: Date = new Date()): string[] {
+export function auditLines(signed: { label: string; name?: string }[], at: Date = new Date(), place = ''): string[] {
   if (!signed.length) return [];
-  return [`Am Gerät unterschrieben (gezeichnete Unterschrift, keine qualifizierte elektronische Signatur): ${signed.map((s) => `${s.label}${s.name ? ` ${s.name}` : ''}`).join(', ')} am ${stamp(at)}.`];
+  return [`Am Gerät unterschrieben (gezeichnete Unterschrift, keine qualifizierte elektronische Signatur): ${signed.map((s) => `${s.label}${s.name ? ` ${s.name}` : ''}`).join(', ')}${place ? ` in ${place}` : ''} am ${stamp(at)}.`];
 }
 
 /** Schreiben für die Ablage im Datensatz: ohne Logo, Unterschriften und Nachweis (die kommen beim Unterschreiben wieder dazu). */
@@ -39,6 +45,7 @@ export function stripForStorage(m: LetterModel): LetterModel {
 }
 
 /** Gespeichertes Schreiben für das PDF: aktuelles Logo, Unterschriften und Nachweis einsetzen. */
-export function withSignatures(m: LetterModel, s: Pick<Settings, 'logo'>, signatures: Record<string, string>, audit: string[]): LetterModel {
-  return { ...m, logo: s.logo || undefined, signatures: { ...(m.signatures ?? {}), ...signatures }, audit: audit.length ? audit : m.audit };
+export function withSignatures(m: LetterModel, s: Pick<Settings, 'logo'>, signatures: Record<string, string>, audit: string[], place?: string, date?: string): LetterModel {
+  const blocks = place === undefined && date === undefined ? m.blocks : m.blocks.map((b) => (b.t === 'sigs' ? { ...b, ...(place !== undefined ? { place } : {}), ...(date !== undefined ? { date } : {}) } : b));
+  return { ...m, blocks, logo: s.logo || undefined, signatures: { ...(m.signatures ?? {}), ...signatures }, audit: audit.length ? audit : m.audit };
 }

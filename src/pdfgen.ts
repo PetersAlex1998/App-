@@ -166,6 +166,11 @@ function drawBlock(w: Writer, b: Block) {
       // Unterschriftsfelder nebeneinander (höchstens zwei je Zeile): Linie, darüber die Unterschrift, darunter Bezeichnung und Name
       const per = Math.min(2, b.fields.length) || 1;
       const space = mm(6);
+      // Ort und Datum über den Feldern
+      w.y += mm(4);
+      w.ensure(mm(8) + mm(32));
+      w.put(TEXT_L, w.y, 14, `Ort, Datum: ${b.place || '____________________'}, ${b.date ? dateDE(b.date) : '____________________'}`, 10.5);
+      w.y += 14;
       const cw = (TEXT_W - space * (per - 1)) / per;
       const h = mm(20);
       for (let i = 0; i < b.fields.length; i += per) {

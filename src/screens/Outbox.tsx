@@ -7,7 +7,7 @@ import { getBlob, fmtSize } from '../files';
 import { mergeStored, signStored } from '../outbox';
 import { useSettings } from '../settings';
 import { SignSheet } from '../SignSheet';
-import { signFields } from '../signature';
+import { sigPlaceDate, signFields } from '../signature';
 import { epostProvider, shareFiles } from '../dispatch';
 import { dateDE, today } from '../calc';
 import { type } from '../theme';
@@ -112,8 +112,8 @@ export function Outbox({ navigation }: any) {
         <ListRow icon="mail" title={epostProvider.label} subtitle={epostProvider.hint} right="Bald" />
       </Section>
       <Note>Wichtig: Eine Mahnung gilt erst als zugestellt, wenn sie den Mieter erreicht hat. Hebe dir Nachweise auf.</Note>
-      <SignSheet visible={!!signDoc} fields={signDoc?.letter ? signFields(signDoc.letter) : []} saved={cfg.signature || undefined} schriftform={/Mietvertrag|Kündigung/.test(signDoc?.note ?? '')} onClose={() => setSignDoc(null)}
-        onDone={(sigs, audit) => { const d = signDoc!; setSignDoc(null); run(async () => { save('documents', await signStored(d, cfg, sigs, audit)); }); }} />
+      <SignSheet visible={!!signDoc} fields={signDoc?.letter ? signFields(signDoc.letter) : []} saved={cfg.signature || undefined} schriftform={/Mietvertrag|Kündigung/.test(signDoc?.note ?? '')} place={signDoc?.letter ? sigPlaceDate(signDoc.letter).place : ''} onClose={() => setSignDoc(null)}
+        onDone={(sigs, audit, place, date) => { const d = signDoc!; setSignDoc(null); run(async () => { save('documents', await signStored(d, cfg, sigs, audit, place, date)); }); }} />
     </Screen>
   );
 }

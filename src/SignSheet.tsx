@@ -1,6 +1,7 @@
-import React, { createRef, useMemo, useRef, useState } from 'react';
+import React, { createRef, useEffect, useMemo, useRef, useState } from 'react';
 import { Image, Modal, Platform, ScrollView, Text, View } from 'react-native';
-import { Badge, Button, ListRow, Note, notify, useColors } from './ui';
+import { Badge, Button, DateField, Field, ListRow, Note, notify, useColors } from './ui';
+import { today } from './calc';
 import { PadHandle, SignaturePad } from './SignaturePad';
 import { FORM_HINT, auditLines } from './signature';
 import type { SigField } from './letters';
@@ -10,15 +11,21 @@ import { type } from './theme';
  * Vollbild zum Unterschreiben am Handy: je Feld eine Zeichenfläche. Die eigene Unterschrift ist (falls gespeichert) vorbelegt.
  * Liefert die gezeichneten Unterschriften und den Nachweis-Text für das PDF.
  */
-export function SignSheet({ visible, fields, saved, schriftform, onClose, onDone }: {
-  visible: boolean; fields: SigField[]; saved?: string; schriftform?: boolean;
-  onClose: () => void; onDone: (signatures: Record<string, string>, audit: string[]) => void;
+export function SignSheet({ visible, fields, saved, schriftform, place: place0 = '', date: date0 = '', onClose, onDone }: {
+  visible: boolean; fields: SigField[]; saved?: string; schriftform?: boolean; place?: string; date?: string;
+  onClose: () => void; onDone: (signatures: Record<string, string>, audit: string[], place: string, date: string) => void;
 }) {
   const c = useColors();
   const pads = useRef<Record<string, React.RefObject<PadHandle | null>>>({});
   const own = (k: string) => (pads.current[k] ??= createRef<PadHandle>());
   const [useSaved, setUseSaved] = useState<Record<string, boolean>>({});
   const [filled, setFilled] = useState<Record<string, boolean>>({});
+  // Ort und Datum: Ort des Hauses, Datum heute (änderbar). Das Datum gilt für den Tag der Unterschrift.
+  const [place, setPlace] = useState<string | null>(null);
+  const [date, setDate] = useState<string | null>(null);
+  useEffect(() => { if (visible) { setPlace(null); setDate(null); setUseSaved({}); setFilled({}); } }, [visible]);
+  const placeV = place ?? place0;
+  const dateV = date ?? (date0 || today());
   const usesSaved = (f: SigField) => f.key === 'vermieter' && !!saved && useSaved[f.key] !== false;
 
   const sheetFields = useMemo(() => fields, [fields]);
@@ -30,7 +37,8 @@ export function SignSheet({ visible, fields, saved, schriftform, onClose, onDone
       if (url) { sigs[f.key] = url; who.push({ label: f.label, name: f.name }); }
     }
     if (who.length === 0) return notify('Bitte zuerst unterschreiben.');
-    onDone(sigs, auditLines(who));
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateV)) return notify('Bitte ein Datum wählen.');
+    onDone(sigs, auditLines(who, new Date(), placeV.trim()), placeV.trim(), dateV);
   };
   const anySigned = sheetFields.some((f) => usesSaved(f) || filled[f.key]);
 
@@ -41,6 +49,10 @@ export function SignSheet({ visible, fields, saved, schriftform, onClose, onDone
           <Text accessibilityRole="header" style={{ fontSize: 28, fontWeight: '800', color: c.text, letterSpacing: -0.5 }}>Unterschreiben</Text>
           <Text style={{ color: c.muted, fontSize: type.body }}>Gib das Handy der unterschreibenden Person. Unterschrieben wird mit dem Finger in das Feld. Dann auf „Fertig“ tippen.</Text>
           {schriftform && <Note>{FORM_HINT}</Note>}
+          <View style={{ backgroundColor: c.card, borderRadius: 22, borderWidth: 1, borderColor: c.glassBorder, overflow: 'hidden' }}>
+            <Field label="Ort" value={placeV} onChangeText={setPlace} placeholder="z. B. Paderborn" />
+            <DateField label="Datum" value={dateV} onChange={setDate} />
+          </View>
           {sheetFields.map((f) => (
             <View key={f.key} style={{ backgroundColor: c.card, borderRadius: 22, padding: 14, borderWidth: 1, borderColor: c.glassBorder, gap: 10 }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>

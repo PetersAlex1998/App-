@@ -63,7 +63,7 @@ export function renderTemplate(tpl: Template, c: Ctx): Rendered {
     h: (t) => ({ t: 'h1', text: fill(t) }),
     kv: (rows) => ({ t: 'kv', rows: rows.map(([k, v]) => [k, fill(v)] as [string, string]) }),
     sign: () => ({ t: 'sign', lines: signatureLines(c.s) }),
-    sigs: (fields) => ({ t: 'sigs', fields: fields.map((f) => ({ ...f, name: f.name ? fill(f.name) : undefined })) }),
+    sigs: (fields) => ({ t: 'sigs', fields: fields.map((f) => ({ ...f, name: f.name ? fill(f.name) : undefined })), place: c.prop.city, date: c.date }),
   };
   const out = tpl.build(c, h);
   const model = frame(c.s, c.tenant, c.prop, c.unit, c.date, out.info ?? [['Objekt', c.prop.name], ['Einheit', `${c.unit.name}`]], out.title, out.blocks);
@@ -143,7 +143,6 @@ export const TEMPLATES: Template[] = [
         p('**§ 12 Schlussbestimmungen**'),
         p('Änderungen und Ergänzungen bedürfen der Schriftform. Sollte eine Bestimmung unwirksam sein, bleibt der Vertrag im Übrigen wirksam. Es gibt keine mündlichen Nebenabreden.'),
         ...(c.f.Besonderes?.trim() ? [p('**Besondere Vereinbarungen**'), p('{{Besonderes}}')] : []),
-        p('Ort, Datum: ______________________'),
         sigs([{ key: 'vermieter', label: 'Vermieter', name: signerOf(c.s) }, { key: 'mieter', label: 'Mieter', name: c.tenant.name }]),
       ];
       return { title: `Mietvertrag – ${c.tenant.name}`, info: [['Objekt', c.prop.name], ['Einheit', c.unit.name], ['Mietbeginn', de(c.f.Mietbeginn)]], blocks, warnings };
@@ -239,7 +238,6 @@ export const TEMPLATES: Template[] = [
         p('**Zustand der Räume**'),
         { t: 'table', head: ['Raum', 'Zustand', 'Mängel / Bemerkungen'], align: ['l', 'l', 'l'], widths: [0.3, 0.2, 0.5], rows: rooms.map((r) => ({ cells: [r, '', ''] })) },
         p('Weitere Bemerkungen: ______________________________________________________________'),
-        p('Ort, Datum: ______________________'),
         sigs([{ key: 'vermieter', label: 'Vermieter', name: signerOf(c.s) }, { key: 'mieter', label: 'Mieter', name: c.tenant.name }]),
       ];
       return { title: `Übergabeprotokoll ${c.f.Art ?? ''} – ${c.tenant.name}`, blocks };
@@ -316,7 +314,6 @@ export const TEMPLATES: Template[] = [
         kv([['Art des Vorgangs', '{{Art}}'], ['Datum', '{{Datum}}'], ['Anschrift der Wohnung', '{{Objektadresse}}, {{Wohnung}}'], ['Wohnungsgeber', '{{Firma}}, {{Anschrift}}'], ['Meldepflichtige Personen', '{{Personen}}']]),
         p('Ich bestätige hiermit, dass die oben genannten Personen zu dem genannten Datum bei mir {{Art}} in die genannte Wohnung. Ich bin Wohnungsgeber oder bevollmächtigt, die Bestätigung auszustellen.'),
         p('Mir ist bekannt, dass ich ordnungswidrig handle, wenn ich diese Bestätigung nicht oder nicht rechtzeitig ausstelle oder sie falsch ausstelle (§ 54 BMG).', true),
-        p('Ort, Datum: ______________________'),
         sigs([{ key: 'vermieter', label: 'Unterschrift Wohnungsgeber', name: signerOf(c.s) }]),
       ],
     }),

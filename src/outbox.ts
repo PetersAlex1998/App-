@@ -36,9 +36,9 @@ export async function mergeStored(docs: Doc[]): Promise<Blob> {
 }
 
 /** Gespeichertes Schreiben unterschreiben: PDF mit den gezeichneten Unterschriften neu erzeugen und das Dokument aktualisieren. */
-export async function signStored(doc: Doc, s: Pick<Settings, 'logo'>, signatures: Record<string, string>, audit: string[]): Promise<Doc> {
+export async function signStored(doc: Doc, s: Pick<Settings, 'logo'>, signatures: Record<string, string>, audit: string[], place?: string, date?: string): Promise<Doc> {
   if (!doc.letter) throw new Error('Dieses Schreiben hat keine Unterschriftsfelder.');
-  const bytes = await modelToPdf(withSignatures(doc.letter, s, signatures, audit));
+  const bytes = await modelToPdf(withSignatures(doc.letter, s, signatures, audit, place, date));
   await putBlob(doc.id, pdfBlob(bytes));
   return { ...doc, size: bytes.length, signed: new Date().toISOString() };
 }
