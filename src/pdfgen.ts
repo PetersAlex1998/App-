@@ -45,6 +45,7 @@ class Writer {
   page!: PDFPage;
   y = 0; // Abstand vom oberen Seitenrand (pt)
   pages = 0;
+  sig: Record<string, PDFImage> = {}; // eingebettete Unterschriften je Feld
   constructor(public doc: PDFDocument, public f: PDFFont, public fb: PDFFont) {}
 
   newPage() {
@@ -118,6 +119,15 @@ function dataUrlBytes(url: string): { bytes: Uint8Array; png: boolean } {
   return { bytes, png: m[1] === 'image/png' };
 }
 
+/** Gezeichnete Unterschrift in ein Feld setzen: einpassen, unten bündig, nicht größer als das Feld. */
+function drawSig(w: Writer, key: string, x: number, yTop: number, maxW: number, maxH: number) {
+  const img = w.sig[key];
+  if (!img) return;
+  const k = Math.min(maxW / img.width, maxH / img.height, 1);
+  const iw = img.width * k, ih = img.height * k;
+  w.page.drawImage(img, { x, y: PH - (yTop + maxH), width: iw, height: ih });
+}
+
 function drawBlock(w: Writer, b: Block) {
   switch (b.t) {
     case 'h1': {
@@ -139,11 +149,37 @@ function drawBlock(w: Writer, b: Block) {
       break;
     }
     case 'sign': {
+      // Grußformel, dann Platz für die Unterschrift (oder die gespeicherte Unterschrift), dann Name und Funktion
       w.y += mm(4.5);
       const lh = 10.5 * 1.35;
-      w.ensure(lh * b.lines.length);
-      for (const l of b.lines) { w.put(TEXT_L, w.y, lh, l, 10.5); w.y += lh; }
+      const gap = mm(13);
+      w.ensure(lh * b.lines.length + gap);
+      b.lines.forEach((l, i) => {
+        w.put(TEXT_L, w.y, lh, l, 10.5);
+        w.y += lh;
+        if (i === 0) { drawSig(w, 'vermieter', TEXT_L, w.y, mm(55), gap - mm(1)); w.y += gap; }
+      });
       w.y += mm(3);
+      break;
+    }
+    case 'sigs': {
+      // Unterschriftsfelder nebeneinander (höchstens zwei je Zeile): Linie, darüber die Unterschrift, darunter Bezeichnung und Name
+      const per = Math.min(2, b.fields.length) || 1;
+      const space = mm(6);
+      const cw = (TEXT_W - space * (per - 1)) / per;
+      const h = mm(20);
+      for (let i = 0; i < b.fields.length; i += per) {
+        const row = b.fields.slice(i, i + per);
+        w.y += mm(6);
+        w.ensure(h + mm(12));
+        row.forEach((f, j) => {
+          const x = TEXT_L + j * (cw + space);
+          drawSig(w, f.key, x, w.y, cw, h);
+          w.line(x, w.y + h, x + cw, w.y + h, 0.5, rgb(0.2, 0.2, 0.2));
+          w.put(x, w.y + h + 2, 11, w.fit(f.name ? `${f.label} · ${f.name}` : f.label, cw, 8), 8, false, GRAY);
+        });
+        w.y += h + mm(10);
+      }
       break;
     }
     case 'kv': {
@@ -222,6 +258,9 @@ export async function modelToPdf(m: LetterModel): Promise<Uint8Array> {
   doc.setCreationDate(new Date(m.date + 'T12:00:00'));
   const w = new Writer(doc, await doc.embedFont(StandardFonts.Helvetica), await doc.embedFont(StandardFonts.HelveticaBold));
   w.newPage();
+  for (const [k, url] of Object.entries(m.signatures ?? {})) {
+    try { const { bytes, png } = dataUrlBytes(url); w.sig[k] = png ? await doc.embedPng(bytes) : await doc.embedJpg(bytes); } catch { /* ungültige Unterschrift ignorieren */ }
+  }
 
   // ── Falz- und Lochmarken ──
   w.line(0, mm(105), mm(5), mm(105), 0.4, rgb(0.33, 0.33, 0.33));
@@ -273,6 +312,7 @@ export async function modelToPdf(m: LetterModel): Promise<Uint8Array> {
   // ── Text ab 98,5 mm ──
   w.y = mm(98.5);
   for (const b of m.blocks) drawBlock(w, b);
+  if (m.audit?.length) { w.y += mm(2); for (const l of m.audit) drawBlock(w, { t: 'p', text: l, small: true }); }
 
   // ── Fußzeile auf der letzten Seite ──
   if (m.footer.length) {

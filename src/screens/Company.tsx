@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { Image, Platform, Pressable, Text, View } from 'react-native';
 import { useSettings } from '../settings';
 import { Badge, Button, ChipField, Disclosure, Field, Gap, ListRow, Note, Screen, Section, notify, useColors } from '../ui';
 import { pickLogo } from '../image';
+import { PadHandle, SignaturePad } from '../SignaturePad';
 import { LEGAL_FORMS, completeness, footerLines, formatIban, placeholders, returnLine, senderLines, signatureLines, validIban } from '../company';
 import { type } from '../theme';
 import { pdfBlob } from '../outbox';
@@ -15,6 +16,7 @@ const LABEL = { brief: 'Briefe', zahlung: 'Zahlungsaufforderung', steuer: 'Fußz
 export function CompanyScreen() {
   const { s, update } = useSettings();
   const c = useColors();
+  const pad = useRef<PadHandle>(null);
   const done = completeness(s);
   const t = (k: 'name' | 'owner' | 'street' | 'zip' | 'city' | 'phone' | 'email' | 'web' | 'taxNo' | 'vatId' | 'taxOffice' | 'register' | 'accountHolder' | 'iban' | 'bic' | 'bank' | 'closing' | 'signerName' | 'signerRole') => (v: string) => update({ [k]: v });
   const ibanBad = s.iban.trim() !== '' && !validIban(s.iban);
@@ -89,6 +91,24 @@ export function CompanyScreen() {
         <Field label="Grußformel" value={s.closing} onChangeText={t('closing')} placeholder="Mit freundlichen Grüßen" />
         <Field label="Unterzeichner" value={s.signerName} onChangeText={t('signerName')} placeholder="leer = Firmenname" />
         <Field label="Funktion" value={s.signerRole} onChangeText={t('signerRole')} placeholder="z. B. Geschäftsführer" />
+      </Section>
+
+      <Section title="Meine Unterschrift" footer="Einmal mit dem Finger zeichnen. Sie wird dann in Schreiben und Verträgen automatisch in das Feld gesetzt. Bei Kündigungen und Mietverträgen wird sie nicht eingesetzt, weil dort die Unterschrift auf Papier nötig ist.">
+        {s.signature ? (
+          <View style={{ padding: 14, gap: 8 }}>
+            <View style={{ backgroundColor: '#fff', borderRadius: 14, borderWidth: 1, borderColor: c.glassBorder, padding: 10, height: 100, alignItems: 'center', justifyContent: 'center' }}>
+              <Image source={{ uri: s.signature }} accessibilityLabel="Gespeicherte Unterschrift" style={{ width: '100%', height: 80 }} resizeMode="contain" />
+            </View>
+          </View>
+        ) : <Note>Noch keine Unterschrift gespeichert.</Note>}
+        {Platform.OS === 'web' ? (
+          <View style={{ padding: 14, gap: 10 }}>
+            <SignaturePad ref={pad} label="Meine Unterschrift" />
+            <Button icon="checkmark" title={s.signature ? 'Neue Unterschrift speichern' : 'Unterschrift speichern'} onPress={() => { const u = pad.current?.toDataUrl(); if (!u) return notify('Bitte zuerst im Feld unterschreiben.'); update({ signature: u }); pad.current?.clear(); notify('Unterschrift gespeichert.'); }} />
+          </View>
+        ) : <Note>Die Unterschrift zeichnest du in der Web-App.</Note>}
+        {s.signature ? <ListRow icon={s.autoSign ? 'checkbox' : 'square-outline'} title="Automatisch in Schreiben einsetzen" subtitle="Mahnungen, Abrechnungen, Bescheinigungen und weitere" onPress={() => update({ autoSign: !s.autoSign })} /> : null}
+        {s.signature ? <ListRow icon="trash-outline" iconTone="danger" title="Unterschrift löschen" onPress={() => update({ signature: '' })} /> : null}
       </Section>
 
       <Section title="Fußzeile" footer="Zuerst Steuer und Register, dann dein Text, zuletzt die Bankverbindung.">

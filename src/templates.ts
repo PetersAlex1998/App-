@@ -1,8 +1,8 @@
-import { Block, LetterModel, frame, salutationText } from './letters';
+import { Block, LetterModel, SigField, frame, salutationText } from './letters';
 import { DB, Property, Tenant, Unit } from './types';
 import type { Settings } from './settingsDefaults';
 import { dateDE, eur, openItems, rentNow, unitDue } from './calc';
-import { placeholders, signatureLines } from './company';
+import { fullName, placeholders, signatureLines } from './company';
 import { unitRef } from './ids';
 import { latestReading, meterLabel } from './meters';
 import { monthEnd } from './rent';
@@ -20,10 +20,12 @@ export interface Rendered { model: LetterModel; missing: string[]; warnings: str
 export type Group = 'Mietverhältnis' | 'Übergabe und Bescheinigungen' | 'Schreiben';
 export interface Template {
   id: string; name: string; group: Group; icon: string; desc: string; fields: Field[]; batch?: boolean; notice?: string;
+  form?: 'schriftform'; // das Gesetz verlangt die eigenhändige Unterschrift auf Papier (Kündigung, Mietvertrag über ein Jahr)
   build: (c: Ctx, h: Helpers) => { title: string; info?: [string, string][]; blocks: Block[]; warnings?: string[] };
 }
-export interface Helpers { p: (t: string, small?: boolean) => Block; h: (t: string) => Block; kv: (rows: [string, string][]) => Block; fill: (t: string) => string; sign: () => Block }
+export interface Helpers { sigs: (fields: SigField[]) => Block; p: (t: string, small?: boolean) => Block; h: (t: string) => Block; kv: (rows: [string, string][]) => Block; fill: (t: string) => string; sign: () => Block }
 
+const signerOf = (s: Settings) => s.signerName.trim() || fullName(s);
 const de = (iso?: string) => (iso ? dateDE(iso) : '');
 const money = (s: string) => { const n = Number(String(s).replace(/\./g, '').replace(',', '.')); return isNaN(n) ? 0 : n; };
 
@@ -61,9 +63,11 @@ export function renderTemplate(tpl: Template, c: Ctx): Rendered {
     h: (t) => ({ t: 'h1', text: fill(t) }),
     kv: (rows) => ({ t: 'kv', rows: rows.map(([k, v]) => [k, fill(v)] as [string, string]) }),
     sign: () => ({ t: 'sign', lines: signatureLines(c.s) }),
+    sigs: (fields) => ({ t: 'sigs', fields: fields.map((f) => ({ ...f, name: f.name ? fill(f.name) : undefined })) }),
   };
   const out = tpl.build(c, h);
   const model = frame(c.s, c.tenant, c.prop, c.unit, c.date, out.info ?? [['Objekt', c.prop.name], ['Einheit', `${c.unit.name}`]], out.title, out.blocks);
+  if (tpl.form === 'schriftform') { delete model.signatures; model.noAutoSign = true; }
   const optional = new Set(tpl.fields.filter((f) => f.optional).map((f) => f.key));
   return { model, missing: [...missing].filter((k) => !optional.has(k)), warnings: out.warnings ?? [] };
 }
@@ -91,7 +95,7 @@ const noteDoc = 'Hinweis: Der Text ist eine Vorlage nach gängiger Praxis. Lass 
 
 export const TEMPLATES: Template[] = [
   {
-    id: 'mietvertrag', name: 'Mietvertrag Wohnraum', group: 'Mietverhältnis', icon: 'document-text-outline', notice: noteDoc,
+    id: 'mietvertrag', name: 'Mietvertrag Wohnraum', group: 'Mietverhältnis', icon: 'document-text-outline', notice: noteDoc, form: 'schriftform',
     desc: 'Unbefristeter Mietvertrag mit Miete, Betriebskosten, Kaution und Kündigung.',
     fields: [
       { key: 'Mietbeginn', label: 'Mietbeginn', kind: 'date', default: (c) => c.tenant.moveIn },
@@ -101,7 +105,7 @@ export const TEMPLATES: Template[] = [
       { key: 'Tierhaltung', label: 'Tierhaltung', kind: 'choice', options: ['Kleintiere sind erlaubt. Andere Tiere nur mit Zustimmung des Vermieters.', 'Tierhaltung ist nur mit Zustimmung des Vermieters erlaubt.'], default: () => 'Kleintiere sind erlaubt. Andere Tiere nur mit Zustimmung des Vermieters.' },
       { key: 'Besonderes', label: 'Besondere Vereinbarungen', kind: 'multiline', optional: true },
     ],
-    build: (c, { p, h, kv, sign }) => {
+    build: (c, { p, h, kv, sign, sigs }) => {
       const now = rentNow(c.unit);
       const dep = money(c.f.Kautionsbetrag ?? '');
       const warnings: string[] = [];
@@ -140,8 +144,7 @@ export const TEMPLATES: Template[] = [
         p('Änderungen und Ergänzungen bedürfen der Schriftform. Sollte eine Bestimmung unwirksam sein, bleibt der Vertrag im Übrigen wirksam. Es gibt keine mündlichen Nebenabreden.'),
         ...(c.f.Besonderes?.trim() ? [p('**Besondere Vereinbarungen**'), p('{{Besonderes}}')] : []),
         p('Ort, Datum: ______________________'),
-        p('Vermieter: ______________________    Mieter: ______________________'),
-        sign(),
+        sigs([{ key: 'vermieter', label: 'Vermieter', name: signerOf(c.s) }, { key: 'mieter', label: 'Mieter', name: c.tenant.name }]),
       ];
       return { title: `Mietvertrag – ${c.tenant.name}`, info: [['Objekt', c.prop.name], ['Einheit', c.unit.name], ['Mietbeginn', de(c.f.Mietbeginn)]], blocks, warnings };
     },
@@ -168,7 +171,7 @@ export const TEMPLATES: Template[] = [
     }),
   },
   {
-    id: 'kuendigung-zahlungsverzug', name: 'Fristlose Kündigung wegen Zahlungsverzug', group: 'Mietverhältnis', icon: 'warning-outline',
+    id: 'kuendigung-zahlungsverzug', name: 'Fristlose Kündigung wegen Zahlungsverzug', group: 'Mietverhältnis', icon: 'warning-outline', form: 'schriftform',
     notice: 'Eine fristlose Kündigung ist ein schwerer Schritt. Lass sie vor dem Versand rechtlich prüfen.',
     desc: 'Nach § 543 Abs. 2 Nr. 3 BGB, hilfsweise ordentlich. Prüft den Rückstand.',
     fields: [
@@ -225,7 +228,7 @@ export const TEMPLATES: Template[] = [
       { key: 'Übergabedatum', label: 'Übergabedatum', kind: 'date', default: (c) => c.date },
       { key: 'Schlüsselzahl', label: 'Schlüssel (Anzahl)', kind: 'text', default: () => '2' },
     ],
-    build: (c, { p, h, kv, sign }) => {
+    build: (c, { p, h, kv, sign, sigs }) => {
       const meters = c.db.meters.filter((m) => m.unitId === c.unit.id);
       const rooms = ['Eingang / Flur', 'Wohnzimmer', 'Schlafzimmer', 'Küche', 'Bad / WC', 'Kinderzimmer / Arbeitszimmer', 'Balkon / Terrasse', 'Keller / Abstellraum'];
       const blocks: Block[] = [
@@ -237,8 +240,7 @@ export const TEMPLATES: Template[] = [
         { t: 'table', head: ['Raum', 'Zustand', 'Mängel / Bemerkungen'], align: ['l', 'l', 'l'], widths: [0.3, 0.2, 0.5], rows: rooms.map((r) => ({ cells: [r, '', ''] })) },
         p('Weitere Bemerkungen: ______________________________________________________________'),
         p('Ort, Datum: ______________________'),
-        p('Vermieter: ______________________    Mieter: ______________________'),
-        sign(),
+        sigs([{ key: 'vermieter', label: 'Vermieter', name: signerOf(c.s) }, { key: 'mieter', label: 'Mieter', name: c.tenant.name }]),
       ];
       return { title: `Übergabeprotokoll ${c.f.Art ?? ''} – ${c.tenant.name}`, blocks };
     },
@@ -307,15 +309,15 @@ export const TEMPLATES: Template[] = [
       { key: 'Datum', label: 'Datum des Einzugs bzw. Auszugs', kind: 'date', default: (c) => c.tenant.moveIn },
       { key: 'Personen', label: 'Meldepflichtige Personen', kind: 'multiline', default: (c) => c.tenant.name },
     ],
-    build: (c, { p, h, kv, sign }) => ({
+    build: (c, { p, h, kv, sign, sigs }) => ({
       title: `Wohnungsgeberbestätigung – ${c.tenant.name}`,
       blocks: [
         h('Wohnungsgeberbestätigung nach § 19 BMG'),
         kv([['Art des Vorgangs', '{{Art}}'], ['Datum', '{{Datum}}'], ['Anschrift der Wohnung', '{{Objektadresse}}, {{Wohnung}}'], ['Wohnungsgeber', '{{Firma}}, {{Anschrift}}'], ['Meldepflichtige Personen', '{{Personen}}']]),
         p('Ich bestätige hiermit, dass die oben genannten Personen zu dem genannten Datum bei mir {{Art}} in die genannte Wohnung. Ich bin Wohnungsgeber oder bevollmächtigt, die Bestätigung auszustellen.'),
         p('Mir ist bekannt, dass ich ordnungswidrig handle, wenn ich diese Bestätigung nicht oder nicht rechtzeitig ausstelle oder sie falsch ausstelle (§ 54 BMG).', true),
-        p('Ort, Datum: ______________________    Unterschrift Wohnungsgeber: ______________________'),
-        sign(),
+        p('Ort, Datum: ______________________'),
+        sigs([{ key: 'vermieter', label: 'Unterschrift Wohnungsgeber', name: signerOf(c.s) }]),
       ],
     }),
   },

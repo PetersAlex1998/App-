@@ -1,4 +1,6 @@
 import { Doc, Tenant } from './types';
+import type { Settings } from './settingsDefaults';
+import { signFields, stripForStorage, withSignatures } from './signature';
 import type { LetterModel } from './letters';
 import { modelToPdf, mergePdfs } from './pdfgen';
 import { getBlob, putBlob } from './files';
@@ -15,7 +17,9 @@ export async function storeLetters(items: { model: LetterModel; tenant: Tenant; 
     const bytes = await modelToPdf(it.model);
     const id = uid();
     await putBlob(id, pdfBlob(bytes));
-    docs.push({ id, ownerKind: 'tenant', ownerId: it.tenant.id, category: 'brief', name: it.model.title, mime: 'application/pdf', size: bytes.length, added: today(), status: 'bereit', note: it.note });
+    // Schreiben mit Unterschriftsfeldern: Aufbau merken, damit es später am Handy unterschrieben werden kann
+    const signable = signFields(it.model).length > 0;
+    docs.push({ id, ownerKind: 'tenant', ownerId: it.tenant.id, category: 'brief', name: it.model.title, mime: 'application/pdf', size: bytes.length, added: today(), status: 'bereit', note: it.note, ...(signable ? { letter: stripForStorage(it.model), ...(it.model.audit?.length ? { signed: new Date().toISOString() } : {}) } : {}) });
   }
   return docs;
 }
@@ -29,4 +33,12 @@ export async function mergeStored(docs: Doc[]): Promise<Blob> {
   }
   if (parts.length === 0) throw new Error('Die Dateien wurden nicht gefunden.');
   return pdfBlob(await mergePdfs(parts));
+}
+
+/** Gespeichertes Schreiben unterschreiben: PDF mit den gezeichneten Unterschriften neu erzeugen und das Dokument aktualisieren. */
+export async function signStored(doc: Doc, s: Pick<Settings, 'logo'>, signatures: Record<string, string>, audit: string[]): Promise<Doc> {
+  if (!doc.letter) throw new Error('Dieses Schreiben hat keine Unterschriftsfelder.');
+  const bytes = await modelToPdf(withSignatures(doc.letter, s, signatures, audit));
+  await putBlob(doc.id, pdfBlob(bytes));
+  return { ...doc, size: bytes.length, signed: new Date().toISOString() };
 }

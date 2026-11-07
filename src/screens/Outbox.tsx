@@ -4,7 +4,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../store';
 import { Badge, Button, EmptyState, FilterChips, Gap, ListRow, Note, Screen, Section, Segmented, notify, useColors } from '../ui';
 import { getBlob, fmtSize } from '../files';
-import { mergeStored } from '../outbox';
+import { mergeStored, signStored } from '../outbox';
+import { useSettings } from '../settings';
+import { SignSheet } from '../SignSheet';
+import { signFields } from '../signature';
 import { epostProvider, shareFiles } from '../dispatch';
 import { dateDE, today } from '../calc';
 import { type } from '../theme';
@@ -13,7 +16,9 @@ import { Doc } from '../types';
 const CHANNELS = ['Post', 'E-POST', 'E-Mail', 'Persönlich'];
 
 export function Outbox({ navigation }: any) {
-  const { db, replaceAll } = useStore();
+  const { db, save, replaceAll } = useStore();
+  const { s: cfg } = useSettings();
+  const [signDoc, setSignDoc] = useState<Doc | null>(null);
   const c = useColors();
   const [tab, setTab] = useState<'bereit' | 'versendet'>('bereit');
   const [picked, setPicked] = useState<Record<string, boolean>>({}); // gesetzt = Gegenteil des Standards
@@ -71,6 +76,12 @@ export function Outbox({ navigation }: any) {
                   </Pressable>
                   <Ionicons name="chevron-forward" size={18} color={c.muted} />
                 </View>
+                {d.signed && <View style={{ paddingLeft: 38 }}><Badge text={`Unterschrieben am ${dateDE(d.signed.slice(0, 10))}`} tone="ok" /></View>}
+                {d.letter && signFields(d.letter).length > 0 && (
+                  <Pressable accessibilityRole="button" accessibilityLabel={`${d.name}: ${d.signed ? 'neu unterschreiben' : 'unterschreiben'}`} onPress={() => setSignDoc(d)} style={{ paddingLeft: 38, minHeight: 36, justifyContent: 'center' }}>
+                    <Text style={{ color: c.primary, fontSize: type.subhead, fontWeight: '600' }}>{d.signed ? 'Neu unterschreiben' : 'Am Handy unterschreiben'}</Text>
+                  </Pressable>
+                )}
                 {d.status === 'versendet' && <View style={{ paddingLeft: 38 }}><Badge text={`Versendet am ${dateDE(d.sentAt ?? '')}${d.channel ? ` · ${d.channel}` : ''}`} tone="ok" /></View>}
               </View>
             );
@@ -101,6 +112,8 @@ export function Outbox({ navigation }: any) {
         <ListRow icon="mail" title={epostProvider.label} subtitle={epostProvider.hint} right="Bald" />
       </Section>
       <Note>Wichtig: Eine Mahnung gilt erst als zugestellt, wenn sie den Mieter erreicht hat. Hebe dir Nachweise auf.</Note>
+      <SignSheet visible={!!signDoc} fields={signDoc?.letter ? signFields(signDoc.letter) : []} saved={cfg.signature || undefined} schriftform={/Mietvertrag|Kündigung/.test(signDoc?.note ?? '')} onClose={() => setSignDoc(null)}
+        onDone={(sigs, audit) => { const d = signDoc!; setSignDoc(null); run(async () => { save('documents', await signStored(d, cfg, sigs, audit)); }); }} />
     </Screen>
   );
 }

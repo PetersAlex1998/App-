@@ -9,6 +9,8 @@ import { modelToPdf } from '../pdfgen';
 import { pdfBlob, storeLetters } from '../outbox';
 import { filesSupported } from '../files';
 import { completeness } from '../company';
+import { SignSheet } from '../SignSheet';
+import { FORM_HINT, signFields, withSignatures } from '../signature';
 import { type } from '../theme';
 
 /** Vorbelegung aus dem Aufruf: „Art=Auszug;Schlüsselzahl=3“. */
@@ -51,6 +53,8 @@ export function VorlageForm({ route, navigation }: any) {
   const [f, setF] = useState<Record<string, string>>({});
   const [house, setHouse] = useState<string>('');
   const [busy, setBusy] = useState(false);
+  const [signOpen, setSignOpen] = useState(false);
+  const [signed, setSigned] = useState<{ sigs: Record<string, string>; audit: string[]; hash: string } | null>(null);
 
   const tenant = db.tenants.find((t) => t.id === tenantId);
   const unit = tenant ? db.units.find((u) => u.id === tenant.unitId) : undefined;
@@ -63,6 +67,12 @@ export function VorlageForm({ route, navigation }: any) {
 
   const rendered = useMemo(() => (tpl && ctx ? renderTemplate(tpl, ctx) : null), [tpl, ctx?.tenant.id, ctx?.date, JSON.stringify(f), cfg, db]);
 
+  // Unterschriften gehören zum genauen Text: ändert sich der Text, gelten sie nicht mehr
+  const fields = rendered ? signFields(rendered.model) : [];
+  const hash = rendered ? JSON.stringify(rendered.model.blocks) : '';
+  const validSig = signed && signed.hash === hash ? signed : null;
+  const finalModel = rendered ? (validSig ? withSignatures(rendered.model, cfg, validSig.sigs, validSig.audit) : rendered.model) : null;
+
   if (!tpl) return <Screen><EmptyState icon="help-circle" title="Vorlage nicht gefunden" text="Wähle eine Vorlage in der Liste." /></Screen>;
 
   const results = activeTenants.filter((t) => t.name.toLowerCase().includes(q.toLowerCase())).slice(0, 8);
@@ -71,14 +81,14 @@ export function VorlageForm({ route, navigation }: any) {
   const preview = async () => {
     if (!rendered) return;
     if (Platform.OS !== 'web') return notify('Die Vorschau ist in der Web-App verfügbar.');
-    try { const url = URL.createObjectURL(pdfBlob(await modelToPdf(rendered.model))); window.open(url, '_blank'); setTimeout(() => URL.revokeObjectURL(url), 60000); } catch (e: any) { notify(String(e?.message ?? e)); }
+    try { const url = URL.createObjectURL(pdfBlob(await modelToPdf(finalModel ?? rendered.model))); window.open(url, '_blank'); setTimeout(() => URL.revokeObjectURL(url), 60000); } catch (e: any) { notify(String(e?.message ?? e)); }
   };
   const create = async () => {
     if (!rendered || !tenant) return;
     if (!filesSupported()) return notify('Das Ablegen ist in der Web-App verfügbar.');
     setBusy(true);
     try {
-      const [doc] = await storeLetters([{ model: rendered.model, tenant, note: tpl.name }]);
+      const [doc] = await storeLetters([{ model: finalModel ?? rendered.model, tenant, note: tpl.name }]);
       save('documents', doc);
       navigation.navigate('Outbox');
     } catch (e: any) { notify(String(e?.message ?? e)); setBusy(false); }
@@ -142,6 +152,12 @@ export function VorlageForm({ route, navigation }: any) {
               {rendered.missing.length > 0 && <Note>Es fehlt noch: {rendered.missing.join(', ')}.</Note>}
             </Section>
           )}
+          {fields.length > 0 && (
+            <Section title="Unterschrift" footer="Unterschrieben wird mit dem Finger direkt in das Feld. Du kannst das auch später im Briefausgang tun, zum Beispiel wenn der Mieter vor dir steht.">
+              {tpl.form === 'schriftform' && <Note>{FORM_HINT}</Note>}
+              <ListRow icon="create-outline" iconTone={validSig ? 'ok' : 'primary'} title={validSig ? 'Unterschrieben. Neu unterschreiben' : 'Jetzt am Handy unterschreiben'} subtitle={fields.map((x) => x.label).join(', ')} onPress={() => setSignOpen(true)} />
+            </Section>
+          )}
           {rendered && <Text style={{ color: c.muted, fontSize: type.footnote, textAlign: 'center', marginBottom: 12 }}>Brief vom {dateDE(date)} an {tenant!.name}</Text>}
           <Button kind="secondary" icon="eye-outline" title="Vorschau als PDF" onPress={preview} disabled={!rendered} />
           <Gap h={8} />
@@ -150,6 +166,7 @@ export function VorlageForm({ route, navigation }: any) {
           <Note>Änderungen am Text nimmst du in der Vorlage vor, nicht im PDF. Bei Fragen zur Wirksamkeit hilft eine rechtliche Prüfung.</Note>
         </>
       )}
+      <SignSheet visible={signOpen} fields={fields} saved={cfg.signature || undefined} schriftform={tpl.form === 'schriftform'} onClose={() => setSignOpen(false)} onDone={(sigs, audit) => { setSigned({ sigs, audit, hash }); setSignOpen(false); }} />
     </Screen>
   );
 }

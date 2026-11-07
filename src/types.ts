@@ -238,6 +238,9 @@ export interface Doc {
   status?: 'bereit' | 'versendet';
   sentAt?: string;
   channel?: string;
+  // Schreiben mit Unterschriftsfeldern: Aufbau (ohne Logo und Unterschriften) für das spätere Unterschreiben, Zeitpunkt der Unterschrift
+  letter?: import('./letters').LetterModel;
+  signed?: string;
 }
 
 export interface DB {

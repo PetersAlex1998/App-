@@ -11,7 +11,11 @@ export type Block =
   | { t: 'p'; text: string; small?: boolean } // **fett** möglich
   | { t: 'table'; head: string[]; align: ('l' | 'r')[]; widths: number[]; rows: { cells: string[]; bold?: boolean; span?: number }[] }
   | { t: 'kv'; rows: [string, string][] }
-  | { t: 'sign'; lines: string[] };
+  | { t: 'sign'; lines: string[] }
+  | { t: 'sigs'; fields: SigField[] }; // Unterschriftsfelder nebeneinander
+
+/** Ein Unterschriftsfeld: `key` bindet eine gezeichnete Unterschrift (vermieter, mieter). */
+export interface SigField { key: string; label: string; name?: string }
 
 export interface LetterModel {
   title: string; // Betreff / Dateiname
@@ -25,6 +29,9 @@ export interface LetterModel {
   blocks: Block[];
   footer: string[];
   guides?: boolean; // Testbrief: Fensterrahmen einzeichnen (nur im PDF)
+  signatures?: Record<string, string>; // Unterschriften als PNG (Data-URL) je Feld
+  audit?: string[]; // Vermerk zu den Unterschriften (wer, wann), klein am Ende
+  noAutoSign?: boolean; // keine gespeicherte Unterschrift einsetzen (Schriftform)
 }
 
 const esc = (s: string) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
@@ -78,6 +85,7 @@ export function frame(s: Settings, t: Tenant, prop: Property, unit: Unit, date: 
     returnLine: returnLine(s),
     address: a.lines, unitNote: a.unitNote, date, info, blocks,
     footer: footerLines(s),
+    ...(s.signature && s.autoSign ? { signatures: { vermieter: s.signature } } : {}),
   };
 }
 
@@ -205,6 +213,7 @@ function blockHtml(b: Block): string {
     case 'h1': return `<h1>${esc(b.text)}</h1>`;
     case 'p': return `<p${b.small ? ' class="small"' : ''}>${rich(b.text)}</p>`;
     case 'sign': return `<p style="margin-top:8mm">${b.lines.map(esc).join('<br>')}</p>`;
+    case 'sigs': return `<table style="width:100%;margin-top:10mm"><tr>${b.fields.map((f) => `<td style="border:none;padding:0 6mm 0 0;vertical-align:bottom;width:${Math.floor(100 / Math.max(1, b.fields.length))}%"><div style="height:20mm;border-bottom:1px solid #000"></div><div class="small">${esc(f.label)}${f.name ? ` · ${esc(f.name)}` : ''}</div></td>`).join('')}</tr></table>`;
     case 'kv': return `<table style="width:auto">${b.rows.map(([k, v]) => `<tr><td class="small">${esc(k)}</td><td>${esc(v)}</td></tr>`).join('')}</table>`;
     case 'table': {
       const head = `<tr>${b.head.map((h, i) => `<th${b.align[i] === 'r' ? ' class="r"' : ''}>${esc(h)}</th>`).join('')}</tr>`;
@@ -297,6 +306,7 @@ export function rentIncreaseModel(kind: 'vergleich' | 'index', t: Tenant, unit: 
     { t: 'sign', lines: signatureLines(s) },
     { t: 'h1', text: 'Zustimmungserklärung' },
     { t: 'p', text: `Ich stimme der Erhöhung der Kaltmiete für ${unit.name} (${prop.name}) auf ${eur(c.newRent)} ab dem ${de(c.effective)} zu.` },
-    { t: 'p', text: 'Ort, Datum: ______________________    Unterschrift Mieter: ______________________' },
+    { t: 'p', text: 'Ort, Datum: ______________________' },
+    { t: 'sigs', fields: [{ key: 'mieter', label: 'Unterschrift Mieter (Zustimmung)', name: t.name }] },
   ]);
 }
