@@ -76,3 +76,23 @@ test('Standard-Gebühr in den Unternehmensdaten und je Haus änderbar', async ({
   await tap(page, btn(page, /Gebühr für dieses Haus dauerhaft speichern/));
   await expect.poll(async () => (await readDb(page)).properties[0].mgmtFee).toBe(20);
 });
+
+test('Kontoauszug des Hauskontos: Zahlung an die Firma markiert die Rechnung als bezahlt', async ({ page }) => {
+  page.on('dialog', (d) => d.accept());
+  const d = data();
+  d.firmInvoices = [
+    { id: 'i1', propertyId: 'p1', month: '2026-11', number: 'R-202611-H01', date: '2026-11-30', lines: [], net: 160, vatSum: 30.4, gross: 190.4 },
+    { id: 'i2', propertyId: 'p1', month: '2026-10', number: 'R-202610-H01', date: '2026-10-31', lines: [], net: 100, vatSum: 19, gross: 119 },
+  ];
+  await seedDb(page, d);
+  await page.goto('/kontoauszug');
+  const csv = 'Buchungstag;Betrag;Name;Verwendungszweck\n03.12.2026;-190,40;Mustermann Verwaltung;Rechnung R-202611-H01\n04.12.2026;-100,00;Mustermann Verwaltung;Rechnung R-202610-H01';
+  await page.getByLabel('CSV-Inhalt').fill(csv);
+  await tap(page, btn(page, /^Einlesen/));
+  await expect.poll(() => body(page)).toContain('BEZAHLTE RECHNUNGEN DER FIRMA');
+  // zweite Rechnung: Betrag weicht ab (100 statt 119) → nicht vorgewählt
+  expect(await body(page)).toContain('Betrag weicht ab');
+  await tap(page, btn(page, /1 Rechnung als bezahlt markieren/));
+  await expect.poll(async () => (await readDb(page)).firmInvoices.find((i: any) => i.id === 'i1').paid).toBe('2026-12-03');
+  expect((await readDb(page)).firmInvoices.find((i: any) => i.id === 'i2').paid).toBeUndefined();
+});

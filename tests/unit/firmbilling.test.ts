@@ -144,3 +144,32 @@ describe('Rechnung löschen und Erinnerung', () => {
     expect(computeTasks({ ...used, firmInvoices: [inv] }, { now: NOW }).some((x) => x.id.startsWith('firmabrechnung:'))).toBe(false);
   });
 });
+
+describe('Bezahlte Rechnungen im Kontoauszug erkennen', () => {
+  const mk = (number: string, gross: number, paid?: string) => ({ id: 'i-' + number, propertyId: 'p1', month: '2026-11', number, date: '2026-11-30', lines: [], net: gross, vatSum: 0, gross, ...(paid ? { paid } : {}) });
+  const out = (id: string, purpose: string, amount = -190.4) => ({ id, date: '2026-12-03', amount, name: 'Mustermann Verwaltung', purpose });
+  it('erkennt die Nummer im Verwendungszweck; Betrag muss passen, sonst „prüfen“', async () => {
+    const { matchInvoices } = await import('../../src/firmBilling');
+    const db = dbWith({ firmInvoices: [mk('R-202611-H01', 190.4)] });
+    const [m] = matchInvoices(db, [out('o1', 'Rechnung R-202611-H01 Verwaltung')]);
+    expect(m.invoice.number).toBe('R-202611-H01');
+    expect(m.amountOk).toBe(true);
+    expect(matchInvoices(db, [out('o1', 'rechnung r–202611–h01', -100)])[0]).toMatchObject({ amountOk: false });
+  });
+  it('Nummern mit Zusatz werden nicht verwechselt; bezahlte und unbekannte werden ignoriert; jede Rechnung nur einmal', async () => {
+    const { matchInvoices } = await import('../../src/firmBilling');
+    const db = dbWith({ firmInvoices: [mk('R-202611-H01', 100), mk('R-202611-H01-2', 200), mk('R-202610-H01', 50, '2026-11-05')] });
+    expect(matchInvoices(db, [out('a', 'R-202611-H01-2', -200)])[0].invoice.number).toBe('R-202611-H01-2');
+    expect(matchInvoices(db, [out('a', 'R-202611-H01', -100)])[0].invoice.number).toBe('R-202611-H01');
+    expect(matchInvoices(db, [out('a', 'R-202610-H01', -50)])).toEqual([]); // schon bezahlt
+    expect(matchInvoices(db, [out('a', 'Miete Oktober')])).toEqual([]);
+    expect(matchInvoices(db, [out('a', 'R-202611-H01', -100), out('b', 'R-202611-H01', -100)])).toHaveLength(1);
+    expect(matchInvoices(db, [])).toEqual([]);
+  });
+  it('Kontoauszug-Parser liefert die Ausgänge mit', async () => {
+    const { parseBankCsv } = await import('../../src/csv');
+    const r = parseBankCsv('Buchungstag;Betrag;Name;Verwendungszweck\n03.12.2026;-190,40;Mustermann Verwaltung;Rechnung R-202611-H01\n04.12.2026;800,00;Anna Schmidt;Miete\n');
+    expect(r.rows).toHaveLength(1);
+    expect(r.outgoing).toEqual([expect.objectContaining({ amount: -190.4, purpose: 'Rechnung R-202611-H01' })]);
+  });
+});

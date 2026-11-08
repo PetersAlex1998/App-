@@ -129,3 +129,20 @@ export function invoiceModel(s: Settings, p: Property, inv: FirmInvoice): Letter
     ...(s.signature && s.autoSign ? { signatures: { vermieter: s.signature } } : {}),
   };
 }
+
+export interface InvoicePayment { row: { id: string; date: string; amount: number; name: string; purpose: string }; invoice: FirmInvoice; amountOk: boolean }
+
+/** Ausgänge vom Hauskonto, in deren Verwendungszweck eine offene Rechnungsnummer der Firma steht. Der Betrag muss zum Rechnungsbetrag passen, sonst „prüfen“. */
+export function matchInvoices(db: DB, outgoing: { id: string; date: string; amount: number; name: string; purpose: string }[] = []): InvoicePayment[] {
+  const open = db.firmInvoices.filter((i) => !i.paid).sort((a, b) => b.number.length - a.number.length);
+  const out: InvoicePayment[] = [];
+  const used = new Set<string>();
+  for (const row of outgoing) {
+    const text = ` ${row.purpose} `.toUpperCase().replace(/[–—]/g, '-');
+    const inv = open.find((i) => !used.has(i.id) && new RegExp(`(^|[^A-Z0-9-])${i.number.toUpperCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![A-Z0-9-])`).test(text));
+    if (!inv) continue;
+    used.add(inv.id);
+    out.push({ row, invoice: inv, amountOk: Math.abs(Math.abs(row.amount) - inv.gross) < 0.01 });
+  }
+  return out;
+}

@@ -86,7 +86,7 @@ const findCol = (headers: string[], pred: (k: string) => boolean) => headers.fin
 export interface BankRow {
   id: string; date: string; amount: number; name: string; purpose: string; iban: string;
 }
-export interface BankParse { rows: BankRow[]; skippedOutgoing: number; error?: string; columns?: string }
+export interface BankParse { rows: BankRow[]; skippedOutgoing: number; outgoing?: BankRow[]; error?: string; columns?: string }
 
 export function parseBankCsv(text: string): BankParse {
   const all = parseCsv(text);
@@ -106,15 +106,16 @@ export function parseBankCsv(text: string): BankParse {
   if (cDate < 0 || (cAmt < 0 && (cSoll < 0 || cHaben < 0))) return { rows: [], skippedOutgoing: 0, error: 'Datum oder Betrag wurden nicht gefunden. Prüfe die Kopfzeile der Datei.' };
 
   const rows: BankRow[] = [];
+  const outgoing: BankRow[] = []; // Ausgänge (negativer Betrag): dienen nur zum Erkennen bezahlter Rechnungen
   let skipped = 0;
   all.slice(hi + 1).forEach((r, i) => {
     const date = parseDate(r[cDate] ?? '');
     const amount = cAmt >= 0 ? parseAmount(r[cAmt] ?? '') : (parseAmount(r[cHaben] ?? '') ?? 0) - (parseAmount(r[cSoll] ?? '') ?? 0);
     if (!date || amount === null || amount === 0) return;
-    if (amount < 0) { skipped++; return; }
+    if (amount < 0) { skipped++; outgoing.push({ id: `o${i}`, date, amount: Math.round(amount * 100) / 100, name: r[cName] ?? '', iban: (r[cIban] ?? '').replace(/\s/g, '').toUpperCase(), purpose: purposeCols.map((c) => r[c] ?? '').filter(Boolean).join(' ') }); return; }
     rows.push({ id: `b${i}`, date, amount: Math.round(amount * 100) / 100, name: r[cName] ?? '', iban: (r[cIban] ?? '').replace(/\s/g, '').toUpperCase(), purpose: purposeCols.map((c) => r[c] ?? '').filter(Boolean).join(' ') });
   });
-  return { rows, skippedOutgoing: skipped, columns: `Datum „${h[cDate]}“, Betrag „${h[cAmt >= 0 ? cAmt : cHaben]}“${cName >= 0 ? `, Name „${h[cName]}“` : ''}${cIban >= 0 ? ', IBAN' : ''}` };
+  return { rows, skippedOutgoing: skipped, outgoing, columns: `Datum „${h[cDate]}“, Betrag „${h[cAmt >= 0 ? cAmt : cHaben]}“${cName >= 0 ? `, Name „${h[cName]}“` : ''}${cIban >= 0 ? ', IBAN' : ''}` };
 }
 
 export type MatchStatus = 'sicher' | 'pruefen' | 'offen' | 'doppelt';

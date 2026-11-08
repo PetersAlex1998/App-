@@ -3,6 +3,7 @@ import { Platform, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore, uid } from '../store';
 import { Badge, Button, EmptyState, Field, FilterChips, Gap, ListRow, Note, Screen, SearchBar, Section, notify, useColors } from '../ui';
+import { matchInvoices } from '../firmBilling';
 import { BESTAND_TEMPLATE, BankRow, MatchRow, applyMatches, scoreRows, parseBankCsv, pickTextFile, paymentsFromMatches, planBestandImport, BestandPlan, planZaehlerImport, ZaehlerPlan, ZAEHLER_TEMPLATE, previewBestand } from '../csv';
 import { saveText } from '../backup';
 import { dateDE, eur, monthLabel, today } from '../calc';
@@ -23,11 +24,12 @@ function UpdateGuard() {
 /* ───────── Kontoauszug importieren ───────── */
 
 export function StatementImport({ navigation }: any) {
-  const { db, replaceAll } = useStore();
+  const { db, save, replaceAll } = useStore();
   const outdated = useUpdateAvailable().available;
   const c = useColors();
   const [text, setText] = useState('');
-  const [parsed, setParsed] = useState<{ rows: BankRow[]; skipped: number; columns?: string } | null>(null);
+  const [parsed, setParsed] = useState<{ rows: BankRow[]; skipped: number; outgoing: BankRow[]; columns?: string } | null>(null);
+  const [invOff, setInvOff] = useState<Record<string, boolean>>({}); // abgewählte (oder bei abweichendem Betrag nicht vorgewählte) Rechnungen
   const [overrides, setOverrides] = useState<Record<string, { tenantId?: string | null; include?: boolean }>>({});
   const [pickFor, setPickFor] = useState<string | null>(null);
   const [q, setQ] = useState('');
@@ -39,10 +41,14 @@ export function StatementImport({ navigation }: any) {
     setFileName(name);
     const res = parseBankCsv(content);
     if (res.error) { setError(res.error); setParsed(null); return; }
-    if (res.rows.length === 0) { setError('Die Datei enthält keine Zahlungseingänge.'); setParsed(null); return; }
-    setError(''); setOverrides({}); setLimit(60); setParsed({ rows: res.rows, skipped: res.skippedOutgoing, columns: res.columns });
+    if (res.rows.length === 0 && matchInvoices(db, res.outgoing).length === 0) { setError('Die Datei enthält keine Zahlungseingänge und keine bezahlten Rechnungen der Firma.'); setParsed(null); return; }
+    setError(''); setOverrides({}); setInvOff({}); setLimit(60); setParsed({ rows: res.rows, skipped: res.skippedOutgoing, outgoing: res.outgoing ?? [], columns: res.columns });
   };
   // Bewertung nur einmal; Änderungen (Häkchen, manuelle Zuordnung) wenden nur noch das Ergebnis neu an
+  // Ausgänge vom Hauskonto an die Firma: offene Rechnungen anhand der Rechnungsnummer erkennen
+  const paidInv = useMemo(() => (parsed ? matchInvoices(db, parsed.outgoing) : []), [db, parsed]);
+  const invOn = (x: { row: { id: string }; amountOk: boolean }) => (invOff[x.row.id] !== undefined ? !invOff[x.row.id] : x.amountOk);
+  const markPaid = () => { paidInv.filter(invOn).forEach((x) => save('firmInvoices', { ...x.invoice, paid: x.row.date })); setInvOff({}); notify(`${paidInv.filter(invOn).length} Rechnung(en) als bezahlt markiert.`); setParsed({ ...parsed!, outgoing: parsed!.outgoing.filter((o) => !paidInv.filter(invOn).some((x) => x.row.id === o.id)) }); };
   const scores = useMemo(() => (parsed ? scoreRows(db, parsed.rows, house || undefined) : []), [db, parsed, house]);
   const rows: MatchRow[] = useMemo(() => applyMatches(db, scores, overrides), [db, scores, overrides]);
   // Feste Reihenfolge: erst was geprüft werden muss, dann sichere Treffer, dann bereits gebuchte
@@ -121,6 +127,14 @@ export function StatementImport({ navigation }: any) {
       <Text style={{ color: c.muted, fontSize: type.subhead, marginBottom: 16 }}>
         {counts.sicher} sicher · {counts.pruefen} prüfen · {counts.offen} offen · {counts.doppelt} doppelt{parsed.skipped ? ` · ${parsed.skipped} Ausgänge übersprungen` : ''}{rows.length > 60 ? '. Zeilen mit Prüfbedarf stehen oben.' : ''}
       </Text>
+      {paidInv.length > 0 && (
+        <Section title="Bezahlte Rechnungen der Firma" footer="Erkannt an der Rechnungsnummer im Verwendungszweck. Weicht der Betrag ab, ist die Rechnung nicht vorgewählt.">
+          {paidInv.map((x) => (
+            <ListRow key={x.row.id} icon={invOn(x) ? 'checkbox' : 'square-outline'} iconTone={invOn(x) ? 'primary' : undefined} title={`Rechnung ${x.invoice.number}`} subtitle={`${dateDE(x.row.date)} · gezahlt ${eur(-x.row.amount)}${x.amountOk ? '' : ` · Rechnungsbetrag ${eur(x.invoice.gross)}`}`} badge={x.amountOk ? undefined : { text: 'Betrag weicht ab', tone: 'warn' }} onPress={() => setInvOff({ ...invOff, [x.row.id]: invOn(x) })} />
+          ))}
+          <View style={{ padding: 12 }}><Button kind="secondary" icon="checkmark-done" title={`${paidInv.filter(invOn).length} Rechnung${paidInv.filter(invOn).length === 1 ? '' : 'en'} als bezahlt markieren`} onPress={markPaid} disabled={paidInv.filter(invOn).length === 0} /></View>
+        </Section>
+      )}
       <Section>
         {ordered.slice(0, limit).map((r) => {
           const st = label[r.status];
