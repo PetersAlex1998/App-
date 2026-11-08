@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Platform, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore, uid } from '../store';
-import { Badge, Button, EmptyState, Field, Gap, ListRow, Note, Screen, SearchBar, Section, notify, useColors } from '../ui';
+import { Badge, Button, EmptyState, Field, FilterChips, Gap, ListRow, Note, Screen, SearchBar, Section, notify, useColors } from '../ui';
 import { BESTAND_TEMPLATE, BankRow, MatchRow, applyMatches, scoreRows, parseBankCsv, pickTextFile, paymentsFromMatches, planBestandImport, BestandPlan, planZaehlerImport, ZaehlerPlan, ZAEHLER_TEMPLATE, previewBestand } from '../csv';
 import { saveText } from '../backup';
 import { dateDE, eur, monthLabel, today } from '../calc';
@@ -33,6 +33,7 @@ export function StatementImport({ navigation }: any) {
   const [q, setQ] = useState('');
   const [error, setError] = useState('');
   const [fileName, setFileName] = useState('');
+  const [house, setHouse] = useState(''); // Kontoauszug eines Hauskontos: nur Mieter dieses Hauses zuordnen
 
   const load = (content: string, name = '') => {
     setFileName(name);
@@ -42,7 +43,7 @@ export function StatementImport({ navigation }: any) {
     setError(''); setOverrides({}); setLimit(60); setParsed({ rows: res.rows, skipped: res.skippedOutgoing, columns: res.columns });
   };
   // Bewertung nur einmal; Änderungen (Häkchen, manuelle Zuordnung) wenden nur noch das Ergebnis neu an
-  const scores = useMemo(() => (parsed ? scoreRows(db, parsed.rows) : []), [db, parsed]);
+  const scores = useMemo(() => (parsed ? scoreRows(db, parsed.rows, house || undefined) : []), [db, parsed, house]);
   const rows: MatchRow[] = useMemo(() => applyMatches(db, scores, overrides), [db, scores, overrides]);
   // Feste Reihenfolge: erst was geprüft werden muss, dann sichere Treffer, dann bereits gebuchte
   const order = useMemo(() => {
@@ -86,6 +87,11 @@ export function StatementImport({ navigation }: any) {
       <Screen>
         <Text accessibilityRole="header" style={{ fontSize: 30, fontWeight: '800', color: c.text, letterSpacing: -0.6, marginTop: 6, marginBottom: 6 }}>Kontoauszug importieren</Text>
         <Text style={{ color: c.muted, fontSize: type.body, marginBottom: 20 }}>Lade den CSV-Export deines Mieteingangskontos hoch. Die App ordnet die Eingänge den Mietern zu, du prüfst und bestätigst.</Text>
+        {db.properties.length > 1 && (
+          <Section title="Von welchem Hauskonto?" footer="Jedes Haus hat sein eigenes Konto. Wählst du das Haus, ordnet die App die Zahlungen nur Mietern dieses Hauses zu.">
+            <View style={{ padding: 12 }}><FilterChips value={house} onChange={setHouse} options={[{ label: 'Alle Häuser', value: '' }, ...db.properties.map((p) => ({ label: p.name, value: p.id }))]} /></View>
+          </Section>
+        )}
         {Platform.OS === 'web' && <Button icon="document-attach-outline" title="CSV-Datei auswählen" onPress={() => pickTextFile().then((t) => t && load(t.text, t.name)).catch((e) => setError(String(e?.message ?? e)))} />}
         <Gap h={16} />
         <Section title="Oder Inhalt einfügen">

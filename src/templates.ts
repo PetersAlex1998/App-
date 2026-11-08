@@ -2,7 +2,8 @@ import { Block, LetterModel, SigField, frame, salutationText } from './letters';
 import { DB, Property, Tenant, Unit } from './types';
 import type { Settings } from './settingsDefaults';
 import { dateDE, eur, openItems, rentNow, unitDue } from './calc';
-import { fullName, placeholders, signatureLines } from './company';
+import { formatIban, fullName, placeholders, signatureLines } from './company';
+import { houseBank, landlordText, onBehalfSentence, ownersFull, ownersLine, ownersOf } from './owners';
 import { unitRef } from './ids';
 import { latestReading, meterLabel } from './meters';
 import { monthEnd } from './rent';
@@ -43,6 +44,9 @@ export function contextPlaceholders(c: Ctx): Record<string, string> {
     Fläche: String(u.area || ''), Zimmer: String(u.rooms || ''), Etage: u.floor ?? '', Lage: u.position ?? '', Keller: u.cellar ?? '', Stellplatz: u.parking ?? '',
     Kaltmiete: eur(now.coldRent), Vorauszahlung: eur(now.advance), Gesamtmiete: eur(unitDue(u)),
     Einzug: de(t.moveIn), Auszug: de(t.moveOut), Kaution: t.deposit ? eur(t.deposit) : '', 'Kaution gezahlt': paidDeposit ? eur(paidDeposit) : '',
+    // Mietzahlungen: Konto des Hauses (nie das Firmenkonto)
+    Kontoinhaber: houseBank(p)?.holder ?? '', IBAN: houseBank(p) ? formatIban(houseBank(p)!.iban) : '', BIC: houseBank(p)?.bic ?? '', Bank: houseBank(p)?.bank ?? '',
+    Eigentümer: ownersLine(p), 'Eigentümer-Anschrift': ownersFull(p), Vermieter: landlordText(s, p),
     Fälligkeitstag: String(s.rentDueDay), Heute: de(c.date),
     ...Object.fromEntries(Object.entries(c.f).map(([k, v]) => [k, /^\d{4}-\d{2}-\d{2}$/.test(v) ? dateDE(v) : v])),
   };
@@ -66,6 +70,12 @@ export function renderTemplate(tpl: Template, c: Ctx): Rendered {
     sigs: (fields) => ({ t: 'sigs', fields: fields.map((f) => ({ ...f, name: f.name ? fill(f.name) : undefined })), place: c.prop.city, date: c.date }),
   };
   const out = tpl.build(c, h);
+  // Die Firma handelt im Namen der Eigentümer: kurzer Hinweis unter der Überschrift (im Mietvertrag steht es ausführlich in den Parteien)
+  const behalf = onBehalfSentence(c.s, c.prop);
+  if (behalf && tpl.id !== 'mietvertrag') {
+    const at = out.blocks[0]?.t === 'h1' ? 1 : 0;
+    out.blocks = [...out.blocks.slice(0, at), { t: 'p', small: true, text: behalf }, ...out.blocks.slice(at)];
+  }
   const model = frame(c.s, c.tenant, c.prop, c.unit, c.date, out.info ?? [['Objekt', c.prop.name], ['Einheit', `${c.unit.name}`]], out.title, out.blocks);
   if (tpl.form === 'schriftform' && !c.s.autoSignFormal) { delete model.signatures; model.noAutoSign = true; }
   const optional = new Set(tpl.fields.filter((f) => f.optional).map((f) => f.key));
@@ -111,10 +121,13 @@ export const TEMPLATES: Template[] = [
       const warnings: string[] = [];
       if (dep > now.coldRent * 3 + 0.005) warnings.push(`Die Kaution übersteigt drei Nettokaltmieten (${eur(now.coldRent * 3)}). Das ist unzulässig (§ 551 BGB).`);
       if (!(c.unit.area > 0)) warnings.push('Die Wohnfläche fehlt in den Wohnungsdaten.');
+      if (!ownersOf(c.prop).length) warnings.push('Für dieses Haus sind keine Eigentümer hinterlegt. Im Vertrag steht dann nur die Firma als Vermieter. Trage die Eigentümer beim Haus ein.');
+      if (!houseBank(c.prop)) warnings.push('Für dieses Haus ist kein Mietkonto hinterlegt (Haus → Bankkonto). Die Miete läuft auf das Konto des Hauses.');
       if (c.f.Schönheitsreparaturen?.startsWith('Der Mieter')) warnings.push('Schönheitsreparaturen auf den Mieter zu übertragen ist nur bei renovierter Übergabe sicher möglich. Starre Fristen sind unwirksam. Besser: Vermieter trägt sie.');
       const blocks: Block[] = [
         h('Mietvertrag über Wohnraum'),
-        p('zwischen **{{Firma}}**, {{Anschrift}}, nachfolgend „Vermieter“, und **{{Mieter}}**, nachfolgend „Mieter“, wird folgender Mietvertrag geschlossen.'),
+        p('zwischen {{Vermieter}}, nachfolgend „Vermieter“, und **{{Mieter}}**, nachfolgend „Mieter“, wird folgender Mietvertrag geschlossen.'),
+        ...(ownersOf(c.prop).length ? [p('Der Vermieter wird bei Abschluss und Durchführung dieses Vertrags von {{Firma}} vertreten. {{Firma}} ist bevollmächtigt, alle Erklärungen im Namen der Eigentümer abzugeben und entgegenzunehmen' + (c.prop.mandate ? ` (Verwaltungsvertrag/Vollmacht vom ${de(c.prop.mandate)})` : '') + '.')] : []),
         p('**§ 1 Mietsache**'),
         p('Vermietet wird die Wohnung **{{Wohnung}}** im Haus {{Objekt}}, {{Objektadresse}}, mit einer Wohnfläche von {{Fläche}} m² ({{Zimmer}} Zimmer). Wohnungs-ID: {{Wohnungs-ID}}.'),
         ...(c.unit.cellar || c.unit.parking ? [p(`Mitvermietet sind: ${[c.unit.cellar && `Keller (${c.unit.cellar})`, c.unit.parking && `Stellplatz (${c.unit.parking})`].filter(Boolean).join(', ')}.`)] : []),
@@ -311,7 +324,7 @@ export const TEMPLATES: Template[] = [
       title: `Wohnungsgeberbestätigung – ${c.tenant.name}`,
       blocks: [
         h('Wohnungsgeberbestätigung nach § 19 BMG'),
-        kv([['Art des Vorgangs', '{{Art}}'], ['Datum', '{{Datum}}'], ['Anschrift der Wohnung', '{{Objektadresse}}, {{Wohnung}}'], ['Wohnungsgeber', '{{Firma}}, {{Anschrift}}'], ['Meldepflichtige Personen', '{{Personen}}']]),
+        kv([['Art des Vorgangs', '{{Art}}'], ['Datum', '{{Datum}}'], ['Anschrift der Wohnung', '{{Objektadresse}}, {{Wohnung}}'], ...(ownersOf(c.prop).length ? [['Wohnungsgeber (Eigentümer)', '{{Eigentümer-Anschrift}}'], ['Ausgestellt durch (bevollmächtigter Verwalter)', '{{Firma}}, {{Anschrift}}']] : [['Wohnungsgeber', '{{Firma}}, {{Anschrift}}']]) as [string, string][], ['Meldepflichtige Personen', '{{Personen}}']]),
         p('Ich bestätige hiermit, dass die oben genannten Personen zu dem genannten Datum bei mir {{Art}} in die genannte Wohnung. Ich bin Wohnungsgeber oder bevollmächtigt, die Bestätigung auszustellen.'),
         p('Mir ist bekannt, dass ich ordnungswidrig handle, wenn ich diese Bestätigung nicht oder nicht rechtzeitig ausstelle oder sie falsch ausstelle (§ 54 BMG).', true),
         sigs([{ key: 'vermieter', label: 'Unterschrift Wohnungsgeber', name: signerOf(c.s) }]),
@@ -343,7 +356,7 @@ export const TEMPLATES: Template[] = [
     fields: [],
     build: (c, { p, h, kv, sign }) => ({
       title: `Zahlungsinformation – ${c.tenant.name}`,
-      warnings: c.unit.no ? [] : ['Für diese Wohnung gibt es noch keine Wohnungs-ID.'],
+      warnings: [...(c.unit.no ? [] : ['Für diese Wohnung gibt es noch keine Wohnungs-ID.']), ...(houseBank(c.prop) ? [] : ['Für dieses Haus ist kein Mietkonto hinterlegt (Haus → Bankkonto).'])],
       blocks: [
         h('Ihre Zahlungsinformation'), p('{{Anrede}},'),
         p('damit wir Ihre Mietzahlungen schnell und sicher zuordnen können, geben Sie bitte bei jeder Überweisung Ihre persönliche **Wohnungs-ID** als Verwendungszweck an.'),

@@ -4,7 +4,7 @@ export const mk = (i: number, name: string, moveIn = '2026-06-01', over: object 
   ({ id: 't' + i, unitId: 'u' + i, name, salutation: i === 1 ? 'Frau' : 'Herr', email: '', phone: '', moveIn, moveOut: '', deposit: 0, trackFrom: '2026-08', ...over });
 
 export const seed = () => ({
-  properties: [{ id: 'p1', name: 'Haus Lindenstraße', street: 'Lindenstr. 12', zip: '50667', city: 'Köln', yearBuilt: '', notes: '', houseNo: 1 }],
+  properties: [{ id: 'p1', name: 'Haus Lindenstraße', street: 'Lindenstr. 12', zip: '50667', city: 'Köln', yearBuilt: '', notes: '', houseNo: 1, owners: [{ name: 'Max Muster', share: 100 }], bank: { iban: 'DE02120300000000202051' } }],
   units: [1, 2].map((i) => ({ id: 'u' + i, propertyId: 'p1', name: 'Wohnung ' + i, no: i, area: 60, rooms: 2, coldRent: 640, advance: 160 })),
   tenants: [mk(1, 'Anna Schmidt'), mk(2, 'Max Becker')],
   payments: [], reminders: [], costs: [], meters: [], readings: [], documents: [],

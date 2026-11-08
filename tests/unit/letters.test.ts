@@ -11,7 +11,7 @@ beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(new Date('2026-11-12T12:
 afterEach(() => vi.useRealTimers());
 
 const s = { ...defaultSettings, name: 'Max Mustermann Immobilien', street: 'Hauptstraße 1', zip: '50667', city: 'Köln', iban: 'DE11 5001 0517 0000 0000 01', bic: 'COLSDE33', bank: 'Sparkasse', footer: 'Steuernummer 123/456' };
-const prop = property({ id: 'p', houseNo: 3, name: 'Haus Lindenstraße', street: 'Lindenstr. 12', zip: '50667', city: 'Köln' });
+const prop = property({ id: 'p', houseNo: 3, name: 'Haus Lindenstraße', street: 'Lindenstr. 12', zip: '50667', city: 'Köln', bank: { holder: 'Eigentümergemeinschaft Muster', iban: 'DE11 5001 0517 0000 0000 01', bic: 'COLSDE33', bank: 'Sparkasse' } });
 const einheit = unit('p', { id: 'u', name: 'Wohnung 12', no: 12 });
 const ten = (o = {}) => tenant('u', { name: 'Erika Mustermann', salutation: 'Frau', ...o });
 const rem = (o: Partial<Reminder> = {}): Reminder => ({ id: 'x', tenantId: 't', date: '2026-11-12', level: 1, amount: 860, fee: 0, deadline: '2026-11-19', items: [{ month: '2026-10', due: 860, paid: 0, open: 860 }], ...o });
@@ -55,7 +55,7 @@ describe('Mahnung (Inhalt)', () => {
     const m = reminderModel(emptyDB, rem(), ten(), einheit, prop, s);
     const kv = m.blocks.find((b) => b.t === 'kv') as any;
     expect(kv.rows).toContainEqual(['Verwendungszweck', 'Miete H03-W12']);
-    expect(kv.rows).toContainEqual(['IBAN', s.iban]);
+    expect(kv.rows).toContainEqual(['IBAN', 'DE11 5001 0517 0000 0000 01']);
     expect(m.info).toContainEqual(['Kennung', 'H03-W12']);
     expect(JSON.stringify(m.blocks)).toContain('Bitte geben Sie bei jeder Zahlung die Kennung H03-W12');
   });
@@ -72,14 +72,15 @@ describe('Mahnung (Inhalt)', () => {
     expect(tab.rows.at(-1)).toMatchObject({ bold: true });
     expect(tab.rows.at(-1).cells[3]).toMatch(/1\.725,00/);
   });
-  it('ohne IBAN: neutraler Hinweis statt Bankdaten', () => {
-    const m = reminderModel(emptyDB, rem(), ten(), einheit, prop, { ...s, iban: '' });
+  it('ohne Hauskonto: neutraler Hinweis statt Bankdaten, nie das Firmenkonto', () => {
+    const m = reminderModel(emptyDB, rem(), ten(), einheit, { ...prop, bank: undefined }, s); // die Firma hat ein IBAN, das Haus nicht
     expect(m.blocks.some((b) => b.t === 'kv')).toBe(false);
+    expect(JSON.stringify(m)).not.toContain('DE11 5001');
   });
   it('Fußzeile mit IBAN und freiem Text', () => {
     const m = reminderModel(emptyDB, rem(), ten(), einheit, prop, s);
     expect(m.footer.join(' ')).toContain('Steuernummer 123/456');
-    expect(m.footer.join(' ')).toContain('IBAN DE11');
+    expect(m.footer.join(' ')).toContain('Mietkonto: Eigentümergemeinschaft Muster · IBAN DE11');
   });
   it('HTML maskiert Sonderzeichen', () => {
     const html = modelToHtml(reminderModel(emptyDB, rem(), ten({ name: 'Jürgen <b>Müller</b> & Co', salutation: 'Herr' }), einheit, prop, s));

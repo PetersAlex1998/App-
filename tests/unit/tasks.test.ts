@@ -3,11 +3,15 @@ import { computeTasks } from '../../src/tasks';
 import { dbWith, payment, property, simple, tenant, unit } from '../helpers/builders';
 
 const NOW = '2026-11-03';
+/** Haus mit Eigentümer und Bankkonto, damit die Pflichtangaben der Haus-Einrichtung keine Aufgabe erzeugen. */
+const complete = <T extends { properties: ReturnType<typeof property>[] }>(db: T): T => ({ ...db, properties: db.properties.map((p) => ({ ...p, owners: [{ name: 'Max Muster', share: 100 }], bank: { iban: 'DE02120300000000202051' } })) });
 
 describe('Aufgaben aus der Datenprüfung', () => {
   it('sauberer Bestand: keine Aufgaben', () => {
     const { db } = simple({ moveIn: '2024-01-01' });
-    expect(computeTasks(db, { now: NOW })).toEqual([]);
+    expect(computeTasks(complete(db), { now: NOW })).toEqual([]);
+    // ohne Eigentümer und Hauskonto: eine Sammelaufgabe für das Haus
+    expect(computeTasks(db, { now: NOW }).map((x) => x.id)).toEqual([`einrichten:${db.properties[0].id}`]);
   });
   it('zwei aktive Mieter in einer Einheit ist „hoch“ und steht oben', () => {
     const { p, u, db } = simple({ name: 'Eins', moveIn: '2020-01-01' });
@@ -46,7 +50,8 @@ describe('Aufgaben aus der Datenprüfung', () => {
     expect(z).toMatchObject({ screen: 'Ablesung', params: { propertyId: p.id } });
   });
   it('Ausgaben ohne Beleg erst nach einer Woche', () => {
-    const { p, db } = simple({ moveIn: '2020-01-01' });
+    const { p, db: db0 } = simple({ moveIn: '2020-01-01' });
+    const db = complete(db0);
     const e = (id: string, date: string) => ({ id, propertyId: p.id, date, amount: 5, category: 'sonstiges' as const, vendor: '', description: '' });
     expect(computeTasks({ ...db, expenses: [e('a', '2026-11-01')] }, { now: NOW })).toEqual([]);
     expect(computeTasks({ ...db, expenses: [e('a', '2026-10-01'), e('b', '2026-10-02')] }, { now: NOW })[0].title).toBe('2 Ausgaben ohne Beleg');

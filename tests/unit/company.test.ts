@@ -80,7 +80,8 @@ describe('Vollständigkeit und Platzhalter', () => {
 
 describe('Einmal pflegen, überall verwenden: Brief übernimmt die Stammdaten', () => {
   it('Mahnung enthält Absender, Fußzeile, Bankblock und Unterschrift aus den Stammdaten', () => {
-    const { db, p, u, t } = simple({ salutation: 'Frau' });
+    const { db, p: p0, u, t } = simple({ salutation: 'Frau' });
+    const p = { ...p0, bank: { iban: firm.iban } }; // Mieten laufen auf das Hauskonto
     const r = { id: 'r', tenantId: t.id, date: '2026-11-03', level: 1 as const, amount: 800, fee: 0, deadline: '2026-11-10', items: [{ month: '2026-10', due: 800, paid: 0, open: 800 }] };
     const m = reminderModel(db ?? emptyDB, r, t, u, p, { ...firm, signerName: 'Max Mustermann', signerRole: 'Geschäftsführer' });
     expect(m.senderLines).toContain('www.muster.de');

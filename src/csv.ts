@@ -137,10 +137,11 @@ export interface RowScore { row: BankRow; tenantId: string | null; score: number
 const REF_RE = /(?:^|[^A-Za-z0-9])H\s*0*(\d{1,3})\s*[-–_./ ]?\s*([WG])\s*0*(\d{1,3})(?!\d)/gi;
 
 /** Bewertet alle Zeilen. Vorab berechnete Mieterdaten und eine Nachschlagetabelle für Wohnungs-IDs halten das schnell (auch bei tausenden Zeilen). */
-export function scoreRows(db: DB, rows: BankRow[]): RowScore[] {
+/** Mit `propertyId`: nur Mieter dieses Hauses kommen infrage (der Kontoauszug gehört zum Konto genau eines Hauses). */
+export function scoreRows(db: DB, rows: BankRow[], propertyId?: string): RowScore[] {
   const unitById = new Map(db.units.map((u) => [u.id, u]));
   const propById = new Map(db.properties.map((p) => [p.id, p]));
-  const infos = db.tenants.map((t) => {
+  const infos = db.tenants.filter((t) => !propertyId || unitById.get(t.unitId)?.propertyId === propertyId).map((t) => {
     const unit = unitById.get(t.unitId);
     const tokens = norm(t.name).split(' ').filter((w) => w.length >= 2);
     return { t, unit, tokens, last: tokens[tokens.length - 1], un: unit ? norm(unit.name) : '', iban: (t.iban ?? '').replace(/\s/g, '').toUpperCase(), due: unit ? unitDue(unit) : NaN };

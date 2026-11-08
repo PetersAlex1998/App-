@@ -70,9 +70,9 @@ export function CompanyScreen() {
         <Field label="Handelsregister" value={s.register} onChangeText={t('register')} placeholder="z. B. Amtsgericht Paderborn, HRB 1234" />
       </Section>
 
-      <Section title="Bankverbindung" footer="Für Zahlungsaufforderungen, Mahnungen und Abrechnungen.">
+      <Section title="Firmenkonto (Verwaltung, Hausmeister)" footer="Dieses Konto der Firma dient der Verwaltung und steht auf Rechnungen der Firma an die Häuser. Die Mieten laufen auf die Konten der Häuser (beim Haus unter „Bankkonto des Hauses“), nicht auf dieses Konto.">
         <Field label="Kontoinhaber" value={s.accountHolder} onChangeText={t('accountHolder')} placeholder="leer = Firmenname" />
-        <Field label="IBAN des Mieteingangskontos" value={s.iban} onChangeText={t('iban')} error={ibanBad ? 'Diese IBAN ist nicht gültig. Bitte Ziffern prüfen.' : undefined} hint={validIban(s.iban) ? `Gültig: ${formatIban(s.iban)}` : undefined} />
+        <Field label="IBAN des Firmenkontos" value={s.iban} onChangeText={t('iban')} error={ibanBad ? 'Diese IBAN ist nicht gültig. Bitte Ziffern prüfen.' : undefined} hint={validIban(s.iban) ? `Gültig: ${formatIban(s.iban)}` : undefined} />
         <Field label="BIC" value={s.bic} onChangeText={t('bic')} placeholder="optional" />
         <Field label="Bank" value={s.bank} onChangeText={t('bank')} placeholder="optional" />
       </Section>
@@ -112,7 +112,7 @@ export function CompanyScreen() {
         {s.signature ? <ListRow icon="trash-outline" iconTone="danger" title="Unterschrift löschen" onPress={() => update({ signature: '' })} /> : null}
       </Section>
 
-      <Section title="Fußzeile" footer="Zuerst Steuer und Register, dann dein Text, zuletzt die Bankverbindung.">
+      <Section title="Fußzeile" footer="Zuerst Steuer und Register, dann dein Text. In Schreiben an Mieter folgen der Hinweis auf die Vollmacht der Eigentümer und das Mietkonto des Hauses.">
         <ListRow icon={s.footerAuto ? 'checkbox' : 'square-outline'} title="Aus den Stammdaten bilden" subtitle="Steuernummer, USt-IdNr., Finanzamt, Register, Inhaber" onPress={() => update({ footerAuto: !s.footerAuto })} chevron={false} />
         <Field label="Zusätzlicher Text" value={s.footer} onChangeText={(v) => update({ footer: v })} multiline placeholder="z. B. Hinweis oder Öffnungszeiten" />
       </Section>

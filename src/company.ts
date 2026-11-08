@@ -50,7 +50,7 @@ export function bankRows(s: Settings): [string, string][] {
 }
 
 /** Fußzeile: Steuer und Register aus den Stammdaten (falls automatisch), dein Zusatztext und die Bankverbindung. */
-export function footerLines(s: Settings): string[] {
+export function footerLines(s: Settings, opts: { bank?: boolean } = {}): string[] {
   const out: string[] = [];
   if (s.footerAuto) {
     const tax = clean([filled(s.taxNo) ? `Steuernummer ${s.taxNo.trim()}` : '', filled(s.vatId) ? `USt-IdNr. ${s.vatId.trim()}` : '', filled(s.taxOffice) ? `Finanzamt ${s.taxOffice.trim()}` : '']);
@@ -59,7 +59,7 @@ export function footerLines(s: Settings): string[] {
     if (reg.length) out.push(reg.join(' · '));
   }
   out.push(...(s.footer ?? '').split('\n').map((x) => x.trim()).filter(Boolean));
-  if (filled(s.iban)) out.push(`IBAN ${formatIban(s.iban)}${filled(s.bic) ? ' · BIC ' + s.bic.trim() : ''}${filled(s.bank) ? ' · ' + s.bank.trim() : ''}`);
+  if (opts.bank !== false && filled(s.iban)) out.push(`IBAN ${formatIban(s.iban)}${filled(s.bic) ? ' · BIC ' + s.bic.trim() : ''}${filled(s.bank) ? ' · ' + s.bank.trim() : ''}`);
   return out;
 }
 
@@ -80,7 +80,7 @@ export function checks(s: Settings): Check[] {
     { key: 'street', label: 'Straße und Hausnummer', ok: filled(s.street), needed: 'brief' },
     { key: 'city', label: 'PLZ und Ort', ok: filled(s.zip) && filled(s.city), needed: 'brief' },
     { key: 'contact', label: 'Telefon oder E-Mail', ok: filled(s.phone) || filled(s.email), needed: 'brief' },
-    { key: 'iban', label: 'Gültige IBAN', ok: validIban(s.iban), needed: 'zahlung' },
+    { key: 'iban', label: 'Gültige IBAN des Firmenkontos', ok: validIban(s.iban), needed: 'zahlung' },
     { key: 'tax', label: 'Steuernummer oder USt-IdNr.', ok: filled(s.taxNo) || filled(s.vatId), needed: 'steuer' },
     { key: 'signer', label: 'Unterzeichner', ok: filled(s.signerName) || filled(s.owner) || filled(s.name), needed: 'brief' },
   ];

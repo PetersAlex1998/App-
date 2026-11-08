@@ -1,4 +1,5 @@
 import { bankRows, footerLines, returnLine, senderLines, signatureLines } from './company';
+import { houseBankRows, tenantFooter } from './owners';
 import { DB, Property, Reminder, Tenant, Unit } from './types';
 import { NkResult, dateDE, eur, monthLabel, openItems } from './calc';
 import type { Settings } from './settings';
@@ -84,15 +85,17 @@ export function frame(s: Settings, t: Tenant, prop: Property, unit: Unit, date: 
     logo: s.logo || undefined,
     returnLine: returnLine(s),
     address: a.lines, unitNote: a.unitNote, date, info, blocks,
-    footer: footerLines(s),
+    footer: tenantFooter(s, prop),
     ...(s.signature && s.autoSign ? { signatures: { vermieter: s.signature } } : {}),
   };
 }
 
 function bankBlocks(s: Settings, unit: Unit, t: Tenant, purpose = 'Miete', prop?: Property): Block[] {
-  if (!s.iban) return [{ t: 'p', small: true, text: 'Bitte überweisen Sie auf das Ihnen bekannte Mietkonto.' }];
+  // Die Miete läuft auf das Konto des Hauses. Ohne hinterlegtes Hauskonto steht hier bewusst nie das Firmenkonto.
+  const hb = houseBankRows(prop);
+  if (hb.length === 0) return [{ t: 'p', small: true, text: 'Bitte überweisen Sie auf das Ihnen bekannte Mietkonto.' }];
   const ref = unitRef(prop, unit);
-  const rows: [string, string][] = bankRows(s);
+  const rows: [string, string][] = hb;
   rows.push(['Verwendungszweck', ref ? `${purpose} ${ref}` : `${purpose} ${unit.name} – ${t.name}`]);
   const blocks: Block[] = [{ t: 'kv', rows }];
   if (ref) blocks.push({ t: 'p', small: true, text: `Bitte geben Sie bei jeder Zahlung die Kennung ${ref} als Verwendungszweck an, damit wir Ihre Zahlung zuordnen können.` });
@@ -193,12 +196,14 @@ export function testLetterModel(s: Settings, date = new Date().toISOString().sli
       ...(s.iban ? [bankKv] : []),
       { t: 'sign', lines: signatureLines(s) },
     ]),
+    footer: footerLines(s),
     guides: true,
   };
 }
 
 export function sampleModel(s: Settings): LetterModel {
-  const prop: Property = { id: 'p', name: 'Haus Lindenstraße', street: 'Lindenstr. 12', zip: '50667', city: 'Köln', yearBuilt: '', notes: '', houseNo: 1 };
+  // Beispielbrief: als Hauskonto dient das Konto aus den Unternehmensdaten, damit die Vorschau Bankblock und Fußzeile zeigt
+  const prop: Property = { id: 'p', name: 'Haus Lindenstraße', street: 'Lindenstr. 12', zip: '50667', city: 'Köln', yearBuilt: '', notes: '', houseNo: 1, ...(s.iban ? { bank: { holder: s.accountHolder || undefined, iban: s.iban, bic: s.bic, bank: s.bank } } : {}) };
   const unit: Unit = { id: 'u', propertyId: 'p', name: 'Wohnung 2', no: 2, area: 70, rooms: 3, coldRent: 700, advance: 160 };
   const t: Tenant = { id: 't', unitId: 'u', name: 'Erika Mustermann', salutation: 'Frau', email: '', phone: '', moveIn: '2024-01-01', moveOut: '', deposit: 0 };
   const items = [{ month: '2026-09', due: 860, paid: 0, open: 860 }, { month: '2026-10', due: 860, paid: 0, open: 860 }];

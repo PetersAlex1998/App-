@@ -4,7 +4,9 @@ import React, { useState } from 'react';
 
 import { useStore, uid } from '../store';
 import { useDelete } from '../undo';
-import { Button, ChipField, DateField, Disclosure, Field, Gap, Note, OptionRow, Row, Screen, Section, Segmented, confirm, infoRows } from '../ui';
+import { Button, ChipField, DateField, Disclosure, Field, Gap, ListRow, Note, OptionRow, Row, Screen, Section, Segmented, confirm, infoRows } from '../ui';
+import { ownersOf, shareProblem, shareSum } from '../owners';
+import { validIban } from '../company';
 import { sourceLong, sourceOf, stamp } from '../payments';
 import { defaultUnitName, houseId, nextHouseNo, nextUnitNo, unitLetter, unitPrefix, unitRef } from '../ids';
 import { Cost, Kind, Payment, Property, Tenant, Unit } from '../types';
@@ -46,6 +48,11 @@ export function PropertyForm({ route, navigation }: any) {
   const [houseNo, setHouseNo] = useState(String(old?.houseNo ?? nextHouseNo(db)));
   const [err, setErr] = useState<Errors>({});
   const set = (k: keyof Property) => (v: string) => setF({ ...f, [k]: v });
+  const [shareTxt, setShareTxt] = useState<Record<number, string>>({}); // Eingabetext der Anteile (damit das Komma beim Tippen bleibt)
+  const setOwner = (i: number, patch: Partial<NonNullable<Property['owners']>[number]>) => setF({ ...f, owners: (f.owners ?? []).map((o, j) => (j === i ? { ...o, ...patch } : o)) });
+  const setBank = (patch: Partial<NonNullable<Property['bank']>>) => setF({ ...f, bank: { iban: '', ...(f.bank ?? {}), ...patch } });
+  // Eigentümer anderer Häuser zum Übernehmen (ohne die schon eingetragenen)
+  const otherOwners = [...new Map(db.properties.filter((p) => p.id !== f.id).flatMap((p) => ownersOf(p)).filter((o) => !(f.owners ?? []).some((x) => x.name.trim() === o.name.trim())).map((o) => [o.name.trim(), { name: o.name, address: o.address, email: o.email, phone: o.phone }] as const)).values()].slice(0, 4) as { name: string; address?: string; email?: string; phone?: string; share?: number }[];
   const setIssued = (v: string) => setF({ ...f, eaIssued: v, eaValidUntil: !f.eaValidUntil || f.eaValidUntil === addYears(f.eaIssued ?? '', 10) ? addYears(v, 10) : f.eaValidUntil });
   const submit = () => {
     const e: Errors = {};
@@ -53,9 +60,13 @@ export function PropertyForm({ route, navigation }: any) {
     const hn = Math.round(num(houseNo));
     if (!(hn >= 1 && hn <= 999)) e.houseNo = 'Bitte eine Nummer von 1 bis 999 eingeben.';
     else if (db.properties.some((p) => p.id !== f.id && p.houseNo === hn)) e.houseNo = `Die Haus-ID ${houseId({ houseNo: hn })} gibt es schon bei „${db.properties.find((p) => p.id !== f.id && p.houseNo === hn)?.name}“.`;
+    const sp = shareProblem(f);
+    if (sp) e.owners = sp;
+    if (f.bank?.iban?.trim() && !validIban(f.bank.iban)) e.iban = 'Die IBAN ist nicht gültig. Bitte prüfen.';
     setErr(e);
     if (Object.keys(e).length) return false;
-    save('properties', { ...f, houseNo: hn });
+    const owners = ownersOf(f).map((o) => ({ ...o, name: o.name.trim(), share: ownersOf(f).length === 1 && !(o.share > 0) ? 100 : o.share }));
+    save('properties', { ...f, houseNo: hn, owners: owners.length ? owners : undefined, bank: f.bank?.iban?.trim() ? { ...f.bank, iban: f.bank.iban.replace(/\s+/g, '').toUpperCase() } : undefined });
     return true;
   };
   return (
@@ -71,6 +82,26 @@ export function PropertyForm({ route, navigation }: any) {
         <Field label="Straße und Hausnummer" value={f.street} onChangeText={set('street')} />
         <Field label="PLZ" value={f.zip} onChangeText={set('zip')} keyboard="numeric" />
         <Field label="Ort" value={f.city} onChangeText={set('city')} />
+      </Section>
+      <Section title="Eigentümer" footer="Die Häuser gehören den Eigentümern, die Firma handelt in deren Namen. Das steht dann in jedem Vertrag und in der Fußzeile der Schreiben. Bei mehreren Eigentümern gibst du die Anteile an.">
+        {(f.owners ?? []).map((o, i) => (
+          <View key={i} style={{ paddingBottom: 6 }}>
+            <Field label={`Eigentümer ${i + 1}`} value={o.name} onChangeText={(v) => setOwner(i, { name: v })} placeholder="Vor- und Nachname" />
+            <Field label="Anteil" value={shareTxt[i] ?? (o.share ? String(o.share).replace('.', ',') : '')} onChangeText={(v) => { setShareTxt({ ...shareTxt, [i]: v }); setOwner(i, { share: num(v) }); }} keyboard="numeric" suffix="%" placeholder={(f.owners ?? []).length === 1 ? '100' : ''} />
+            <Field label="Anschrift" value={o.address ?? ''} onChangeText={(v) => setOwner(i, { address: v })} placeholder="Straße, PLZ Ort (für Verträge)" />
+            <ListRow icon="trash-outline" iconTone="danger" title="Eigentümer entfernen" onPress={() => { setShareTxt({}); setF({ ...f, owners: (f.owners ?? []).filter((_, j) => j !== i) }); }} />
+          </View>
+        ))}
+        {err.owners && shareProblem(f) ? <Note>{shareProblem(f)}</Note> : (f.owners ?? []).length > 1 ? <Note>Anteile zusammen: {String(shareSum(f)).replace('.', ',')} %{shareSum(f) === 100 ? ' ✓' : ''}</Note> : null}
+        {otherOwners.map((o) => <ListRow key={o.name} icon="person-add-outline" title={`${o.name} übernehmen`} subtitle="Eigentümer aus einem anderen Haus" onPress={() => setF({ ...f, owners: [...(f.owners ?? []), { ...o, share: (f.owners ?? []).length === 0 ? 100 : 0 }] })} />)}
+        <ListRow icon="add-circle-outline" title="Eigentümer hinzufügen" onPress={() => setF({ ...f, owners: [...(f.owners ?? []), { name: '', share: (f.owners ?? []).length === 0 ? 100 : 0 }] })} />
+        {(f.owners ?? []).length > 0 && <DateField label="Verwaltungsvertrag/Vollmacht vom" value={f.mandate ?? ''} onChange={set('mandate')} optional />}
+      </Section>
+      <Section title="Bankkonto des Hauses" footer="Die Mieten dieses Hauses laufen auf dieses Konto. Es erscheint in Mahnungen, Abrechnungen und Mietverträgen. Das Firmenkonto aus den Unternehmensdaten steht dort nie.">
+        <Field label="Kontoinhaber" value={f.bank?.holder ?? ''} onChangeText={(v) => setBank({ holder: v })} placeholder="leer = Eigentümer" />
+        <Field label="IBAN" value={f.bank?.iban ?? ''} onChangeText={(v) => setBank({ iban: v })} error={err.iban} />
+        <Field label="BIC" value={f.bank?.bic ?? ''} onChangeText={(v) => setBank({ bic: v })} placeholder="optional" />
+        <Field label="Bank" value={f.bank?.bank ?? ''} onChangeText={(v) => setBank({ bank: v })} placeholder="optional" />
       </Section>
       <Disclosure title="Gebäude und Technik" filled={filled(f.plotArea, f.floors, f.heatingType, f.heatingYear, f.energySource)} hint="Grundstück, Etagen, Heizung">
         <Field label="Grundstücksfläche" value={f.plotArea ?? ''} onChangeText={set('plotArea')} keyboard="numeric" suffix="m²" />

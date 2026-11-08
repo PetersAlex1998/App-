@@ -1,3 +1,4 @@
+import { houseBank } from '../owners';
 import React, { useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,7 +22,9 @@ export function Mahnlauf({ navigation }: any) {
   const [off, setOff] = useState<Record<string, boolean>>({}); // abgewählte Mieter
   const selected = due.filter((p) => !off[p.tenant.id]);
   const sum = selected.reduce((a, p) => a + p.open + p.fee, 0);
-  const missingSender = !cfg.name.trim() || !cfg.iban.trim();
+  const propOf = (p: (typeof plans)[number]) => db.properties.find((x) => x.id === p.unit.propertyId);
+  const noBank = [...new Map(selected.map(propOf).filter((x): x is NonNullable<ReturnType<typeof propOf>> => !!x && !houseBank(x)).map((x) => [x.id, x])).values()];
+  const missingSender = !cfg.name.trim() || noBank.length > 0;
 
   const run = () => {
     if (selected.length === 0) return;
@@ -80,9 +83,9 @@ export function Mahnlauf({ navigation }: any) {
       </Text>
       {missingSender && (
         <Section>
-          <Pressable accessibilityRole="button" onPress={() => navigation.navigate('Briefe')} style={{ padding: 14, flexDirection: 'row', gap: 10, alignItems: 'center' }}>
+          <Pressable accessibilityRole="button" onPress={() => (cfg.name.trim() ? navigation.navigate('PropertyForm', { id: noBank[0].id }) : navigation.navigate('Briefe'))} style={{ padding: 14, flexDirection: 'row', gap: 10, alignItems: 'center' }}>
             <Ionicons name="alert-circle" size={22} color={c.warn} />
-            <Text style={{ flex: 1, color: c.text, fontSize: type.subhead }}>Absender oder IBAN fehlen. Die Briefe haben sonst keine Bankverbindung. Jetzt ergänzen</Text>
+            <Text style={{ flex: 1, color: c.text, fontSize: type.subhead }}>{cfg.name.trim() ? `Für ${noBank.map((x) => x.name).join(', ')} ist kein Bankkonto hinterlegt. Die Briefe haben sonst keine Bankverbindung. Jetzt ergänzen` : 'Der Absender fehlt. Jetzt ergänzen'}</Text>
             <Ionicons name="chevron-forward" size={18} color={c.muted} />
           </Pressable>
         </Section>

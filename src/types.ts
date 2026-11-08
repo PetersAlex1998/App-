@@ -21,6 +21,10 @@ export interface Property {
   insurer?: string; policyNo?: string; premium?: string;
   // Begründung für Mieterhöhungen (§ 558a BGB): gibt es für den Ort einen Mietspiegel?
   rentBasis?: { kind: 'eigene' | 'andere' | 'keiner'; name?: string; gemeinde?: string; stand?: string; validUntil?: string; qualified?: boolean };
+  // Eigentümer (Privatbesitz, auch mehrere mit Anteilen) und Konto des Hauses: Mieten laufen auf das Hauskonto, nicht auf das Firmenkonto
+  owners?: { name: string; share: number; address?: string; email?: string; phone?: string }[];
+  bank?: { holder?: string; iban: string; bic?: string; bank?: string };
+  mandate?: string; // YYYY-MM-DD: Verwaltungsvertrag bzw. Vollmacht der Eigentümer vom …
   setupSkip?: string[]; // Einrichtungsschritte, die für dieses Haus nicht nötig sind (z. B. „darlehen“)
   // Ansprechpartner (Hausmeister, Verwalter)
   contactName?: string; contactPhone?: string;

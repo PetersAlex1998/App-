@@ -10,13 +10,14 @@ const DATE = '2026-11-15';
 
 function ctx(over: Partial<ReturnType<typeof simple>['t']> = {}, unitOver = {}) {
   const x = simple({ name: 'Anna Schmidt', salutation: 'Frau', moveIn: '2025-01-01', deposit: 1500, ...over }, { name: 'Wohnung 1', no: 1, area: 60, rooms: 2, coldRent: 640, advance: 160, ...unitOver });
-  return { s, db: x.db, tenant: x.t, unit: x.u, prop: x.p, date: DATE };
+  const prop = { ...x.p, owners: [{ name: 'Max Muster', share: 60, address: 'Hauptstr. 1, 33098 Paderborn' }, { name: 'Erika Muster', share: 40 }], bank: { holder: 'Eigentümergemeinschaft Muster', iban: 'DE02120300000000202051', bic: 'BYLADEM1001' } };
+  return { s, db: x.db, tenant: x.t, unit: x.u, prop, date: DATE };
 }
 
 describe('Dokumentvorlagen: Platzhalter', () => {
   it('Mieter, Wohnung, Miete, Firma und Datum', () => {
     const p = contextPlaceholders({ ...ctx(), f: {} });
-    expect(p).toMatchObject({ Mieter: 'Anna Schmidt', Anrede: 'Sehr geehrte Frau Schmidt', Wohnung: 'Wohnung 1', 'Wohnungs-ID': 'H01-W01', Fläche: '60', Firma: 'Mustermann Immobilien GmbH', IBAN: 'DE89 3704 0044 0532 0130 00', Heute: '15.11.2026' });
+    expect(p).toMatchObject({ Mieter: 'Anna Schmidt', Anrede: 'Sehr geehrte Frau Schmidt', Wohnung: 'Wohnung 1', 'Wohnungs-ID': 'H01-W01', Fläche: '60', Firma: 'Mustermann Immobilien GmbH', IBAN: 'DE02 1203 0000 0000 2020 51', Heute: '15.11.2026' });
     expect(p.Kaltmiete).toMatch(/640,00/);
     expect(p.Gesamtmiete).toMatch(/800,00/);
     expect(p.Kaution).toMatch(/1\.500,00/);

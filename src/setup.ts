@@ -1,5 +1,6 @@
 import { DB, Property } from './types';
 import { energyMissing } from './expose';
+import { houseBank, houseBankValid, ownersLine, ownersOf, shareProblem } from './owners';
 import { kindOf, today } from './calc';
 
 /**
@@ -24,6 +25,8 @@ export function houseSetup(db: DB, p: Property, now = today()): Setup {
   const edit = { screen: 'PropertyForm', params: { id: p.id } };
   const raw: Omit<SetupItem, 'skipped'>[] = [
     { id: 'adresse', title: 'Adresse', core: true, done: !!(p.street.trim() && p.zip.trim() && p.city.trim()), detail: p.street.trim() && p.zip.trim() && p.city.trim() ? `${p.street}, ${p.zip} ${p.city}` : `Es fehlt: ${[!p.street.trim() && 'Straße', !p.zip.trim() && 'PLZ', !p.city.trim() && 'Ort'].filter(Boolean).join(', ')}. Steht in Briefen und im Exposé.`, ...edit },
+    { id: 'eigentuemer', title: 'Eigentümer', core: true, done: ownersOf(p).length > 0 && !shareProblem(p), detail: ownersOf(p).length === 0 ? 'Wem gehört das Haus? Die Firma handelt in deren Namen, das steht in Verträgen und Schreiben. Bei mehreren Eigentümern mit Anteilen.' : shareProblem(p) ?? ownersLine(p), ...edit },
+    { id: 'hauskonto', title: 'Bankkonto des Hauses', core: true, done: houseBankValid(p), detail: !houseBank(p) ? 'Auf welches Konto zahlen die Mieter? Steht in Mahnungen, Abrechnungen und Mietverträgen.' : houseBankValid(p) ? 'IBAN hinterlegt.' : 'Die IBAN ist nicht gültig.', ...edit },
     { id: 'einheiten', title: 'Wohnungen und Gewerbe', core: true, done: units.length > 0, detail: units.length ? `${units.length} Einheit${units.length === 1 ? '' : 'en'} angelegt` : 'Noch keine Einheit angelegt.', screen: units.length ? 'PropertyDetail' : 'UnitForm', params: units.length ? { id: p.id } : { propertyId: p.id } },
     { id: 'flaechen', title: 'Flächen', core: true, done: units.length > 0 && noArea.length === 0, detail: units.length === 0 ? 'Zuerst Einheiten anlegen.' : noArea.length ? `${noArea.length} Einheit${noArea.length === 1 ? '' : 'en'} ohne Fläche (${noArea.slice(0, 3).map((u) => u.name).join(', ')}${noArea.length > 3 ? ' …' : ''}). Nötig für die Nebenkostenabrechnung.` : 'Alle Flächen eingetragen.', screen: noArea.length ? 'UnitDetail' : 'PropertyDetail', params: { id: noArea[0]?.id ?? p.id } },
     { id: 'kauf', title: 'Kaufpreis und Marktwert', skippable: true, done: !!(p.purchasePrice?.trim() && p.marketValue?.trim()), detail: p.purchasePrice?.trim() && p.marketValue?.trim() ? 'Für Rendite und Beleihung eingetragen.' : `Für Rendite und Beleihung im Portfolio. Es fehlt: ${[!p.purchasePrice?.trim() && 'Kaufpreis', !p.marketValue?.trim() && 'Marktwert'].filter(Boolean).join(', ')}.`, ...edit },
