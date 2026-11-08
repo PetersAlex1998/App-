@@ -30,6 +30,8 @@ export const MODULES: AppModule[] = [
   { id: 'briefe', group: 'Abläufe', icon: 'mail-open-outline', title: 'Briefausgang', subtitle: 'Erstellte Briefe teilen und versenden', screen: 'Outbox' },
 
   { id: 'ausgaben', group: 'Finanzen', icon: 'receipt-outline', title: 'Ausgaben und Belege', subtitle: 'Rechnungen erfassen, Beleg fotografieren', screen: 'Ausgaben' },
+  { id: 'firmenabrechnung', group: 'Finanzen', icon: 'business-outline', title: 'Abrechnung an die Häuser', subtitle: 'Monatsrechnung der Firma: Verwaltung und Hausmeister', screen: 'Firmenabrechnung' },
+  { id: 'firmenkosten', group: 'Finanzen', icon: 'construct-outline', title: 'Firmenkosten', subtitle: 'Hausmeister und mehr, von der Firma bezahlt', screen: 'Firmenkosten' },
   { id: 'portfolio', group: 'Finanzen', icon: 'stats-chart-outline', title: 'Portfolio', subtitle: 'Cashflow, Leerstand, Rendite und Schulden je Haus', screen: 'Portfolio' },
   { id: 'darlehen', group: 'Finanzen', icon: 'cash-outline', title: 'Darlehen', subtitle: 'Restschuld, Zinsen, Zinsbindung pro Haus', screen: 'Darlehen' },
   { id: 'kautionen', group: 'Finanzen', icon: 'wallet-outline', title: 'Kautionen', subtitle: 'Gehalten, fehlend, Rückzahlung offen', screen: 'Kautionen' },

@@ -11,6 +11,9 @@ export interface Settings {
   closing: string; signerName: string; signerRole: string; // Grußformel, Unterzeichner, Funktion
   footerAuto: boolean; // Fußzeile automatisch aus den Stammdaten bilden
   logo: string; // Data-URL (PNG/JPEG), '' = kein Logo
+  mgmtFee: number; // Verwaltungsgebühr pro Einheit und Monat, netto (Standard)
+  vatRate: number; // Umsatzsteuer der Firma in %
+  invoiceDays: number; // Zahlungsziel der Rechnungen an die Häuser in Tagen
   signature: string; // eigene Unterschrift als PNG (Data-URL), '' = keine
   autoSignFormal: boolean; // auch bei Mietvertrag und Kündigung automatisch einsetzen
   autoSign: boolean; // gespeicherte Unterschrift automatisch in Schreiben einsetzen (nicht bei Kündigungen)
@@ -22,5 +25,5 @@ export interface Settings {
 }
 export const defaultSettings: Settings = {
   name: '', street: '', zip: '', city: '', phone: '', email: '', bank: '', iban: '', bic: '',
-  fee2: 5, fee3: 10, deadlineDays: 7, rentDueDay: 3, graceDays: 5, legalForm: '', owner: '', web: '', taxNo: '', vatId: '', taxOffice: '', register: '', accountHolder: '', closing: 'Mit freundlichen Grüßen', signerName: '', signerRole: '', footerAuto: true, logo: '', signature: '', autoSign: true, autoSignFormal: false, footer: '', lastBackupAt: '', backupRemindDays: 30, dismissedTasks: [], calcDefaults: {},
+  fee2: 5, fee3: 10, deadlineDays: 7, rentDueDay: 3, graceDays: 5, legalForm: '', owner: '', web: '', taxNo: '', vatId: '', taxOffice: '', register: '', accountHolder: '', closing: 'Mit freundlichen Grüßen', signerName: '', signerRole: '', footerAuto: true, logo: '', mgmtFee: 25, vatRate: 19, invoiceDays: 14, signature: '', autoSign: true, autoSignFormal: false, footer: '', lastBackupAt: '', backupRemindDays: 30, dismissedTasks: [], calcDefaults: {},
 };

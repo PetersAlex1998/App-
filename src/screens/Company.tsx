@@ -1,6 +1,7 @@
 import React, { useRef } from 'react';
 import { Image, Platform, Pressable, Text, View } from 'react-native';
 import { useSettings } from '../settings';
+import { num } from '../calc';
 import { Badge, Button, ChipField, Disclosure, Field, Gap, ListRow, Note, Screen, Section, notify, useColors } from '../ui';
 import { pickLogo } from '../image';
 import { PadHandle, SignaturePad } from '../SignaturePad';
@@ -75,6 +76,12 @@ export function CompanyScreen() {
         <Field label="IBAN des Firmenkontos" value={s.iban} onChangeText={t('iban')} error={ibanBad ? 'Diese IBAN ist nicht gültig. Bitte Ziffern prüfen.' : undefined} hint={validIban(s.iban) ? `Gültig: ${formatIban(s.iban)}` : undefined} />
         <Field label="BIC" value={s.bic} onChangeText={t('bic')} placeholder="optional" />
         <Field label="Bank" value={s.bank} onChangeText={t('bank')} placeholder="optional" />
+      </Section>
+
+      <Section title="Verwaltungsvergütung" footer="Die Firma stellt den Häusern monatlich die Verwaltungsgebühr je Einheit in Rechnung (netto plus Umsatzsteuer). Pro Haus und pro Monat lässt sich der Betrag in der Abrechnung ändern.">
+        <Field label="Gebühr je Einheit und Monat (netto)" value={String(s.mgmtFee).replace('.', ',')} onChangeText={(v) => update({ mgmtFee: num(v) })} keyboard="numeric" suffix="€" />
+        <Field label="Umsatzsteuer" value={String(s.vatRate).replace('.', ',')} onChangeText={(v) => update({ vatRate: num(v) })} keyboard="numeric" suffix="%" />
+        <Field label="Zahlungsziel" value={String(s.invoiceDays)} onChangeText={(v) => update({ invoiceDays: Math.max(0, Math.round(num(v))) })} keyboard="numeric" suffix="Tage" />
       </Section>
 
       <Section title="Briefkopf" footer={Platform.OS === 'web' ? 'Das Logo wird verkleinert und in der Sicherung mitgespeichert.' : 'Das Logo wählst du in der Web-App aus.'}>

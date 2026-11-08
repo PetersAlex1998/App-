@@ -42,3 +42,10 @@ export async function signStored(doc: Doc, s: Pick<Settings, 'logo'>, signatures
   await putBlob(doc.id, pdfBlob(bytes));
   return { ...doc, size: bytes.length, signed: new Date().toISOString() };
 }
+
+/** Rechnung der Firma an ein Haus als PDF ablegen (beim Haus, im Briefausgang). `id` ist die Dokument-ID, damit Rechnung und Buchungen darauf verweisen. */
+export async function storeInvoicePdf(id: string, model: LetterModel, propertyId: string, note: string): Promise<Doc> {
+  const bytes = await modelToPdf(model);
+  await putBlob(id, pdfBlob(bytes));
+  return { id, ownerKind: 'property', ownerId: propertyId, category: 'brief', name: model.title, mime: 'application/pdf', size: bytes.length, added: today(), status: 'bereit', note };
+}

@@ -24,6 +24,7 @@ export interface Property {
   // Eigentümer (Privatbesitz, auch mehrere mit Anteilen) und Konto des Hauses: Mieten laufen auf das Hauskonto, nicht auf das Firmenkonto
   owners?: { name: string; share: number; address?: string; email?: string; phone?: string }[];
   bank?: { holder?: string; iban: string; bic?: string; bank?: string };
+  mgmtFee?: number; // Verwaltungsgebühr pro Einheit und Monat (netto) für dieses Haus; fehlt = Standard aus den Unternehmensdaten
   mandate?: string; // YYYY-MM-DD: Verwaltungsvertrag bzw. Vollmacht der Eigentümer vom …
   setupSkip?: string[]; // Einrichtungsschritte, die für dieses Haus nicht nötig sind (z. B. „darlehen“)
   // Ansprechpartner (Hausmeister, Verwalter)
@@ -170,6 +171,38 @@ export interface Expense {
   receiptId?: ID; // Dokument-ID des Belegs
   allocatable?: boolean; // umlagefähig auf Mieter (Hinweis für die Nebenkosten)
   issueId?: ID; // gehört zu einer Schadensmeldung
+  invoiceId?: ID; // gebucht aus einer Rechnung der Firma an das Haus (Verwaltung, Hausmeister)
+}
+
+/** Kosten, die die Firma für ein Haus bezahlt hat (z. B. Hausmeister) und mit der monatlichen Rechnung an die Eigentümer weiterbelastet. */
+export interface FirmCost {
+  id: ID;
+  updatedAt?: string;
+  propertyId: ID;
+  date: string; // YYYY-MM-DD
+  description: string;
+  vendor?: string;
+  net: number; // netto
+  vat: number; // USt in %
+  category: ExpenseCategory;
+  allocatable: boolean; // beim Haus als umlagefähig buchen (Hausmeister)
+  billedIn?: ID; // Rechnung, in der es weiterbelastet wurde
+}
+
+/** Position einer Rechnung der Firma an ein Haus. */
+export interface FirmInvoiceLine { text: string; qty: number; unit: number; net: number; vat: number; kind: 'verwaltung' | 'kosten' | 'sonstig'; category: ExpenseCategory; allocatable: boolean; costId?: ID }
+/** Monatliche Rechnung der Firma an die Eigentümer eines Hauses. */
+export interface FirmInvoice {
+  id: ID;
+  updatedAt?: string;
+  propertyId: ID;
+  month: string; // YYYY-MM
+  number: string;
+  date: string; // Rechnungsdatum
+  lines: FirmInvoiceLine[];
+  net: number; vatSum: number; gross: number;
+  docId?: ID; // PDF im Briefausgang
+  paid?: string; // bezahlt am
 }
 
 /** Handwerker und Dienstleister. */
@@ -258,6 +291,8 @@ export interface DB {
   loans: Loan[];
   issues: Issue[];
   contractors: Contractor[];
+  firmCosts: FirmCost[];
+  firmInvoices: FirmInvoice[];
   checks: Check[];
   calculations: Calculation[];
   meters: Meter[];
@@ -277,6 +312,8 @@ export const emptyDB: DB = {
   loans: [],
   issues: [],
   contractors: [],
+  firmCosts: [],
+  firmInvoices: [],
   checks: [],
   calculations: [],
   meters: [],

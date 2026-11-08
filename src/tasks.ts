@@ -120,6 +120,13 @@ export function computeTasks(db: DB, opts: { dismissed?: string[]; now?: string 
     else if (st.status === 'unbekannt') out.push({ id: `wartung-datum:${x.id}`, level: 'hinweis', ...base, title: `Datum eintragen: ${x.title}`, detail: `${prop} · wann war die letzte Prüfung?` });
   }
 
+  // 4k) Monatliche Rechnung der Firma an die Häuser (nur, wenn die Funktion genutzt wird): Vormonat noch nicht abgerechnet
+  if (db.firmInvoices.length > 0 || db.firmCosts.length > 0) {
+    const prev = (() => { const y = Number(now.slice(0, 4)), m = Number(now.slice(5, 7)); return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`; })();
+    const missing = db.properties.filter((p) => db.units.some((u) => u.propertyId === p.id) && !db.firmInvoices.some((i) => i.propertyId === p.id && i.month === prev));
+    if (missing.length) out.push({ id: `firmabrechnung:${prev}`, level: 'normal', icon: 'business-outline', title: `Abrechnung an die Häuser ${prev.slice(5)}/${prev.slice(0, 4)}: ${missing.length} Haus${missing.length === 1 ? '' : 'äuser'} offen`, detail: missing.slice(0, 3).map((p) => p.name).join(', ') + (missing.length > 3 ? ' …' : ''), screen: 'Firmenabrechnung' });
+  }
+
   // 4j) Pflichtangaben eines Hauses fehlen (Adresse, Einheiten, Flächen): eine Sammelaufgabe je Haus. Die übrigen Schritte zeigt die Hausseite, ohne die Liste zu füllen.
   for (const p of db.properties) {
     const st = houseSetup(db, p, now);

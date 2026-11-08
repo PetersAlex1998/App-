@@ -48,6 +48,7 @@ export function PropertyForm({ route, navigation }: any) {
   const [houseNo, setHouseNo] = useState(String(old?.houseNo ?? nextHouseNo(db)));
   const [err, setErr] = useState<Errors>({});
   const set = (k: keyof Property) => (v: string) => setF({ ...f, [k]: v });
+  const [feeTxt, setFeeTxt] = useState(old?.mgmtFee !== undefined ? String(old.mgmtFee).replace('.', ',') : '');
   const [shareTxt, setShareTxt] = useState<Record<number, string>>({}); // Eingabetext der Anteile (damit das Komma beim Tippen bleibt)
   const setOwner = (i: number, patch: Partial<NonNullable<Property['owners']>[number]>) => setF({ ...f, owners: (f.owners ?? []).map((o, j) => (j === i ? { ...o, ...patch } : o)) });
   const setBank = (patch: Partial<NonNullable<Property['bank']>>) => setF({ ...f, bank: { iban: '', ...(f.bank ?? {}), ...patch } });
@@ -102,6 +103,9 @@ export function PropertyForm({ route, navigation }: any) {
         <Field label="IBAN" value={f.bank?.iban ?? ''} onChangeText={(v) => setBank({ iban: v })} error={err.iban} />
         <Field label="BIC" value={f.bank?.bic ?? ''} onChangeText={(v) => setBank({ bic: v })} placeholder="optional" />
         <Field label="Bank" value={f.bank?.bank ?? ''} onChangeText={(v) => setBank({ bank: v })} placeholder="optional" />
+      </Section>
+      <Section title="Verwaltungsgebühr" footer="Je Einheit und Monat (netto), mit der die Firma dieses Haus abrechnet. Leer lassen = Standard aus den Unternehmensdaten.">
+        <Field label="Gebühr je Einheit (netto)" value={feeTxt} onChangeText={(v) => { setFeeTxt(v); setF({ ...f, mgmtFee: v.trim() === '' ? undefined : num(v) }); }} keyboard="numeric" suffix="€" placeholder="Standard" />
       </Section>
       <Disclosure title="Gebäude und Technik" filled={filled(f.plotArea, f.floors, f.heatingType, f.heatingYear, f.energySource)} hint="Grundstück, Etagen, Heizung">
         <Field label="Grundstücksfläche" value={f.plotArea ?? ''} onChangeText={set('plotArea')} keyboard="numeric" suffix="m²" />
