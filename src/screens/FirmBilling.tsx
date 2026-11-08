@@ -3,9 +3,9 @@ import { Text, View } from 'react-native';
 import { useStore, uid } from '../store';
 import { useDelete } from '../undo';
 import { useSettings } from '../settings';
-import { Badge, Button, ChipField, DateField, EmptyState, Field, FilterChips, Gap, ListRow, Note, Screen, Section, notify, useColors } from '../ui';
+import { Badge, Button, ChipField, DateField, EmptyState, Field, FilterChips, Gap, ListRow, Note, Screen, Section, Segmented, notify, useColors } from '../ui';
 import { dateDE, eur, monthLabel, num, today } from '../calc';
-import { HouseOverride, HousePlan, buildInvoice, expensesFromInvoice, feeOf, firmIssues, invoiceModel, planAll, totals } from '../firmBilling';
+import { HouseOverride, HousePlan, SPLIT_LABEL, SplitBasis, buildInvoice, expensesFromInvoice, feeOf, firmIssues, invoiceModel, planAll, splitCost, totals } from '../firmBilling';
 import { storeInvoicePdf } from '../outbox';
 import { filesSupported } from '../files';
 import { EXPENSE_LABEL } from '../expenses';
@@ -168,6 +168,9 @@ export function FirmCostForm({ route, navigation }: any) {
   const [vat, setVat] = useState(old ? txt(old.vat) : txt(cfg.vatRate));
   const [category, setCategory] = useState<ExpenseCategory>(old?.category ?? 'hausmeister');
   const [alloc, setAlloc] = useState(old?.allocatable ?? true);
+  const [split, setSplit] = useState(false);
+  const [houses, setHouses] = useState<string[]>(db.properties.map((p) => p.id));
+  const [basis, setBasis] = useState<SplitBasis>('einheiten');
   const [err, setErr] = useState<Record<string, string>>({});
   const billed = old?.billedIn ? db.firmInvoices.find((i) => i.id === old.billedIn) : undefined;
   if (old?.billedIn) {
@@ -176,7 +179,8 @@ export function FirmCostForm({ route, navigation }: any) {
   const brutto = num(net) * (1 + num(vat) / 100);
   const submit = () => {
     const e: Record<string, string> = {};
-    if (!propertyId) e.property = 'Bitte ein Haus wählen.';
+    if (!split && !propertyId) e.property = 'Bitte ein Haus wählen.';
+    if (split && houses.length < 2) e.property = 'Bitte mindestens zwei Häuser wählen.';
     if (!description.trim()) e.description = 'Bitte beschreiben, wofür die Kosten sind.';
     if (!(num(net) > 0)) e.net = 'Bitte den Nettobetrag eingeben.';
     else if (tooBig(num(net))) e.net = BIG_MONEY;
@@ -184,6 +188,15 @@ export function FirmCostForm({ route, navigation }: any) {
     if (num(vat) < 0 || num(vat) > 30) e.vat = 'Bitte einen Satz zwischen 0 und 30 % eingeben.';
     setErr(e);
     if (Object.keys(e).length) return;
+    if (split && !old) {
+      const groupId = uid();
+      for (const part of splitCost(db, houses, Math.round(num(net) * 100) / 100, basis)) {
+        if (part.net <= 0) continue;
+        save('firmCosts', { id: uid(), propertyId: part.propertyId, date, description: description.trim(), vendor: vendor.trim() || undefined, net: part.net, vat: num(vat), category, allocatable: alloc, splitId: groupId });
+      }
+      navigation.goBack();
+      return;
+    }
     const x: FirmCost = { id: old?.id ?? uid(), propertyId, date, description: description.trim(), vendor: vendor.trim() || undefined, net: Math.round(num(net) * 100) / 100, vat: num(vat), category, allocatable: alloc };
     save('firmCosts', x);
     navigation.goBack();
@@ -191,13 +204,28 @@ export function FirmCostForm({ route, navigation }: any) {
   return (
     <Screen>
       <Section title="Kosten">
-        {db.properties.length > 1 && <ChipField label="Haus" value={db.properties.find((p) => p.id === propertyId)?.name ?? ''} options={db.properties.map((p) => p.name)} onChange={(v) => { const p = db.properties.find((x) => x.name === v); if (p) setPropertyId(p.id); }} />}
+        {db.properties.length > 1 && !split && <ChipField label="Haus" value={db.properties.find((p) => p.id === propertyId)?.name ?? ''} options={db.properties.map((p) => p.name)} onChange={(v) => { const p = db.properties.find((x) => x.name === v); if (p) setPropertyId(p.id); }} />}
         <DateField label="Datum" value={date} onChange={setDate} error={err.date} />
         <Field label="Wofür" value={description} onChangeText={setDescription} placeholder="z. B. Hausmeister Oktober" error={err.description} />
         <Field label="Von wem" value={vendor} onChangeText={setVendor} placeholder="optional, z. B. Hausmeisterdienst Meier" />
         <Field label="Betrag netto" value={net} onChangeText={setNet} keyboard="numeric" suffix="€" error={err.net} hint={num(net) > 0 ? `Brutto ${eur(brutto)}` : undefined} />
         <Field label="Umsatzsteuer" value={vat} onChangeText={setVat} keyboard="numeric" suffix="%" error={err.vat} />
       </Section>
+      {!old && db.properties.length > 1 && (
+        <Section title="Auf mehrere Häuser aufteilen" footer={split ? 'Der Betrag wird auf die gewählten Häuser verteilt. Jedes Haus bekommt seinen Anteil als eigene Kosten und wird in seiner Rechnung weiterbelastet.' : 'Betrifft die Rechnung mehrere Häuser, etwa ein Hausmeister für alle? Dann hier aufteilen.'}>
+          <ListRow icon={split ? 'checkbox' : 'square-outline'} iconTone={split ? 'primary' : undefined} title="Rechnung auf mehrere Häuser verteilen" onPress={() => setSplit(!split)} />
+          {split && (
+            <>
+              <View style={{ padding: 12 }}><Segmented<SplitBasis> value={basis} onChange={setBasis} options={(Object.keys(SPLIT_LABEL) as SplitBasis[]).map((k) => ({ label: SPLIT_LABEL[k], value: k }))} /></View>
+              {db.properties.map((p) => {
+                const on = houses.includes(p.id);
+                const part = on && num(net) > 0 ? splitCost(db, houses, Math.round(num(net) * 100) / 100, basis).find((x) => x.propertyId === p.id) : undefined;
+                return <ListRow key={p.id} icon={on ? 'checkbox' : 'square-outline'} iconTone={on ? 'primary' : undefined} title={p.name} subtitle={`${db.units.filter((u) => u.propertyId === p.id).length} Einheiten`} right={part ? eur(part.net) : undefined} rightSub={part ? 'netto' : undefined} onPress={() => setHouses(on ? houses.filter((x) => x !== p.id) : [...houses, p.id])} />;
+              })}
+            </>
+          )}
+        </Section>
+      )}
       <Section title="Buchung beim Haus">
         <ChipField label="Kategorie" value={EXPENSE_LABEL[category]} options={CATS.map((k) => EXPENSE_LABEL[k])} onChange={(v) => { const k = CATS.find((x) => EXPENSE_LABEL[x] === v); if (k) { setCategory(k); setAlloc(k === 'hausmeister' || k === 'betriebskosten'); } }} />
         <ListRow icon={alloc ? 'checkbox' : 'square-outline'} title="Auf Mieter umlagefähig" subtitle="Fließt in die Betriebskosten der Abrechnung ein" onPress={() => setAlloc(!alloc)} />

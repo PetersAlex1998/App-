@@ -187,6 +187,7 @@ export interface FirmCost {
   category: ExpenseCategory;
   allocatable: boolean; // beim Haus als umlagefähig buchen (Hausmeister)
   billedIn?: ID; // Rechnung, in der es weiterbelastet wurde
+  splitId?: ID; // gehört zu einer Rechnung, die auf mehrere Häuser aufgeteilt wurde
 }
 
 /** Position einer Rechnung der Firma an ein Haus. */
@@ -278,6 +279,7 @@ export interface Doc {
   // Schreiben mit Unterschriftsfeldern: Aufbau (ohne Logo und Unterschriften) für das spätere Unterschreiben, Zeitpunkt der Unterschrift
   letter?: import('./letters').LetterModel;
   signed?: string;
+  issueId?: ID; // Foto zu einer Schadensmeldung
 }
 
 export interface DB {

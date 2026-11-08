@@ -27,6 +27,7 @@ export function removeItem(d: DB, kind: Kind, id: string): { db: DB; goneDocs: D
   const receiptIds = new Set<string>();
   if (kind === 'expenses') { const r = d.expenses.find((e) => e.id === id)?.receiptId; if (r) receiptIds.add(r); }
   if (kind === 'properties') d.expenses.filter((e) => e.propertyId === id && e.receiptId).forEach((e) => receiptIds.add(e.receiptId!));
+  if (kind === 'issues') d.documents.filter((x) => x.issueId === id).forEach((x) => receiptIds.add(x.id));
   if (kind === 'firmInvoices') { const dId = d.firmInvoices.find((i) => i.id === id)?.docId; if (dId) receiptIds.add(dId); }
   const goneDocs = d.documents.filter((x) => (kind === 'documents' ? x.id === id : ownerIds.has(x.ownerId) || receiptIds.has(x.id)));
 

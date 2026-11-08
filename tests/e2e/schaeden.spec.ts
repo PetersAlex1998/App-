@@ -60,3 +60,25 @@ test('Schaden ohne Titel wird abgewiesen', async ({ page }) => {
   await expect.poll(() => body(page)).toContain('Bitte kurz beschreiben');
   expect((await readDb(page)).issues ?? []).toHaveLength(0);
 });
+
+test('Fotos an der Schadensmeldung: aufnehmen, bei den Dokumenten, mit der Meldung gelöscht', async ({ page }) => {
+  page.on('dialog', (d) => d.accept());
+  const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+  const d = data();
+  d.issues = [{ id: 'i1', propertyId: 'p1', unitId: 'u1', title: 'Wasserfleck', reported: '2026-11-01', status: 'offen' }];
+  await seedDb(page, d);
+  await page.goto('/schaeden/i1');
+  await expect.poll(() => body(page)).toContain('FOTOS');
+  const [fc] = await Promise.all([page.waitForEvent('filechooser'), tap(page, btn(page, /Fotos auswählen/))]);
+  await fc.setFiles({ name: 'fleck.png', mimeType: 'image/png', buffer: PNG });
+  await expect.poll(async () => (await readDb(page)).documents.length, { timeout: 15_000 }).toBe(1);
+  const doc = (await readDb(page)).documents[0];
+  expect(doc).toMatchObject({ category: 'foto', ownerKind: 'unit', ownerId: 'u1', issueId: 'i1' });
+  await expect.poll(() => body(page)).toContain('Schaden Wasserfleck');
+
+  // Meldung löschen: Foto verschwindet mit
+  await page.goto('/schaeden/formular?id=i1');
+  await tap(page, btn(page, /^Löschen/));
+  await expect.poll(async () => (await readDb(page)).issues.length).toBe(0);
+  expect((await readDb(page)).documents).toHaveLength(0);
+});

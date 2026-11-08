@@ -7,6 +7,7 @@ import { Badge, Button, ChipField, DateField, EmptyState, Field, FilterChips, Ga
 import { dateDE, eur, today } from '../calc';
 import { STATUS_LABEL, ageDays, contractorStats, isOpen, issueCost, issueExpenses, orderMail, placeOf, sortIssues } from '../issues';
 import { type } from '../theme';
+import { filesSupported, putBlob, pickFiles, shrinkImage } from '../files';
 import { Contractor, Issue } from '../types';
 
 const Title = ({ children }: { children: string }) => {
@@ -64,6 +65,16 @@ export function IssueDetail({ route, navigation }: any) {
   const exp = issueExpenses(db, i);
   const tenant = db.tenants.find((t) => t.id === i.tenantId);
   const set = (patch: Partial<Issue>) => save('issues', { ...i, ...patch });
+  const photos = db.documents.filter((d) => d.issueId === i.id);
+  const addPhotos = async (camera: boolean) => {
+    const files = await pickFiles({ camera, multiple: !camera, accept: 'image/*' });
+    for (const f of files) {
+      const blob = await shrinkImage(f);
+      const id = uid();
+      await putBlob(id, blob);
+      save('documents', { id, ownerKind: i.unitId ? 'unit' : 'property', ownerId: i.unitId ?? i.propertyId, category: 'foto', name: `Schaden ${i.title} ${today()}`, mime: blob.type || 'image/jpeg', size: blob.size, added: today(), issueId: i.id });
+    }
+  };
   const mail = k?.email ? orderMail(db, i, k, cfg.name || cfg.owner || '') : null;
   return (
     <Screen>
@@ -83,6 +94,14 @@ export function IssueDetail({ route, navigation }: any) {
           {i.status === 'erledigt' && <Button kind="secondary" icon="refresh" title="Wieder öffnen" onPress={() => set({ status: i.ordered ? 'beauftragt' : 'offen', done: undefined })} />}
         </View>
       </Section>
+
+      {filesSupported() && (
+        <Section title="Fotos" footer="Fotos vom Schaden helfen dem Handwerker und der Versicherung. Sie erscheinen auch bei den Dokumenten, aber nie im Exposé.">
+          {photos.map((d) => <ListRow key={d.id} icon="image-outline" title={d.name} subtitle={dateDE(d.added)} onPress={() => navigation.navigate('DocumentViewer', { id: d.id })} />)}
+          <ListRow icon="camera-outline" title="Foto aufnehmen" onPress={() => addPhotos(true)} />
+          <ListRow icon="images-outline" title="Fotos auswählen" onPress={() => addPhotos(false)} />
+        </Section>
+      )}
 
       <Section title="Handwerker">
         {k ? (

@@ -96,3 +96,23 @@ test('Kontoauszug des Hauskontos: Zahlung an die Firma markiert die Rechnung als
   await expect.poll(async () => (await readDb(page)).firmInvoices.find((i: any) => i.id === 'i1').paid).toBe('2026-12-03');
   expect((await readDb(page)).firmInvoices.find((i: any) => i.id === 'i2').paid).toBeUndefined();
 });
+
+test('Hausmeister-Rechnung auf zwei Häuser nach Einheiten aufteilen', async ({ page }) => {
+  page.on('dialog', (d) => d.accept());
+  const d = data();
+  d.properties = [d.properties[0], { id: 'p2', name: 'Haus Zwei', street: 'Weg 2', zip: '33100', city: 'Paderborn', yearBuilt: '', notes: '', houseNo: 2, owners: [{ name: 'Max Muster', share: 100 }], bank: { iban: 'DE02120300000000202051' } }];
+  d.units = [...d.units, ...[1, 2, 3, 4].map((i) => ({ id: 'z' + i, propertyId: 'p2', name: 'Wohnung ' + i, no: i, area: 50, rooms: 2, coldRent: 500, advance: 100 }))];
+  await seedDb(page, d); // Haus 1: 2 Einheiten, Haus Zwei: 4 Einheiten
+  await page.goto('/firmenkosten/formular');
+  await tap(page, btn(page, /Rechnung auf mehrere Häuser verteilen/));
+  await page.getByLabel('Betrag netto').fill('300');
+  // Vorschau: 2 von 6 Einheiten = 100 €, 4 von 6 = 200 €
+  await expect.poll(() => body(page)).toMatch(/100,00\s€\s*netto/);
+  expect(await body(page)).toMatch(/200,00\s€\s*netto/);
+  await tap(page, btn(page, /^[^A-Za-z]*Speichern/));
+  await expect.poll(async () => (await readDb(page)).firmCosts?.length).toBe(2);
+  const costs = (await readDb(page)).firmCosts;
+  expect(costs.map((c: any) => [c.propertyId, c.net]).sort()).toEqual([['p1', 100], ['p2', 200]]);
+  expect(new Set(costs.map((c: any) => c.splitId)).size).toBe(1);
+  expect(costs.every((c: any) => c.vat === 19 && c.allocatable)).toBe(true);
+});

@@ -5,6 +5,7 @@ import { addDays, dateDE, eur } from './calc';
 import { bankHolder, footerLines, formatIban, returnLine, senderLines, signatureLines, validIban } from './company';
 import { houseId } from './ids';
 import { houseBank, ownersOf } from './owners';
+import { splitByShare } from './ownerStatement';
 
 /**
  * Monatliche Rechnung der Firma an die Eigentümer eines Hauses: Verwaltungsgebühr pro Einheit (netto plus Umsatzsteuer, änderbar)
@@ -145,4 +146,19 @@ export function matchInvoices(db: DB, outgoing: { id: string; date: string; amou
     out.push({ row, invoice: inv, amountOk: Math.abs(Math.abs(row.amount) - inv.gross) < 0.01 });
   }
   return out;
+}
+
+export type SplitBasis = 'einheiten' | 'flaeche' | 'gleich';
+export const SPLIT_LABEL: Record<SplitBasis, string> = { einheiten: 'Nach Einheiten', flaeche: 'Nach Fläche', gleich: 'Zu gleichen Teilen' };
+
+/** Eine Rechnung (netto) auf mehrere Häuser verteilen: nach Einheiten, Wohn- und Nutzfläche oder gleich. Der Rundungsrest geht an das größte Haus, die Summe stimmt immer. */
+export function splitCost(db: DB, propertyIds: string[], totalNet: number, basis: SplitBasis): { propertyId: string; net: number; weight: number }[] {
+  const weight = (id: string) => {
+    const us = db.units.filter((u) => u.propertyId === id);
+    return basis === 'einheiten' ? us.length : basis === 'flaeche' ? us.reduce((a, u) => a + (u.area || 0), 0) : 1;
+  };
+  let ws = propertyIds.map(weight);
+  if (ws.every((w) => w <= 0)) ws = propertyIds.map(() => 1); // Häuser ohne Einheiten oder Fläche: zu gleichen Teilen
+  const parts = splitByShare(totalNet, ws.map((w) => Math.max(0, w)));
+  return propertyIds.map((propertyId, i) => ({ propertyId, net: parts[i], weight: ws[i] }));
 }

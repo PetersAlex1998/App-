@@ -173,3 +173,33 @@ describe('Bezahlte Rechnungen im Kontoauszug erkennen', () => {
     expect(r.outgoing).toEqual([expect.objectContaining({ amount: -190.4, purpose: 'Rechnung R-202611-H01' })]);
   });
 });
+
+describe('Rechnung auf mehrere Häuser aufteilen', () => {
+  const two = () => {
+    const a = house(8).db; const b = house(4, { id: 'p2', name: 'Haus B' });
+    const pb = { ...b.p, id: 'p2', name: 'Haus B' };
+    const ub = Array.from({ length: 4 }, (_, i) => unit('p2', { name: `B${i + 1}`, no: i + 1, area: 100 }));
+    return dbWith({ properties: [...a.properties, pb], units: [...a.units, ...ub] });
+  };
+  it('nach Einheiten: 8 zu 4 Einheiten teilt 300 € in 200 und 100', async () => {
+    const { splitCost } = await import('../../src/firmBilling');
+    const r = splitCost(two(), ['p1', 'p2'], 300, 'einheiten');
+    expect(r.map((x) => x.net)).toEqual([200, 100]);
+  });
+  it('nach Fläche und zu gleichen Teilen', async () => {
+    const { splitCost } = await import('../../src/firmBilling');
+    const db = two(); // Haus A: 8 × 60 m² (Standard der Testdaten), Haus B: 4 × 100 m²
+    const f = splitCost(db, ['p1', 'p2'], 880, 'flaeche').map((x) => x.net);
+    expect(f[0] + f[1]).toBe(880);
+    expect(f[0]).toBeCloseTo((880 * 480) / 880, 2); // 480 m² von 880 m²
+    expect(splitCost(db, ['p1', 'p2'], 101, 'gleich').map((x) => x.net)).toEqual([50.5, 50.5]);
+  });
+  it('Summe stimmt immer, auch bei Rundung und ohne Einheiten', async () => {
+    const { splitCost } = await import('../../src/firmBilling');
+    const leer = dbWith({ properties: [property({ id: 'a' }), property({ id: 'b' }), property({ id: 'c' })] });
+    const r = splitCost(leer, ['a', 'b', 'c'], 100, 'einheiten'); // keine Einheiten → gleiche Teile
+    expect(Math.round(r.reduce((s, x) => s + x.net, 0) * 100) / 100).toBe(100);
+    expect(r.map((x) => x.net).sort()).toEqual([33.33, 33.33, 33.34]);
+    expect(splitCost(two(), ['p1'], 50, 'einheiten')).toEqual([{ propertyId: 'p1', net: 50, weight: 8 }]);
+  });
+});

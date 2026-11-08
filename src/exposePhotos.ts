@@ -3,7 +3,7 @@ import { getBlob } from './files';
 
 /** Fotos der Wohnung und des Hauses (Dokumente der Kategorie Foto), Wohnungsfotos zuerst. */
 export function photoDocs(db: DB, unit: Unit): Doc[] {
-  const ok = (d: Doc) => d.category === 'foto' && /^image\/(jpeg|png|webp)/.test(d.mime);
+  const ok = (d: Doc) => d.category === 'foto' && !d.issueId && /^image\/(jpeg|png|webp)/.test(d.mime); // Schadensfotos kommen nie ins Exposé
   const own = db.documents.filter((d) => ok(d) && d.ownerKind === 'unit' && d.ownerId === unit.id);
   const house = db.documents.filter((d) => ok(d) && d.ownerKind === 'property' && d.ownerId === unit.propertyId);
   return [...own, ...house];

@@ -74,3 +74,19 @@ describe('Aufgaben zu Schäden', () => {
     expect(t(issue({ status: 'erledigt', done: NOW }))).toEqual([]);
   });
 });
+
+describe('Fotos an Schadensmeldungen', () => {
+  const photo = (o: object = {}) => ({ id: 'd1', ownerKind: 'unit' as const, ownerId: 'u', category: 'foto' as const, name: 'Schaden', mime: 'image/jpeg', size: 1, added: NOW, ...o });
+  it('kommen nie ins Exposé', async () => {
+    const { photoDocs } = await import('../../src/exposePhotos');
+    const p = property({ id: 'p' }); const u = unit(p.id, { id: 'u' });
+    const db = dbWith({ properties: [p], units: [u], documents: [photo({ id: 'wohnung' }), photo({ id: 'schaden', issueId: 'i1' })] });
+    expect(photoDocs(db, u).map((d) => d.id)).toEqual(['wohnung']);
+  });
+  it('werden mit der Meldung gelöscht, andere Fotos bleiben', () => {
+    const db = dbWith({ issues: [issue()], documents: [photo({ id: 'a', issueId: 'i1' }), photo({ id: 'b' })] });
+    const { db: after, goneDocs } = removeItem(db, 'issues', 'i1');
+    expect(goneDocs.map((d) => d.id)).toEqual(['a']);
+    expect(after.documents.map((d) => d.id)).toEqual(['b']);
+  });
+});
