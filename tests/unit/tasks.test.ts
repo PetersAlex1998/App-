@@ -81,3 +81,23 @@ describe('Aufgaben: Nebenkosten-Kreislauf', () => {
     expect(computeTasks({ ...db, tenants: [{ ...t, advanceChange: { ...t.advanceChange!, from: '2027-01-01' } }] }, { now: NOW }).some((x) => x.id.startsWith('vorauszahlung:'))).toBe(false);
   });
 });
+
+describe('Sammelaufgaben', () => {
+  const issues = (n: number, over = {}) => Array.from({ length: n }, (_, i) => ({ id: `i${i}`, propertyId: 'p', title: `Schaden ${i}`, reported: '2026-10-01', status: 'offen' as const, ...over }));
+  it('ab sechs gleichartigen Aufgaben wird eine daraus', () => {
+    const t = computeTasks(dbWith({ issues: issues(8) }), { now: NOW });
+    expect(t).toHaveLength(1);
+    expect(t[0]).toMatchObject({ id: 'sammel:schaden:8', title: '8 offene Schäden', screen: 'Schaeden', level: 'normal' });
+    expect(t[0].detail).toContain('Schaden 0');
+  });
+  it('bis fünf bleiben einzeln; die Sammelaufgabe übernimmt die höchste Dringlichkeit', () => {
+    expect(computeTasks(dbWith({ issues: issues(5) }), { now: NOW })).toHaveLength(5);
+    const mixed = [...issues(5), { ...issues(1)[0], id: 'x', urgent: true, title: 'Wasser' }];
+    expect(computeTasks(dbWith({ issues: mixed }), { now: NOW })[0]).toMatchObject({ level: 'hoch', title: '6 offene Schäden' });
+  });
+  it('als erledigt Markiertes zählt nicht mit', () => {
+    const t = computeTasks(dbWith({ issues: issues(7) }), { now: NOW, dismissed: ['schaden:i0:offen', 'schaden:i1:offen'] });
+    expect(t).toHaveLength(5); // 7 − 2 erledigt = 5: wieder einzeln
+    expect(t.some((x) => x.id.startsWith('sammel:'))).toBe(false);
+  });
+});

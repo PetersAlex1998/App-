@@ -51,3 +51,18 @@ export function bigDb(): DB {
   });
   return db;
 }
+
+/** Ausgebauter Bestand: 7 Häuser, 88 Einheiten, ~2.000 Zahlungen plus Eigentümer, Darlehen, Schäden, Prüfungen, Firmenkosten, Kautionen. */
+export function fullDb(): DB {
+  const db = bigDb();
+  const owners = [{ name: 'Max Muster', share: 50 }, { name: 'Erika Muster', share: 30 }, { name: 'Paul Muster', share: 20 }];
+  db.properties = db.properties.map((p) => ({ ...p, owners, bank: { iban: 'DE02120300000000202051' }, purchasePrice: '400000', marketValue: '500000' }));
+  db.loans = db.properties.flatMap((p) => [{ id: `l${p.id}`, propertyId: p.id, name: 'Bank', amount: 300000, start: '2020-01-01', rate: 2.5, repayment: 2, fixedUntil: '2027-12-31' }]);
+  db.issues = db.units.slice(0, 40).map((u, i) => ({ id: `i${i}`, propertyId: u.propertyId, unitId: u.id, title: 'Schaden', reported: '2026-10-01', status: 'offen' as const }));
+  db.checks = db.properties.flatMap((p) => ['heizung', 'rauchmelder', 'schornstein'].map((k) => ({ id: `c${p.id}${k}`, propertyId: p.id, title: k, preset: k, intervalMonths: 12, last: '2025-06-01' })));
+  db.firmCosts = db.properties.map((p) => ({ id: `fc${p.id}`, propertyId: p.id, date: '2026-10-20', description: 'Hausmeister', net: 100, vat: 19, category: 'hausmeister' as const, allocatable: true }));
+  db.tenants = db.tenants.map((t) => ({ ...t, deposit: 1500 }));
+  db.payments = [...db.payments, ...db.tenants.slice(0, 60).map((t, i) => ({ id: `k${i}`, tenantId: t.id, date: '2022-03-03', month: '2022-03', amount: 1500, kind: 'kaution' as const, note: '' }))];
+  return db;
+}
+

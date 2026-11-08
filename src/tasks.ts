@@ -156,5 +156,27 @@ export function computeTasks(db: DB, opts: { dismissed?: string[]; now?: string 
 
   const hidden = new Set(opts.dismissed ?? []);
   const rank = { hoch: 0, normal: 1, hinweis: 2 } as const;
-  return out.filter((t) => !hidden.has(t.id)).sort((a, b) => rank[a.level] - rank[b.level]);
+  return groupTasks(out.filter((t) => !hidden.has(t.id))).sort((a, b) => rank[a.level] - rank[b.level]);
+}
+
+/** Gleichartige Aufgaben ab dieser Anzahl werden zu einer Sammelaufgabe, damit die Liste übersichtlich bleibt. */
+export const GROUP_MIN = 6;
+const GROUPS: { keys: string[]; label: string; screen: string }[] = [
+  { keys: ['schaden'], label: 'offene Schäden', screen: 'Schaeden' },
+  { keys: ['wartung', 'wartung-datum'], label: 'Prüfungen und Wartungen', screen: 'Wartung' },
+  { keys: ['kaution-zurueck', 'kaution-anlage', 'kaution-hoch'], label: 'Kautionen zu klären', screen: 'Kautionen' },
+  { keys: ['einrichten'], label: 'Häuser einzurichten', screen: 'Objekte' },
+];
+function groupTasks(list: Task[]): Task[] {
+  const rank = { hoch: 0, normal: 1, hinweis: 2 } as const;
+  const drop = new Set<string>();
+  const extra: Task[] = [];
+  for (const g of GROUPS) {
+    const items = list.filter((t) => g.keys.includes(t.id.split(':')[0]));
+    if (items.length < GROUP_MIN) continue;
+    items.forEach((t) => drop.add(t.id));
+    const level = items.reduce((m, t) => (rank[t.level] < rank[m] ? t.level : m), items[0].level);
+    extra.push({ id: `sammel:${g.keys[0]}:${items.length}`, level, icon: items[0].icon, title: `${items.length} ${g.label}`, detail: `${items.slice(0, 3).map((t) => t.title).join(' · ')} · …`, screen: g.screen });
+  }
+  return [...list.filter((t) => !drop.has(t.id)), ...extra];
 }
